@@ -78,6 +78,7 @@ optionType
 functionType
     : LPAREN typeList? RPAREN ARROW functionType
     | collectionType
+    | primaryType
     ;
 
 collectionType
