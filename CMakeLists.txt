@@ -17,12 +17,14 @@ set(MYLANG_SOURCES
     src/main.cpp
     src/driver/driver.cpp
     src/ast/builder.hpp
+    src/ast/serializer.cpp
 )
 set(MYLANG_HEADERS
     src/driver/driver.hpp
     src/parser/errorListener.hpp
     src/ast/builder.cpp
     src/ast/nodes.hpp  
+    src/ast/serializer.hpp
 )
 
 # Define executable

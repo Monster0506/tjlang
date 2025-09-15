@@ -517,7 +517,15 @@ std::unique_ptr<ast::Type> ASTBuilder::buildFunctionType(
         
         return funcType;
     } else {
-        return buildCollectionType(ctx->collectionType());
+        // Could be a collection type or a primary type (due to grammar alternative)
+        if (auto coll = ctx->collectionType()) {
+            return buildCollectionType(coll);
+        }
+        if (auto prim = ctx->primaryType()) {
+            return buildPrimaryType(prim);
+        }
+        debugError("buildType: Unrecognized functionType alternative");
+        return nullptr;
     }
 }
 

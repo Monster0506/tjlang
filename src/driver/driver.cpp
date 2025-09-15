@@ -39,6 +39,12 @@ std::unique_ptr<ast::Program> Driver::parseFile(const std::string &filePath, boo
     parser.addErrorListener(&errorListener);
 
     if (debug) {
+        std::cout << "Tokens:" << std::endl;
+        tokens.fill();
+        for (auto t : tokens.getTokens()) {
+            std::cout << "  [" << t->getType() << "] '" << t->getText() << "'";
+            std::cout << " (line " << t->getLine() << ", col " << t->getCharPositionInLine() << ")" << std::endl;
+        }
         std::cout << "Starting parse..." << std::endl;
     }
     // Run parse
