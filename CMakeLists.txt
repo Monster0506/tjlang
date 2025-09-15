@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(MyLang LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(NOT DEFINED ANTLR_GEN_DIR)
@@ -16,11 +16,13 @@ file(GLOB ANTLR_GEN_HEADERS "${ANTLR_GEN_DIR}/*.h" "${ANTLR_GEN_DIR}/*.hpp")
 set(MYLANG_SOURCES
     src/main.cpp
     src/driver/driver.cpp
-    # src/parser/errorListener.cpp
+    src/ast/builder.hpp
 )
 set(MYLANG_HEADERS
     src/driver/driver.hpp
     src/parser/errorListener.hpp
+    src/ast/builder.cpp
+    src/ast/nodes.hpp  
 )
 
 # Define executable

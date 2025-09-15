@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "../ast/builder.hpp"
 #include "../parser/errorListener.hpp"
 #include "LanguageLexer.h"
 #include "LanguageParser.h"
@@ -15,8 +16,10 @@ std::string Driver::readFile(const std::string &path) {
     return ss.str();
 }
 
-bool Driver::parseFile(const std::string &filePath) {
+std::unique_ptr<ast::Program> Driver::parseFile(const std::string &filePath) {
+    std::cout << "Reading file: " << filePath << std::endl;
     std::string source = readFile(filePath);
+    std::cout << "File content:\n" << source << std::endl;
 
     antlr4::ANTLRInputStream input(source);
     LanguageLexer lexer(&input);
@@ -28,18 +31,24 @@ bool Driver::parseFile(const std::string &filePath) {
     parser.removeErrorListeners();
     parser.addErrorListener(&errorListener);
 
+    std::cout << "Starting parse..." << std::endl;
     // Run parse
     antlr4::tree::ParseTree *tree = parser.program();
+    std::cout << "Parse completed." << std::endl;
 
     if (errorListener.hasErrors()) {
+        std::cout << "Parse errors found:" << std::endl;
         for (auto &err : errorListener.errors) {
             std::cerr << filePath << ":" << err.line << ":" << err.charPosition
                       << ": error: " << err.msg << "\n";
         }
-        return false;
+        return nullptr;
     }
 
-    // Print debug parse tree (optional)
-    std::cout << tree->toStringTree(&parser) << "\n";
-    return true;
+    std::cout << "Parse successful, building AST..." << std::endl;
+    // Build AST from parse tree
+    ASTBuilder builder;
+    auto result = builder.build(tree);
+    std::cout << "AST built successfully!" << std::endl;
+    return result;
 }
