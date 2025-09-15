@@ -9,7 +9,7 @@ class Program;
 
 class Driver {
    public:
-    std::unique_ptr<ast::Program> parseFile(const std::string &filePath);
+    std::unique_ptr<ast::Program> parseFile(const std::string &filePath, bool debug = false);
 
    private:
     std::string readFile(const std::string &path);

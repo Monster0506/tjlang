@@ -1,0 +1,11 @@
+def complexMath(a: int, b: int, c: int) -> int {
+    return (a + b) * c - (a / b) % c
+}
+
+def logicalOps(x: bool, y: bool) -> bool {
+    return x and y or not x
+}
+
+def comparisons(a: int, b: int) -> bool {
+    return a == b and a != b and a < b and a > b and a <= b and a >= b
+}

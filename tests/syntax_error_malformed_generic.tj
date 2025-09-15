@@ -1,0 +1,3 @@
+def add<T: Implements[Interface> (x: int, y: int) -> int {
+    return x + y
+}

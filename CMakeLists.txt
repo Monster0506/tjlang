@@ -47,3 +47,4 @@ target_link_libraries(tjlang PRIVATE
 
 message(STATUS "ANTLR_GEN_DIR = ${ANTLR_GEN_DIR}")
 message(STATUS "Added src include dir = ${CMAKE_SOURCE_DIR}/src")
+

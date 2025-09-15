@@ -1,0 +1,4 @@
+def test() -> int {
+    /* This comment is not closed
+    return 42
+}

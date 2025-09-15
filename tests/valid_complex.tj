@@ -1,0 +1,15 @@
+def add(x: int, y: int) -> int {
+    return x + y
+}
+
+def process(data: int) -> int {
+    return data
+}
+
+def optionalValue(value: int) -> int {
+    return value
+}
+
+def unionType(x: int) -> int {
+    return x
+}

@@ -1,0 +1,7 @@
+def testLiterals() -> string {
+    let intVal = 42
+    let floatVal = 3.14
+    let stringVal = "Hello, World!"
+    let boolVal = true
+    return stringVal
+}

@@ -1,0 +1,11 @@
+def add(x: int, y: int) -> int {
+    return x + y
+}
+
+def greet(name: string) -> string {
+    return "Hello, " + name
+}
+
+def isEven(n: int) -> bool {
+    return n % 2 == 0
+}
