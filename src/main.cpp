@@ -5,7 +5,6 @@
 
 #include "LanguageLexer.h"
 #include "LanguageParser.h"
-#include "antlr4-runtime.h"
 
 static std::string readFile(const std::string &path) {
     std::ifstream in(path, std::ios::binary);

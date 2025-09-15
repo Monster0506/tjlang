@@ -1,2 +1,7 @@
 build/
 gen/
+cmake/
+.cache/
+build-ninja/
+cmakefiles/
+cmakecache.txt
