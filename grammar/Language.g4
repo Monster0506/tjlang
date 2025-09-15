@@ -64,17 +64,66 @@ typeDecl
 
 /* ----- Types ----- */
 type
+    : unionType
+    ;
+
+unionType
+    : optionType (PIPE optionType)*
+    ;
+
+optionType
+    : QUESTION? functionType
+    ;
+
+functionType
+    : LPAREN typeList? RPAREN ARROW functionType
+    | collectionType
+    ;
+
+collectionType
+    : vecType
+    | setType
+    | mapType
+    | tupleType
+    ;
+
+vecType
+    : LBRACK type RBRACK
+    ;
+
+setType
+    : LBRACE type RBRACE
+    ;
+
+mapType
+    : primaryType LT type COMMA type GT
+    ;
+
+tupleType
+    : LPAREN type (COMMA type)+ RPAREN
+    ;
+
+primaryType
     : primitiveType
     | IDENTIFIER (typeParams)?
-    | type PIPE type
-    | QUESTION type
+    | RESULT LT type COMMA type GT
+    | OPTION LT type GT
     ;
 
 primitiveType
     : INT | FLOAT | BOOL | STR | ANY
     ;
 
+typeList
+    : type (COMMA type)*
+    ;
+
 typeParams
+    : LT type (COMMA type)* GT
+    ;
+
+// Generic type parameter list (for function declarations)
+genericTypeParams
     : LT type (COMMA type)* GT
     ;
 
@@ -139,6 +188,21 @@ paramList
 
 param
     : IDENTIFIER COLON type
+    ;
+
+// Simple type for function parameters (avoids left recursion)
+simpleType
+    : primitiveType
+    | IDENTIFIER (simpleTypeParams)?
+    | LBRACK simpleType RBRACK
+    | LBRACE simpleType RBRACE
+    | LPAREN simpleType (COMMA simpleType)+ RPAREN
+    | QUESTION simpleType
+    | RESULT LT simpleType COMMA simpleType GT
+    ;
+
+simpleTypeParams
+    : LT simpleType (COMMA simpleType)* GT
     ;
 
 /* ----- Variables ----- */
@@ -234,6 +298,41 @@ literal
     | FLOAT_LITERAL
     | STRING_LITERAL
     | FSTRING_LITERAL
+    | BOOL_LITERAL
+    | NONE
+    | collectionLiteral
+    | tupleLiteral
+    | structLiteral
+    ;
+
+collectionLiteral
+    : vecLiteral
+    | setLiteral
+    | mapLiteral
+    ;
+
+vecLiteral
+    : LBRACK (expression (COMMA expression)*)? RBRACK
+    ;
+
+setLiteral
+    : LBRACE (expression (COMMA expression)*)? RBRACE
+    ;
+
+mapLiteral
+    : LBRACE (mapEntry (COMMA mapEntry)*)? RBRACE
+    ;
+
+mapEntry
+    : expression COLON expression
+    ;
+
+tupleLiteral
+    : LPAREN expression (COMMA expression)+ RPAREN
+    ;
+
+structLiteral
+    : IDENTIFIER LBRACE fieldInit (COMMA fieldInit)* RBRACE
     ;
 
 /* ----- Expressions ----- */
@@ -357,6 +456,10 @@ BOOL        : 'bool' ;
 STR         : 'str' ;
 ANY         : 'any' ;
 
+// Built-in Types
+RESULT      : 'Result' ;
+OPTION      : 'Option' ;
+
 // Symbols
 ARROW       : '->' ;
 ASSIGN      : '=' ;
@@ -392,6 +495,8 @@ INT_LITERAL     : [0-9]+ ;
 FLOAT_LITERAL   : [0-9]+ '.' [0-9]+ ;
 STRING_LITERAL  : '"' (~["\r\n])* '"' ;
 FSTRING_LITERAL : 'f"' ( ~["{}] | '{' ~["}]* '}' )* '"' ;
+BOOL_LITERAL    : 'true' | 'false' ;
+NONE            : 'None' ;
 
 // Identifier
 IDENTIFIER

@@ -1,0 +1,81 @@
+# Comprehensive Type System Test Suite
+
+# 1. Primitive Types
+def test_primitives() -> int {
+    let x: int = 42
+    let y: float = 3.14
+    let z: bool = true
+    let s: str = "hello"
+    return x
+}
+
+# 2. Collection Types
+def test_vectors() -> [int] {
+    let nums: [int] = [1, 2, 3, 4, 5]
+    return nums
+}
+
+def test_sets() -> {int} {
+    let unique_nums: {int} = {1, 2, 3, 4, 5}
+    return unique_nums
+}
+
+def test_maps() -> int<str> {
+    let mapping: int<str> = {"a": 1, "b": 2, "c": 3}
+    return mapping
+}
+
+# 3. Tuple Types
+def test_tuples() -> (int, str, bool) {
+    let point: (int, int) = (10, 20)
+    let data: (int, str, bool) = (42, "hello", true)
+    return data
+}
+
+# 4. Optional Types
+def test_optionals() -> ?int {
+    let maybe_value: ?int = 42
+    let no_value: ?int = null
+    return maybe_value
+}
+
+# 5. Result Types
+def test_results() -> Result<int, str> {
+    let success: Result<int, str> = Ok(42)
+    let failure: Result<int, str> = Err("something went wrong")
+    return success
+}
+
+# 6. Union Types
+def test_unions() -> int | str {
+    let value: int | str = 42
+    return value
+}
+
+# 7. Function Types
+def test_function_types() -> (int, int) -> int {
+    let add_func: (int, int) -> int = (x: int, y: int) -> int { return x + y }
+    return add_func
+}
+
+# 8. Nested Types
+def test_nested_types() -> [?(int, str)] {
+    let complex: [?(int, str)] = [Some((1, "a")), None, Some((2, "b"))]
+    return complex
+}
+
+# 9. Generic-like Types
+def test_generic_types() -> Result<[int], str> {
+    let result: Result<[int], str> = Ok([1, 2, 3])
+    return result
+}
+
+# 10. Complex Combinations
+def test_complex_combinations() -> {Result<(int, str), str>} {
+    let complex_set: {Result<(int, str), str>} = {
+        Ok((1, "a")),
+        Ok((2, "b")),
+        Err("error")
+    }
+    return complex_set
+}

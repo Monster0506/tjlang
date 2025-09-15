@@ -42,6 +42,11 @@ class ASTBuilder {
 
     // Helper methods
     std::unique_ptr<ast::Type> buildType(LanguageParser::TypeContext* ctx);
+    std::unique_ptr<ast::Type> buildOptionType(LanguageParser::OptionTypeContext* ctx);
+    std::unique_ptr<ast::Type> buildFunctionType(LanguageParser::FunctionTypeContext* ctx);
+    std::unique_ptr<ast::Type> buildCollectionType(LanguageParser::CollectionTypeContext* ctx);
+    std::unique_ptr<ast::Type> buildPrimaryType(LanguageParser::PrimaryTypeContext* ctx);
+    std::unique_ptr<ast::Type> buildSimpleType(LanguageParser::SimpleTypeContext* ctx);
 
    private:
     bool debugMode = false;

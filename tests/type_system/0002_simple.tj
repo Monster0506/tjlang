@@ -1,0 +1,35 @@
+def test_primitives() -> int {
+    return 42
+}
+
+def test_vectors() -> [int] {
+    return [1, 2, 3]
+}
+
+def test_sets() -> {int} {
+    return {1, 2, 3}
+}
+
+def test_tuples() -> (int, str) {
+    return (42, "hello")
+}
+
+def test_optionals() -> ?int {
+    return 42
+}
+
+def test_results() -> Result<int, str> {
+    return Ok(42)
+}
+
+def test_nested_vectors() -> [[int]] {
+    return [[1, 2], [3, 4]]
+}
+
+def test_complex_tuple() -> (int, [str], ?bool) {
+    return (42, ["a", "b"], true)
+}
+
+def test_result_with_tuple() -> Result<(int, str), str> {
+    return Ok((42, "success"))
+}

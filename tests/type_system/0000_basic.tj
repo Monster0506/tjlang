@@ -1,0 +1,27 @@
+def add(x: int, y: int) -> int {
+    return x + y
+}
+
+def process_numbers(nums: [int]) -> int {
+    return nums[0] + nums[1]
+}
+
+def create_point(x: int, y: int) -> (int, int) {
+    return (x, y)
+}
+
+def maybe_value(x: int) -> ?int {
+    if x > 0 {
+        return x
+    } else {
+        return null
+    }
+}
+
+def handle_result(x: int) -> Result<int, str> {
+    if x >= 0 {
+        return Ok(x)
+    } else {
+        return Err("negative number")
+    }
+}

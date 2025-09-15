@@ -96,34 +96,34 @@ std::unique_ptr<ast::Node> ASTBuilder::visitFunctionDecl(
         fn->name = ctx->IDENTIFIER()->getText();
         debug("visitFunctionDecl: Function name = " + fn->name);
 
-    // Build parameters
-    debug("visitFunctionDecl: Checking for parameter list...");
-    if (auto plist = ctx->paramList()) {
-        debug("visitFunctionDecl: Found parameter list with " + std::to_string(plist->param().size()) + " parameters");
-        for (size_t i = 0; i < plist->param().size(); ++i) {
-            auto p = plist->param(i);
-            ast::Param param;
-            param.name = p->IDENTIFIER()->getText();
-            debug("visitFunctionDecl: Parameter " + std::to_string(i) + " name = " + param.name);
-            debug("visitFunctionDecl: Building parameter type...");
-            param.type = buildType(p->type());
-            if (!param.type) {
-                debugError("visitFunctionDecl: Failed to build parameter type for " + param.name);
-                return nullptr;
+        // Build parameters
+        debug("visitFunctionDecl: Checking for parameter list...");
+        if (auto plist = ctx->paramList()) {
+            debug("visitFunctionDecl: Found parameter list with " + std::to_string(plist->param().size()) + " parameters");
+            for (size_t i = 0; i < plist->param().size(); ++i) {
+                auto p = plist->param(i);
+                ast::Param param;
+                param.name = p->IDENTIFIER()->getText();
+                debug("visitFunctionDecl: Parameter " + std::to_string(i) + " name = " + param.name);
+                debug("visitFunctionDecl: Building parameter type...");
+                param.type = buildType(p->type());
+                if (!param.type) {
+                    debugError("visitFunctionDecl: Failed to build parameter type for " + param.name);
+                    return nullptr;
+                }
+                fn->params.push_back(std::move(param));
             }
-            fn->params.push_back(std::move(param));
+        } else {
+            debug("visitFunctionDecl: No parameter list found");
         }
-    } else {
-        debug("visitFunctionDecl: No parameter list found");
-    }
-    
-    // Build return type
-    debug("visitFunctionDecl: Building return type");
-    fn->returnType = buildType(ctx->type());
-    if (!fn->returnType) {
-        debugError("visitFunctionDecl: Failed to build return type");
-        return nullptr;
-    }
+
+        // Build return type
+        debug("visitFunctionDecl: Building return type");
+        fn->returnType = buildType(ctx->type());
+        if (!fn->returnType) {
+            debugError("visitFunctionDecl: Failed to build return type");
+            return nullptr;
+        }
     
     // Build body
     debug("visitFunctionDecl: Building function body");
@@ -433,43 +433,46 @@ std::unique_ptr<ast::Type> ASTBuilder::buildType(
     debug("buildType: Starting type building");
     debug("buildType: Type text = '" + ctx->getText() + "'");
     
-    auto type = make<ast::Type>();
-
-    if (auto primitive = ctx->primitiveType()) {
-        type->name = primitive->getText();
-        debug("buildType: Primitive type = " + type->name);
-        return type;
-    }
-
-    if (auto id = ctx->IDENTIFIER()) {
-        type->name = id->getText();
-        debug("buildType: Identifier type = " + type->name);
-
-        if (auto typeParams = ctx->typeParams()) {
-            debug("buildType: Found type parameters with " + std::to_string(typeParams->type().size()) + " args");
-            for (size_t i = 0; i < typeParams->type().size(); ++i) {
-                auto param = typeParams->type(i);
-                debug("buildType: Building type parameter " + std::to_string(i));
-                auto paramType = buildType(param);
-                if (paramType) {
-                    type->args.push_back(std::move(paramType));
+    // Handle union types: Type1 | Type2 | Type3
+    if (auto unionCtx = ctx->unionType()) {
+        auto types = unionCtx->optionType();
+        if (types.size() > 1) {
+            auto unionType = make<ast::Type>();
+            unionType->kind = ast::Type::Kind::UNION;
+            unionType->name = "Union";
+            
+            for (auto optionCtx : types) {
+                auto innerType = buildOptionType(optionCtx);
+                if (innerType) {
+                    unionType->args.push_back(std::move(innerType));
                 } else {
-                    debugError("buildType: Failed to build type parameter " + std::to_string(i));
+                    debugError("buildType: Failed to build union component");
                     return nullptr;
                 }
             }
+            return unionType;
         } else {
-            debug("buildType: No type parameters found");
+            return buildOptionType(types[0]);
         }
-        return type;
     }
+    
+    // Fallback
+    debug("buildType: Using fallback - type text = '" + ctx->getText() + "'");
+    auto type = make<ast::Type>();
+    type->kind = ast::Type::Kind::NAMED;
+    type->name = ctx->getText();
+    return type;
+}
 
+std::unique_ptr<ast::Type> ASTBuilder::buildOptionType(
+    LanguageParser::OptionTypeContext* ctx) {
     if (ctx->QUESTION()) {
         debug("buildType: Optional type detected");
-        // Optional type: ?Type becomes Option<Type>
         auto optionType = make<ast::Type>();
+        optionType->kind = ast::Type::Kind::OPTION;
         optionType->name = "Option";
-        auto innerType = buildType(ctx->type(0));
+        
+        auto innerType = buildFunctionType(ctx->functionType());
         if (innerType) {
             optionType->args.push_back(std::move(innerType));
         } else {
@@ -477,27 +480,303 @@ std::unique_ptr<ast::Type> ASTBuilder::buildType(
             return nullptr;
         }
         return optionType;
+    } else {
+        return buildFunctionType(ctx->functionType());
     }
+}
 
-    if (ctx->PIPE()) {
-        debug("buildType: Union type detected");
-        // Union type: Type1 | Type2 becomes Union<Type1, Type2>
-        auto unionType = make<ast::Type>();
-        unionType->name = "Union";
-        auto type1 = buildType(ctx->type(0));
-        auto type2 = buildType(ctx->type(1));
-        if (type1 && type2) {
-            unionType->args.push_back(std::move(type1));
-            unionType->args.push_back(std::move(type2));
+std::unique_ptr<ast::Type> ASTBuilder::buildFunctionType(
+    LanguageParser::FunctionTypeContext* ctx) {
+    if (ctx->LPAREN()) {
+        debug("buildType: Function type detected");
+        auto funcType = make<ast::Type>();
+        funcType->kind = ast::Type::Kind::FUNCTION;
+        funcType->name = "Function";
+        
+        // Build parameter types
+        if (auto typeList = ctx->typeList()) {
+            for (auto paramType : typeList->type()) {
+                auto param = buildType(paramType);
+                if (param) {
+                    funcType->args.push_back(std::move(param));
+                } else {
+                    debugError("buildType: Failed to build function parameter type");
+                    return nullptr;
+                }
+            }
+        }
+        
+        // Build return type
+        auto returnType = buildFunctionType(ctx->functionType());
+        if (returnType) {
+            funcType->args.push_back(std::move(returnType));
         } else {
-            debugError("buildType: Failed to build union type components");
+            debugError("buildType: Failed to build function return type");
             return nullptr;
         }
-        return unionType;
+        
+        return funcType;
+    } else {
+        return buildCollectionType(ctx->collectionType());
     }
+}
 
-    // Fallback
-    debug("buildType: Using fallback - type text = '" + ctx->getText() + "'");
-    type->name = ctx->getText();
-    return type;
+std::unique_ptr<ast::Type> ASTBuilder::buildCollectionType(
+    LanguageParser::CollectionTypeContext* ctx) {
+    if (auto vecCtx = ctx->vecType()) {
+        debug("buildType: Vector type detected");
+        auto vecType = make<ast::Type>();
+        vecType->kind = ast::Type::Kind::VEC;
+        vecType->name = "Vec";
+        
+        auto elementType = buildType(vecCtx->type());
+        if (elementType) {
+            vecType->args.push_back(std::move(elementType));
+        } else {
+            debugError("buildType: Failed to build vector element type");
+            return nullptr;
+        }
+        return vecType;
+    }
+    
+    if (auto setCtx = ctx->setType()) {
+        debug("buildType: Set type detected");
+        auto setType = make<ast::Type>();
+        setType->kind = ast::Type::Kind::SET;
+        setType->name = "Set";
+        
+        auto elementType = buildType(setCtx->type());
+        if (elementType) {
+            setType->args.push_back(std::move(elementType));
+        } else {
+            debugError("buildType: Failed to build set element type");
+            return nullptr;
+        }
+        return setType;
+    }
+    
+    if (auto mapCtx = ctx->mapType()) {
+        debug("buildType: Map type detected");
+        auto mapType = make<ast::Type>();
+        mapType->kind = ast::Type::Kind::MAP;
+        mapType->name = "Map";
+        
+        auto keyType = buildType(mapCtx->type(0));
+        auto valueType = buildType(mapCtx->type(1));
+        if (keyType && valueType) {
+            mapType->args.push_back(std::move(keyType));
+            mapType->args.push_back(std::move(valueType));
+        } else {
+            debugError("buildType: Failed to build map key/value types");
+            return nullptr;
+        }
+        return mapType;
+    }
+    
+    if (auto tupleCtx = ctx->tupleType()) {
+        debug("buildType: Tuple type detected");
+        auto tupleType = make<ast::Type>();
+        tupleType->kind = ast::Type::Kind::TUPLE;
+        tupleType->name = "Tuple";
+        
+        for (auto elementType : tupleCtx->type()) {
+            auto element = buildType(elementType);
+            if (element) {
+                tupleType->args.push_back(std::move(element));
+            } else {
+                debugError("buildType: Failed to build tuple element type");
+                return nullptr;
+            }
+        }
+        return tupleType;
+    }
+    
+    return nullptr;
+}
+
+std::unique_ptr<ast::Type> ASTBuilder::buildPrimaryType(
+    LanguageParser::PrimaryTypeContext* ctx) {
+    if (auto primitive = ctx->primitiveType()) {
+        auto type = make<ast::Type>();
+        type->kind = ast::Type::Kind::PRIMITIVE;
+        type->name = primitive->getText();
+        debug("buildType: Primitive type = " + type->name);
+        return type;
+    }
+    
+    if (auto id = ctx->IDENTIFIER()) {
+        auto type = make<ast::Type>();
+        type->kind = ast::Type::Kind::NAMED;
+        type->name = id->getText();
+        debug("buildType: Identifier type = " + type->name);
+        
+        if (auto typeParams = ctx->typeParams()) {
+            debug("buildType: Found type parameters with " + std::to_string(typeParams->type().size()) + " args");
+            for (auto param : typeParams->type()) {
+                auto paramType = buildType(param);
+                if (paramType) {
+                    type->args.push_back(std::move(paramType));
+                } else {
+                    debugError("buildType: Failed to build type parameter");
+                    return nullptr;
+                }
+            }
+        }
+        return type;
+    }
+    
+    if (auto resultCtx = ctx->RESULT()) {
+        debug("buildType: Result type detected");
+        auto resultType = make<ast::Type>();
+        resultType->kind = ast::Type::Kind::RESULT;
+        resultType->name = "Result";
+        
+        // Parse Result<OkType, ErrType>
+        auto types = ctx->type();
+        if (types.size() >= 2) {
+            auto okType = buildType(types[0]);
+            auto errType = buildType(types[1]);
+            if (okType && errType) {
+                resultType->args.push_back(std::move(okType));
+                resultType->args.push_back(std::move(errType));
+            } else {
+                debugError("buildType: Failed to build Result type components");
+                return nullptr;
+            }
+        } else {
+            debugError("buildType: Result type needs exactly 2 type parameters");
+            return nullptr;
+        }
+        return resultType;
+    }
+    
+    return nullptr;
+}
+
+std::unique_ptr<ast::Type> ASTBuilder::buildSimpleType(
+    LanguageParser::SimpleTypeContext* ctx) {
+    debug("buildSimpleType: Starting simple type building");
+    debug("buildSimpleType: Type text = '" + ctx->getText() + "'");
+    
+    if (auto primitive = ctx->primitiveType()) {
+        auto type = make<ast::Type>();
+        type->kind = ast::Type::Kind::PRIMITIVE;
+        type->name = primitive->getText();
+        debug("buildSimpleType: Primitive type = " + type->name);
+        return type;
+    }
+    
+    if (auto id = ctx->IDENTIFIER()) {
+        auto type = make<ast::Type>();
+        type->kind = ast::Type::Kind::NAMED;
+        type->name = id->getText();
+        debug("buildSimpleType: Identifier type = " + type->name);
+        
+        if (auto typeParams = ctx->simpleTypeParams()) {
+            debug("buildSimpleType: Found type parameters with " + std::to_string(typeParams->simpleType().size()) + " args");
+            for (auto param : typeParams->simpleType()) {
+                auto paramType = buildSimpleType(param);
+                if (paramType) {
+                    type->args.push_back(std::move(paramType));
+                } else {
+                    debugError("buildSimpleType: Failed to build type parameter");
+                    return nullptr;
+                }
+            }
+        }
+        return type;
+    }
+    
+    if (ctx->LBRACK()) {
+        debug("buildSimpleType: Vector type detected");
+        auto vecType = make<ast::Type>();
+        vecType->kind = ast::Type::Kind::VEC;
+        vecType->name = "Vec";
+        
+        auto elementType = buildSimpleType(ctx->simpleType(0));
+        if (elementType) {
+            vecType->args.push_back(std::move(elementType));
+        } else {
+            debugError("buildSimpleType: Failed to build vector element type");
+            return nullptr;
+        }
+        return vecType;
+    }
+    
+    if (ctx->LBRACE()) {
+        debug("buildSimpleType: Set type detected");
+        auto setType = make<ast::Type>();
+        setType->kind = ast::Type::Kind::SET;
+        setType->name = "Set";
+        
+        auto elementType = buildSimpleType(ctx->simpleType(0));
+        if (elementType) {
+            setType->args.push_back(std::move(elementType));
+        } else {
+            debugError("buildSimpleType: Failed to build set element type");
+            return nullptr;
+        }
+        return setType;
+    }
+    
+    if (ctx->LPAREN()) {
+        debug("buildSimpleType: Tuple type detected");
+        auto tupleType = make<ast::Type>();
+        tupleType->kind = ast::Type::Kind::TUPLE;
+        tupleType->name = "Tuple";
+        
+        for (auto elementType : ctx->simpleType()) {
+            auto element = buildSimpleType(elementType);
+            if (element) {
+                tupleType->args.push_back(std::move(element));
+            } else {
+                debugError("buildSimpleType: Failed to build tuple element type");
+                return nullptr;
+            }
+        }
+        return tupleType;
+    }
+    
+    if (ctx->QUESTION()) {
+        debug("buildSimpleType: Optional type detected");
+        auto optionType = make<ast::Type>();
+        optionType->kind = ast::Type::Kind::OPTION;
+        optionType->name = "Option";
+        
+        auto innerType = buildSimpleType(ctx->simpleType(0));
+        if (innerType) {
+            optionType->args.push_back(std::move(innerType));
+        } else {
+            debugError("buildSimpleType: Failed to build inner type for optional");
+            return nullptr;
+        }
+        return optionType;
+    }
+    
+    if (ctx->RESULT()) {
+        debug("buildSimpleType: Result type detected");
+        auto resultType = make<ast::Type>();
+        resultType->kind = ast::Type::Kind::RESULT;
+        resultType->name = "Result";
+        
+        // Parse Result<OkType, ErrType>
+        auto types = ctx->simpleType();
+        if (types.size() >= 2) {
+            auto okType = buildSimpleType(types[0]);
+            auto errType = buildSimpleType(types[1]);
+            if (okType && errType) {
+                resultType->args.push_back(std::move(okType));
+                resultType->args.push_back(std::move(errType));
+            } else {
+                debugError("buildSimpleType: Failed to build Result type components");
+                return nullptr;
+            }
+        } else {
+            debugError("buildSimpleType: Result type needs exactly 2 type parameters");
+            return nullptr;
+        }
+        return resultType;
+    }
+    
+    return nullptr;
 }

@@ -4,74 +4,81 @@
 Write-Host "=== TJ Language Compiler Test Suite ===" -ForegroundColor Green
 Write-Host ""
 
-# Valid test cases
-Write-Host "=== VALID TEST CASES ===" -ForegroundColor Yellow
-$validTests = @(
-    "valid_simple.tj",
-    "valid_complex.tj", 
-    "valid_expressions.tj",
-    "valid_literals.tj"
-)
+# Initialize counters
+$totalTests = 0
+$passedTests = 0
+$failedTests = 0
 
-foreach ($test in $validTests) {
-    Write-Host "Testing: $test" -ForegroundColor Cyan
-    $result = & ".\build\Release\tjlang.exe" "tests\$test" 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "  ✅ PASSED" -ForegroundColor Green
-    } else {
-        Write-Host "  ❌ FAILED" -ForegroundColor Red
-        Write-Host "  Output: $result" -ForegroundColor Red
+# Function to run tests from a folder
+function Run-TestCategory {
+    param(
+        [string]$CategoryName,
+        [string]$FolderPath,
+        [bool]$ShouldFail = $false
+    )
+    
+    Write-Host "=== $CategoryName ===" -ForegroundColor Yellow
+    
+    $testFiles = Get-ChildItem -Path "tests\$FolderPath" -Filter "*.tj" | Sort-Object Name
+    $categoryPassed = 0
+    $categoryFailed = 0
+    
+    foreach ($testFile in $testFiles) {
+        $testPath = "$FolderPath\$($testFile.Name)"
+        Write-Host "Testing: $testPath" -ForegroundColor Cyan
+        
+        $result = & ".\build\Release\tjlang.exe" "tests\$testPath" 2>&1
+        $script:totalTests++
+        
+        if ($ShouldFail) {
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "  CORRECTLY FAILED" -ForegroundColor Green
+                Write-Host "  Error: $($result -join ' ')" -ForegroundColor Yellow
+                $categoryPassed++
+                $script:passedTests++
+            } else {
+                Write-Host "  SHOULD HAVE FAILED" -ForegroundColor Red
+                $categoryFailed++
+                $script:failedTests++
+            }
+        } else {
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  PASSED" -ForegroundColor Green
+                $categoryPassed++
+                $script:passedTests++
+            } else {
+                Write-Host "  FAILED" -ForegroundColor Red
+                Write-Host "  Output: $result" -ForegroundColor Red
+                $categoryFailed++
+                $script:failedTests++
+            }
+        }
+        Write-Host ""
     }
+    
+    Write-Host "Category Results: $categoryPassed passed, $categoryFailed failed" -ForegroundColor Gray
     Write-Host ""
 }
 
-# Lexical error test cases
-Write-Host "=== LEXICAL ERROR TEST CASES ===" -ForegroundColor Yellow
-$lexErrorTests = @(
-    "lex_error_unclosed_string.tj",
-    "lex_error_invalid_char.tj",
-    "lex_error_unclosed_comment.tj",
-    "lex_error_invalid_number.tj",
-    "lex_error_invalid_escape.tj"
-)
+# Run all test categories
+Run-TestCategory "VALID TEST CASES - FUNCTIONS" "valid\functions"
+Run-TestCategory "VALID TEST CASES - EXPRESSIONS" "valid\expressions"
+Run-TestCategory "VALID TEST CASES - LITERALS" "valid\literals"
+Run-TestCategory "TYPE SYSTEM TEST CASES" "type_system"
+Run-TestCategory "LEXICAL ERROR TEST CASES" "lexer\errors" -ShouldFail $true
+Run-TestCategory "SYNTAX ERROR TEST CASES" "syntax\errors" -ShouldFail $true
 
-foreach ($test in $lexErrorTests) {
-    Write-Host "Testing: $test" -ForegroundColor Cyan
-    $result = & ".\build\Release\tjlang.exe" "tests\$test" 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "  ✅ CORRECTLY FAILED (Lexical Error)" -ForegroundColor Green
-        Write-Host "  Error: $($result -join ' ')" -ForegroundColor Yellow
-    } else {
-        Write-Host "  ❌ SHOULD HAVE FAILED" -ForegroundColor Red
-    }
-    Write-Host ""
+# Summary
+Write-Host "=== TEST SUITE SUMMARY ===" -ForegroundColor Green
+Write-Host "Total Tests: $totalTests" -ForegroundColor White
+Write-Host "Passed: $passedTests" -ForegroundColor Green
+Write-Host "Failed: $failedTests" -ForegroundColor Red
+
+if ($failedTests -eq 0) {
+    Write-Host "All tests passed!" -ForegroundColor Green
+} else {
+    Write-Host " Some tests failed. Please review the output above." -ForegroundColor Yellow
 }
 
-# Syntax error test cases
-Write-Host "=== SYNTAX ERROR TEST CASES ===" -ForegroundColor Yellow
-$syntaxErrorTests = @(
-    "syntax_error_missing_paren.tj",
-    "syntax_error_missing_brace.tj",
-    "syntax_error_missing_colon.tj",
-    "syntax_error_missing_arrow.tj",
-    "syntax_error_invalid_type.tj",
-    "syntax_error_missing_def.tj",
-    "syntax_error_missing_return.tj",
-    "syntax_error_extra_semicolon.tj",
-    "syntax_error_malformed_generic.tj",
-    "syntax_error_missing_comma.tj"
-)
-
-foreach ($test in $syntaxErrorTests) {
-    Write-Host "Testing: $test" -ForegroundColor Cyan
-    $result = & ".\build\Release\tjlang.exe" "tests\$test" 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "  ✅ CORRECTLY FAILED (Syntax Error)" -ForegroundColor Green
-        Write-Host "  Error: $($result -join ' ')" -ForegroundColor Yellow
-    } else {
-        Write-Host "  ❌ SHOULD HAVE FAILED" -ForegroundColor Red
-    }
-    Write-Host ""
-}
-
+Write-Host ""
 Write-Host "=== Test Suite Complete ===" -ForegroundColor Green
