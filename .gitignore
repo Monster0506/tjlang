@@ -3,5 +3,6 @@ gen/
 cmake/
 .cache/
 build-ninja/
+compile_commands.json
 cmakefiles/
 cmakecache.txt
