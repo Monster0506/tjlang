@@ -18,21 +18,22 @@ void FunctionLengthRule::checkFunctionLength(const ast::FunctionDecl& func, std:
 
     int statementCount = countStatements(*func.body);
     
-    if (statementCount > 50) {
-        Issue issue;
-        issue.severity = Issue::Severity::Warning;
-        issue.rule = "long-function";
-        issue.message = "Function '" + func.name + "' is very long (" + std::to_string(statementCount) + " statements). Consider breaking it into smaller functions";
-        issue.location = "Function '" + func.name + "'";
-        issues.push_back(issue);
-    } else if (statementCount > 30) {
-        Issue issue;
-        issue.severity = Issue::Severity::Info;
-        issue.rule = "long-function";
-        issue.message = "Function '" + func.name + "' is quite long (" + std::to_string(statementCount) + " statements). Consider if it could be refactored";
-        issue.location = "Function '" + func.name + "'";
-        issues.push_back(issue);
-    }
+    // Disabled for now - function length detection needs better implementation
+    // if (statementCount > 10) {
+    //     Issue issue;
+    //     issue.severity = Issue::Severity::Warning;
+    //     issue.rule = "long-function";
+    //     issue.message = "Function '" + func.name + "' is very long (" + std::to_string(statementCount) + " statements). Consider breaking it into smaller functions";
+    //     issue.location = "Function '" + func.name + "'";
+    //     issues.push_back(issue);
+    // } else if (statementCount > 5) {
+    //     Issue issue;
+    //     issue.severity = Issue::Severity::Info;
+    //     issue.rule = "long-function";
+    //     issue.message = "Function '" + func.name + "' is quite long (" + std::to_string(statementCount) + " statements). Consider if it could be refactored";
+    //     issue.location = "Function '" + func.name + "'";
+    //     issues.push_back(issue);
+    // }
 }
 
 int FunctionLengthRule::countStatements(const ast::Block& block) {
@@ -50,14 +51,24 @@ int FunctionLengthRule::countStatements(const ast::Stmt* stmt) {
     int count = 1;
 
     if (auto blk = dynamic_cast<const ast::Block*>(stmt)) {
-        count += countStatements(*blk) - 1; // -1 because we already counted the block itself
+        int blockCount = countStatements(*blk);
+        count += blockCount - 1; // -1 because we already counted the block itself
+        std::cout << "[COUNT_STATEMENTS] Block has " << blockCount << " statements" << std::endl;
     } else if (auto iff = dynamic_cast<const ast::IfStmt*>(stmt)) {
-        count += countStatements(*iff->thenBlock);
+        // Count the if statement itself (already counted as 1)
+        // Plus all nested statements
+        int thenCount = countStatements(*iff->thenBlock);
+        count += thenCount;
+        std::cout << "[COUNT_STATEMENTS] IfStmt thenBlock has " << thenCount << " statements" << std::endl;
         for (auto& p : iff->elifBranches) {
-            count += countStatements(*p.second);
+            int elifCount = countStatements(*p.second);
+            count += elifCount;
+            std::cout << "[COUNT_STATEMENTS] IfStmt elif has " << elifCount << " statements" << std::endl;
         }
         if (iff->elseBlock) {
-            count += countStatements(*iff->elseBlock);
+            int elseCount = countStatements(*iff->elseBlock);
+            count += elseCount;
+            std::cout << "[COUNT_STATEMENTS] IfStmt elseBlock has " << elseCount << " statements" << std::endl;
         }
     } else if (auto wh = dynamic_cast<const ast::WhileStmt*>(stmt)) {
         count += countStatements(*wh->body);

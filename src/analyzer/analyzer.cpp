@@ -1,19 +1,19 @@
 #include <iostream>
 
 #include "analyzer.hpp"
-#include "rules/rules_duplicate_names.hpp"
-#include "rules/rules_unreachable_code.hpp"
-#include "rules/rules_unused_params.hpp"
-#include "rules/rules_unused_variables.hpp"
-#include "rules/rules_dead_code.hpp"
-#include "rules/rules_constant_conditions.hpp"
-#include "rules/rules_type_safety.hpp"
 #include "rules/rules_complexity.hpp"
+#include "rules/rules_constant_conditions.hpp"
+#include "rules/rules_dead_code.hpp"
+#include "rules/rules_duplicate_names.hpp"
 #include "rules/rules_empty_functions.hpp"
 #include "rules/rules_function_length.hpp"
 #include "rules/rules_long_params.hpp"
 #include "rules/rules_magic_numbers.hpp"
 #include "rules/rules_naming_conventions.hpp"
+#include "rules/rules_type_safety.hpp"
+#include "rules/rules_unreachable_code.hpp"
+#include "rules/rules_unused_params.hpp"
+#include "rules/rules_unused_variables.hpp"
 
 namespace analyzer {
 
@@ -27,7 +27,7 @@ StaticAnalyzer::StaticAnalyzer() {
     addRule(std::make_unique<ConstantConditionsRule>());
     addRule(std::make_unique<TypeSafetyRule>());
     addRule(std::make_unique<ComplexityRule>());
-    
+
     // Code quality rules
     addRule(std::make_unique<EmptyFunctionsRule>());
     addRule(std::make_unique<FunctionLengthRule>());
@@ -50,7 +50,8 @@ std::vector<Issue> StaticAnalyzer::analyze(const ast::Program& program) {
     }
     for (size_t i = 0; i < rules.size(); ++i) {
         if (debug_) {
-            std::cout << "[ANALYZE] Running rule " << i << "...\n";
+            std::cout << "[ANALYZE] Running rule " << i << ": '"
+                      << rules[i]->getName() << "'...\n";
         }
         rules[i]->analyzeProgram(program, issues);
     }

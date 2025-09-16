@@ -22,6 +22,7 @@ class AnalysisRule {
     virtual ~AnalysisRule() = default;
     virtual void analyzeProgram(const ast::Program& program,
                                 std::vector<Issue>& issues) = 0;
+    virtual std::string getName() const = 0;
 };
 
 class StaticAnalyzer {
