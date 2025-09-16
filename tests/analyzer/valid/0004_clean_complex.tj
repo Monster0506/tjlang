@@ -1,0 +1,11 @@
+def calculate(a: int, b: int) -> int {
+    if (a > b) {
+        return a - b
+    } else {
+        return b - a
+    }
+}
+
+def process(x: int) -> int {
+    return x * 2
+}

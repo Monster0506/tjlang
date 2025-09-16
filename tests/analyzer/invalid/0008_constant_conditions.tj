@@ -1,0 +1,19 @@
+def constantConditions() -> int {
+    if (true) {
+        return 1
+    }
+    
+    if (false) {
+        return 2
+    }
+    
+    if (5 > 3) {
+        return 3
+    }
+    
+    if (2 == 3) {
+        return 4
+    }
+    
+    return 0
+}

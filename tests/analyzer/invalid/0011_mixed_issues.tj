@@ -1,0 +1,16 @@
+def mixedIssuesFunction(x: int, x: int) -> int {
+    # Duplicate parameter names
+    return x
+}
+
+def duplicateFunctionName(a: int) -> int {
+    return a * 2
+}
+
+def duplicateFunctionName(b: int) -> int {
+    return b + 1
+}
+
+def unusedParameterExample(unused: int, used: int) -> int {
+    return used
+}

@@ -1,0 +1,11 @@
+def process(x: int) -> int {
+    return x * 2
+}
+
+def process(y: int) -> int {
+    return y * 3
+}
+
+def process(z: int) -> int {
+    return z * 4
+}

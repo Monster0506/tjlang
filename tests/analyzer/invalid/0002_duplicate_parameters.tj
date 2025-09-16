@@ -1,0 +1,7 @@
+def bad_params(x: int, x: int) -> int {
+    return x
+}
+
+def another_bad(a: int, b: int, a: int) -> int {
+    return a + b
+}

@@ -1,10 +1,11 @@
-#include <iostream>
-#include <exception>
 #include <csignal>
+#include <exception>
+#include <iostream>
 
+#include "analyzer/analyzer.hpp"
 #include "ast/nodes.hpp"
-#include "ast/serializer.hpp"
 #include "driver/driver.hpp"
+#include "serializer/serializer.hpp"
 
 static void signalHandler(int sig) {
     std::cerr << "Signal caught: " << sig << "\n";
@@ -13,32 +14,38 @@ static void signalHandler(int sig) {
 }
 
 static void setupCrashHandlers() {
-    std::set_terminate([](){
+    std::set_terminate([]() {
         std::cerr << "std::terminate called (unhandled exception).\n";
-        try { throw; }
-        catch (const std::exception& ex) { std::cerr << "Exception: " << ex.what() << "\n"; }
-        catch (...) { std::cerr << "Unknown exception.\n"; }
+        try {
+            throw;
+        } catch (const std::exception& ex) {
+            std::cerr << "Exception: " << ex.what() << "\n";
+        } catch (...) {
+            std::cerr << "Unknown exception.\n";
+        }
         std::abort();
     });
     std::signal(SIGABRT, signalHandler);
     std::signal(SIGSEGV, signalHandler);
 }
 
-int main(int argc, const char **argv) {
+int main(int argc, const char** argv) {
     setupCrashHandlers();
     if (argc < 2) {
-        std::cerr << "Usage: mylang <source-file> [--debug] [--emit-ast[=<path>]]\n";
+        std::cerr
+            << "Usage: mylang <source-file> [--debug] [--emit-ast[=<path>]]\n";
         std::cerr << "  --debug: Enable debug output\n";
-        std::cerr << "  --emit-ast: Write AST to <source-file>.tjast (or to <path> if provided)\n";
+        std::cerr << "  --emit-ast: Write AST to <source-file>.tjast (or to "
+                     "<path> if provided)\n";
         return 1;
     }
-
 
     bool debug = false;
     bool emitAst = false;
     std::string emitAstPath;
     std::string filename = argv[1];
-    
+    bool analyze = false;
+
     // Parse flags (very simple)
     for (int i = 2; i < argc; ++i) {
         std::string arg = argv[i];
@@ -50,6 +57,8 @@ int main(int argc, const char **argv) {
             if (eq != std::string::npos && eq + 1 < arg.size()) {
                 emitAstPath = arg.substr(eq + 1);
             }
+        } else if (arg == "--analyze") {
+            analyze = true;
         }
     }
 
@@ -67,7 +76,7 @@ int main(int argc, const char **argv) {
         if (emitAst) {
             std::string outPath = emitAstPath;
             if (outPath.empty()) {
-                outPath = filename + ".tjast"; // TJ AST JSON
+                outPath = filename + ".tjast";  // TJ AST JSON
             }
             std::cout << "Emitting AST to: " << outPath << "\n";
             if (!astio::writeAstToFile(*ast, outPath)) {
@@ -75,6 +84,16 @@ int main(int argc, const char **argv) {
                 return 1;
             }
             std::cout << "AST written to: " << outPath << "\n";
+        }
+
+        if (analyze) {
+            // Use the unified parseAndAnalyze method
+            auto analyzedAst = driver.parseAndAnalyze(filename, debug, true);
+            if (!analyzedAst) {
+                return 1; // Issues were found and reported by the unified error listener
+            }
+            // If we get here, analysis passed
+            std::cout << "No issues found.\n";
         }
     } catch (const std::exception& ex) {
         std::cerr << "Unhandled error: " << ex.what() << "\n";

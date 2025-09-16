@@ -1,0 +1,7 @@
+def all_unused(a: int, b: int, c: int) -> int {
+    return 42
+}
+
+def some_unused(x: int, y: int, z: int) -> int {
+    return x + z
+}

@@ -1,0 +1,14 @@
+def typeSafetyIssues() -> int {
+    # This function should trigger type safety analysis issues
+    return 42
+}
+
+def anotherTypeIssue(a: int, b: string) -> int {
+    # This function should also trigger type safety analysis issues
+    return a
+}
+
+def typeSafetyExample() -> int {
+    # This function name suggests type safety issues
+    return 0
+}

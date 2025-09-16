@@ -1,0 +1,7 @@
+def unused_param(x: int, y: int) -> int {
+    return x
+}
+
+def another_unused(a: int, b: int, c: int) -> int {
+    return a + c
+}

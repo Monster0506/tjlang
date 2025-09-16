@@ -1,0 +1,22 @@
+# Test file for clean code quality
+
+# Well-named function with good parameters
+def calculateTotal(price: int, taxRate: float) -> int {
+    return price + (price * taxRate)
+}
+
+# Function with reasonable length
+def processData(items: int) -> int {
+    if (items > 0) {
+        return items * 2
+    } else {
+        return 0
+    }
+}
+
+# Function with good naming and no magic numbers
+def isValidAge(age: int) -> bool {
+    const MIN_AGE = 0
+    const MAX_AGE = 150
+    return age >= MIN_AGE && age <= MAX_AGE
+}

@@ -16,15 +16,51 @@ file(GLOB ANTLR_GEN_HEADERS "${ANTLR_GEN_DIR}/*.h" "${ANTLR_GEN_DIR}/*.hpp")
 set(MYLANG_SOURCES
     src/main.cpp
     src/driver/driver.cpp
-    src/ast/builder.hpp
-    src/ast/serializer.cpp
+    src/builder/builder.hpp
+    src/serializer/serializer.cpp
+    src/analyzer/analyzer.cpp
+    src/analyzer/rules/rules_unused_params.cpp
+    src/analyzer/rules/rules_unused_variables.cpp
+    src/analyzer/rules/rules_duplicate_names.cpp
+    src/analyzer/rules/rules_unreachable_code.cpp
+    src/analyzer/rules/rules_dead_code.cpp
+    src/analyzer/rules/rules_constant_conditions.cpp
+    src/analyzer/rules/rules_type_safety.cpp
+    src/analyzer/rules/rules_complexity.cpp
+    src/analyzer/rules/rules_empty_functions.cpp
+    src/analyzer/rules/rules_function_length.cpp
+    src/analyzer/rules/rules_long_params.cpp
+    src/analyzer/rules/rules_magic_numbers.cpp
+    src/analyzer/rules/rules_naming_conventions.cpp
+    src/parser/errorFormatter.cpp
+    src/parser/suggestionEngine.cpp
+    src/parser/errorCategories.cpp
+    src/parser/unifiedErrorListener.cpp
 )
 set(MYLANG_HEADERS
     src/driver/driver.hpp
     src/parser/errorListener.hpp
-    src/ast/builder.cpp
+    src/parser/unifiedErrorListener.hpp
+    src/parser/errorFormatter.hpp
+    src/parser/suggestionEngine.hpp
+    src/parser/errorCategories.hpp
+    src/builder/builder.cpp
     src/ast/nodes.hpp  
-    src/ast/serializer.hpp
+    src/serializer/serializer.hpp
+    src/analyzer/analyzer.hpp
+    src/analyzer/rules/rules_unused_params.hpp
+    src/analyzer/rules/rules_unused_variables.hpp
+    src/analyzer/rules/rules_duplicate_names.hpp
+    src/analyzer/rules/rules_unreachable_code.hpp
+    src/analyzer/rules/rules_dead_code.hpp
+    src/analyzer/rules/rules_constant_conditions.hpp
+    src/analyzer/rules/rules_type_safety.hpp
+    src/analyzer/rules/rules_complexity.hpp
+    src/analyzer/rules/rules_empty_functions.hpp
+    src/analyzer/rules/rules_function_length.hpp
+    src/analyzer/rules/rules_long_params.hpp
+    src/analyzer/rules/rules_magic_numbers.hpp
+    src/analyzer/rules/rules_naming_conventions.hpp
 )
 
 # Define executable

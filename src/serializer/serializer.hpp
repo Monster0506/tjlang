@@ -1,7 +1,8 @@
 #pragma once
 
 #include <string>
-#include "nodes.hpp"
+
+#include "../ast/nodes.hpp"
 
 namespace astio {
 
@@ -9,6 +10,4 @@ namespace astio {
 // Returns true on success, false otherwise.
 bool writeAstToFile(const ast::Program& program, const std::string& filePath);
 
-} // namespace astio
-
-
+}  // namespace astio

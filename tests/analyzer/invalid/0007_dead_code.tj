@@ -1,0 +1,15 @@
+def deadCodeExample(x: int) -> int {
+    return x * 2
+    # This line should be flagged as dead code
+    let unused = x + 1
+    return x + 5
+}
+
+def anotherDeadCode() -> int {
+    if (true) {
+        return 42
+        # Dead code after return
+        let dead = 100
+    }
+    return 0
+}
