@@ -1,0 +1,17 @@
+# Missing Semicolons and Braces
+
+def incomplete_function {
+    return 42
+  # Missing closing brace
+
+def missing_paren(x: int -> int {
+    return x
+}
+
+def missing_brace(x: int) -> int
+    return x
+
+# Missing semicolon
+x: int = 42
+y: int = 10  # Missing semicolon
+z: int = 5

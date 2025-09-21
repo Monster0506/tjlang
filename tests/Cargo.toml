@@ -1,0 +1,12 @@
+[package]
+name = "tjlang-tests"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "test_runner"
+path = "test_runner.rs"
+
+[dependencies]
+codespan = "0.12.0"
+tjlang-lexer = { version = "0.1.0", path = "../tjlang-lexer" }

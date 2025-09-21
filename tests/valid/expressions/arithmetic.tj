@@ -1,0 +1,26 @@
+# Arithmetic Expressions
+
+def arithmetic_ops() -> int {
+    a: int = 10 + 5 * 2
+    b: int = (10 + 5) * 2
+    c: int = 20 / 4
+    d: int = 17 % 5
+    e: int = 2 ** 8
+    
+    return a + b + c + d + e
+}
+
+def float_arithmetic() -> float {
+    x: float = 3.14 + 2.86
+    y: float = 10.0 / 3.0
+    z: float = 2.5 ** 2.0
+    
+    return x * y + z
+}
+
+def precedence_test() -> int {
+    # Test operator precedence
+    result: int = 2 + 3 * 4 - 5 / 2
+    # Should be: 2 + 12 - 2 = 12
+    return result
+}

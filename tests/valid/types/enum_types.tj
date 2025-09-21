@@ -1,0 +1,44 @@
+# Enum Types
+
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+enum Result[T, E] {
+    Ok(T),
+    Err(E)
+}
+
+enum Option[T] {
+    Some(T),
+    None
+}
+
+def create_color() -> Color {
+    return Color.Red
+}
+
+def create_result() -> Result[int, str] {
+    return Ok(42)
+}
+
+def create_option() -> Option[str] {
+    return Some("hello")
+}
+
+def match_color(c: Color) -> str {
+    match c {
+        Color.Red: { return "red" }
+        Color.Green: { return "green" }
+        Color.Blue: { return "blue" }
+    }
+}
+
+def match_result(r: Result[int, str]) -> str {
+    match r {
+        Ok(value: int): { return f"Success: {value}" }
+        Err(error: str): { return f"Error: {error}" }
+    }
+}

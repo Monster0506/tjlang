@@ -1,0 +1,41 @@
+# If Statements
+
+def simple_if(x: int) -> str {
+    if x > 0 {
+        return "positive"
+    } else {
+        return "negative or zero"
+    }
+}
+
+def if_elif_else(x: int) -> str {
+    if x > 0 {
+        return "positive"
+    } elif x < 0 {
+        return "negative"
+    } else {
+        return "zero"
+    }
+}
+
+def nested_if(x: int, y: int) -> str {
+    if x > 0 {
+        if y > 0 {
+            return "both positive"
+        } else {
+            return "x positive, y not"
+        }
+    } else {
+        return "x not positive"
+    }
+}
+
+def complex_condition(x: int, y: int) -> str {
+    if x > 0 and y > 0 {
+        return "both positive"
+    } elif x > 0 or y > 0 {
+        return "at least one positive"
+    } else {
+        return "neither positive"
+    }
+}

@@ -1,0 +1,41 @@
+# Pattern Matching
+
+def match_int(x: int) -> str {
+    match x {
+        0: { return "zero" }
+        1: { return "one" }
+        42: { return "the answer" }
+        n: int: { return f"number {n}" }
+    }
+}
+
+def match_option(opt: Option[int]) -> str {
+    match opt {
+        Some(value: int): { return f"Some {value}" }
+        None: { return "None" }
+    }
+}
+
+def match_result(res: Result[int, str]) -> str {
+    match res {
+        Ok(value: int): { return f"Ok {value}" }
+        Err(error: str): { return f"Err {error}" }
+    }
+}
+
+def match_tuple(tup: (int, str)) -> str {
+    match tup {
+        (0, s: str): { return f"zero with {s}" }
+        (n: int, "hello"): { return f"{n} with hello" }
+        (a: int, b: str): { return f"{a} with {b}" }
+    }
+}
+
+def match_array(arr: [int]) -> str {
+    match arr {
+        []: { return "empty" }
+        [x: int]: { return f"single {x}" }
+        [x: int, y: int]: { return f"pair {x}, {y}" }
+        [x: int, ..rest: [int]]: { return f"starts with {x}, rest has {rest.len()} items" }
+    }
+}

@@ -1,0 +1,35 @@
+# Logical Operations
+
+def logical_and() -> bool {
+    return true and false
+}
+
+def logical_or() -> bool {
+    return true or false
+}
+
+def logical_not() -> bool {
+    return not false
+}
+
+def complex_logical() -> bool {
+    a: bool = true
+    b: bool = false
+    c: bool = true
+    
+    return (a and b) or (not c)
+}
+
+def comparison_ops() -> [bool] {
+    x: int = 10
+    y: int = 5
+    
+    return [
+        x == y,
+        x != y,
+        x < y,
+        x <= y,
+        x > y,
+        x >= y
+    ]
+}

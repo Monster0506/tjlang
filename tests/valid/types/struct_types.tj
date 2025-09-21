@@ -1,0 +1,38 @@
+# Struct Types
+
+type Point {
+    x: int,
+    y: int
+}
+
+type Person {
+    name: str,
+    age: int,
+    email: str
+}
+
+type Pair[T, U] {
+    first: T,
+    second: U
+}
+
+def create_point() -> Point {
+    return Point{x: 10, y: 20}
+}
+
+def create_person() -> Person {
+    return Person{
+        name: "Alice",
+        age: 30,
+        email: "alice@example.com"
+    }
+}
+
+def create_pair() -> Pair[int, str] {
+    return Pair{first: 42, second: "hello"}
+}
+
+def access_fields() -> int {
+    point: Point = Point{x: 5, y: 10}
+    return point.x + point.y
+}

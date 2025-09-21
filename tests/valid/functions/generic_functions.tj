@@ -1,0 +1,25 @@
+# Generic Functions
+
+def identity[T](x: T) -> T {
+    return x
+}
+
+def swap[T, U](pair: (T, U)) -> (U, T) {
+    return (pair.1, pair.0)
+}
+
+def first[T](items: [T]) -> Option[T] {
+    if items.len() > 0 {
+        return Some(items[0])
+    } else {
+        return None
+    }
+}
+
+def map[T, U](items: [T], f: (T) -> U) -> [U] {
+    result: [U] = []
+    for (item: T | items) {
+        result.append(f(item))
+    }
+    return result
+}
