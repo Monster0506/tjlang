@@ -1,0 +1,11 @@
+[package]
+name = "tjlang-lexer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+codespan = "0.12.0"
+codespan-reporting = "0.12.0"
+logos = "0.15.1"
+thiserror = "2.0.16"
+tjlang-diagnostics = { version = "0.1.0", path = "../tjlang-diagnostics" }

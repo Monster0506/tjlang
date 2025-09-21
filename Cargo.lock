@@ -552,10 +552,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tjlang-examples"
+version = "0.1.0"
+dependencies = [
+ "codespan",
+ "tjlang-lexer",
+]
+
+[[package]]
 name = "tjlang-lexer"
 version = "0.1.0"
 dependencies = [
  "codespan",
+ "codespan-reporting",
  "logos",
  "thiserror 2.0.16",
  "tjlang-diagnostics",

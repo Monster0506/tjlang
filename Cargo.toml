@@ -16,7 +16,8 @@ members = [
     "tjlang-codegen",
     "tjlang-runtime",
     "tjlang-diagnostics",
-    "tjlang-cli"
+    "tjlang-cli",
+    "examples"
 ]
 
 [dependencies]
