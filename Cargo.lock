@@ -590,6 +590,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tjlang-tests"
+version = "0.1.0"
+dependencies = [
+ "codespan",
+ "tjlang-lexer",
+]
+
+[[package]]
 name = "tjlang-tir"
 version = "0.1.0"
 dependencies = [
