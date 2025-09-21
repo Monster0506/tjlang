@@ -1,0 +1,33 @@
+[package]
+name = "tjlang"
+version = "0.1.0"
+edition = "2021"
+authors = ["TJ"]
+description = "A statically typed, compiled language with algebraic data types and pattern matching"
+license = "MIT"
+
+[workspace]
+members = [
+    "tjlang-lexer",
+    "tjlang-parser", 
+    "tjlang-ast",
+    "tjlang-analyzer",
+    "tjlang-tir",
+    "tjlang-codegen",
+    "tjlang-runtime",
+    "tjlang-diagnostics",
+    "tjlang-cli"
+]
+
+[dependencies]
+anyhow = "1.0.100"
+clap = "4.5.48"
+codespan = "0.12.0"
+codespan-reporting = "0.12.0"
+inkwell = "0.6.0"
+llvm-sys = "211.0.0"
+logos = "0.15.1"
+miette = "7.6.0"
+serde = "1.0.226"
+serde_json = "1.0.145"
+thiserror = "2.0.16"
