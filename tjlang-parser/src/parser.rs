@@ -69,7 +69,6 @@ impl PestParser {
                             }
                         }
                         Rule::function_decl => {
-                            println!("Parsing function_decl at program level");
                             let func_decl = self.parse_function_decl(inner)?;
                             units.push(ProgramUnit::Declaration(Declaration::Function(func_decl)));
                         }
@@ -705,33 +704,58 @@ impl PestParser {
         
         let mut inner = pair_clone.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
         
-        // Skip "def" keyword
-        inner.next().ok_or("Missing 'def' keyword")?;
-        
-        // Parse function name
+        // Parse function name (first token after filtering whitespace)
         let name = inner.next().ok_or("Missing function name")?.as_str().to_string();
         
         // Parse generic parameters (optional)
-        let mut generic_params = Vec::new();
+        let generic_params = Vec::new();
         let mut params = Vec::new();
         
-        // Based on debug output, the grammar produces: identifier, type_, block
-        // So we just need to handle these three tokens directly
+        // Check what the next token is
+        if let Some(next_token) = inner.next() {
+            match next_token.as_rule() {
+                Rule::param_list => {
+                    // Function has parameters
+                    params = self.parse_param_list(next_token)?;
+                    
+                    // Parse return type (next token should be type_)
+                    let return_type = self.parse_type(inner.next().ok_or("Missing return type")?)?;
+                    
+                    // Parse function body (next token should be block)
+                    let body = self.parse_block(inner.next().ok_or("Missing function body")?)?;
+                    
+                    return Ok(FunctionDecl {
+                        name,
+                        generic_params,
+                        params,
+                        return_type,
+                        body,
+                        span: self.create_span(span),
+                    });
+                }
+                Rule::type_ => {
+                    // Function has no parameters
+                    let return_type = self.parse_type(next_token)?;
+                    
+                    // Parse function body (next token should be block)
+                    let body = self.parse_block(inner.next().ok_or("Missing function body")?)?;
+                    
+                    return Ok(FunctionDecl {
+                        name,
+                        generic_params,
+                        params,
+                        return_type,
+                        body,
+                        span: self.create_span(span),
+                    });
+                }
+                _ => {
+                    return Err(format!("Expected param_list or type_, got {:?}", next_token.as_rule()).into());
+                }
+            }
+        }
         
-        // Parse return type (next token should be type_)
-        let return_type = self.parse_type(inner.next().ok_or("Missing return type")?)?;
-        
-        // Parse function body (next token should be block)
-        let body = self.parse_block(inner.next().ok_or("Missing function body")?)?;
-        
-        Ok(FunctionDecl {
-            name,
-            generic_params,
-            params,
-            return_type,
-            body,
-            span: self.create_span(span),
-        })
+        Err("Missing return type or parameters".into())
     }
     
     /// Parse generic parameters
@@ -819,9 +843,6 @@ impl PestParser {
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
         
         let name = inner.next().ok_or("Missing parameter name")?.as_str().to_string();
-        
-        // Skip colon
-        inner.next().ok_or("Missing ':'")?;
         
         let param_type = self.parse_type(inner.next().ok_or("Missing parameter type")?)?;
         
