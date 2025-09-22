@@ -1,6 +1,6 @@
 // Minimal TJLang Grammar for pest
 program = { SOI ~ statement* ~ EOI }
-statement = { variable_decl ~ ";" | expression ~ ";" | block }
+statement = { variable_decl | expression | block }
 block = { "{" ~ statement* ~ "}" }
 variable_decl = { identifier ~ ":" ~ type_ ~ "=" ~ expression }
 type_ = { primitive_type | identifier }

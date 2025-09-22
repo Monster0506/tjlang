@@ -2,20 +2,13 @@
 //! 
 //! Pest-based parser for TJLang source code.
 
-pub mod pest_parser;
-
-// Keep the old parser for reference/fallback (disabled for now)
-// pub mod parser;
-// pub mod declarations;
-// pub mod types;
-// pub mod statements;
-// pub mod expressions;
+pub mod parser;
 
 #[cfg(test)]
 mod tests;
 
 /// Main pest parser
-pub use pest_parser::PestParser;
+pub use parser::PestParser;
 
 /// Parse TJLang source code into an AST using pest
 pub fn parse(source: &str, file_id: codespan::FileId) -> Result<(tjlang_ast::Program, tjlang_diagnostics::DiagnosticCollection), tjlang_diagnostics::DiagnosticCollection> {
