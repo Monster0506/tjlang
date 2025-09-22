@@ -581,6 +581,36 @@ mod tests {
     }
 
     #[test]
+    fn test_grammar_parse_type_decl() {
+        use pest::Parser;
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+
+        let source = "type MyType = int | str";
+        let result = TJLangPestParser::parse(Rule::type_decl, source);
+
+        match result {
+            Ok(pairs) => {
+                println!("Type declaration grammar parse successful!");
+                for pair in pairs {
+                    println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    for inner in pair.into_inner() {
+                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        for inner2 in inner.into_inner() {
+                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                        }
+                    }
+                }
+                assert!(true, "Type declaration grammar should parse successfully");
+            }
+            Err(e) => {
+                println!("Type declaration grammar parse failed: {}", e);
+                panic!("Type declaration grammar should parse successfully");
+            }
+        }
+    }
+
+    #[test]
     fn test_grammar_parse_map_type() {
         use pest::Parser;
         use crate::parser::TJLangPestParser;
@@ -607,6 +637,51 @@ mod tests {
                 println!("Map type grammar parse failed: {}", e);
                 panic!("Map type grammar should parse successfully");
             }
+        }
+    }
+
+    #[test]
+    fn test_parse_custom_type_declarations() {
+        let test_cases = vec![
+            // Type aliases
+            "type MyType = int | str",
+            "type Point = (int, int)",
+            "type Callback = () -> void",
+            
+            // Struct declarations
+            "type Point { x: int, y: int }",
+            "type Person { name: str, age: int }",
+            "type Complex { real: float, imag: float }",
+            
+            // Enum declarations
+            "enum Option<T> { Some(T), None }",
+            "enum Result<T, E> { Ok(T), Err(E) }",
+            "enum Color { Red, Green, Blue }",
+            
+            // Interface declarations
+            "interface Drawable { draw(): void }",
+            "interface Comparable<T> { compare(other: T): int }",
+            "interface Iterator<T> { next(): Option<T> }",
+            
+            // Implementation blocks
+            "impl Drawable for Point { def draw(): void { } }",
+            "impl Comparable<Point> for Point { def compare(other: Point): int { 0 } }",
+        ];
+
+        for source in test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+
+            match &result {
+                Ok(_program) => {
+                    println!("Successfully parsed custom type: {}", source);
+                }
+                Err(e) => {
+                    println!("Failed to parse custom type '{}': {}", source, e);
+                }
+            }
+
+            assert!(result.is_ok(), "Failed to parse custom type declaration: {}", source);
         }
     }
 

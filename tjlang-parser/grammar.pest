@@ -4,7 +4,7 @@ COMMENT = { "#" ~ (!"\n" ~ ANY)* }
 
 program = { SOI ~ program_unit* ~ EOI }
 
-program_unit = { function_decl | statement }
+program_unit = { function_decl | type_decl | struct_decl | enum_decl | interface_decl | impl_block | statement }
 
 // Statements
 statement = { 
@@ -55,6 +55,29 @@ param_list = { param ~ ("," ~ param)* }
 param = { identifier ~ ":" ~ type_ }
 
 identifier_list = { identifier ~ ("," ~ identifier)* }
+
+// Custom type declarations
+type_decl = { "type" ~ identifier ~ "=" ~ type_ }
+
+struct_decl = { "type" ~ identifier ~ "{" ~ field_decl ~ ("," ~ field_decl)* ~ "}" }
+
+field_decl = { identifier ~ ":" ~ type_ }
+
+enum_decl = { "enum" ~ identifier ~ (type_params)? ~ "{" ~ enum_variant ~ ("," ~ enum_variant)* ~ "}" }
+
+enum_variant = { identifier ~ ("(" ~ variant_fields? ~ ")")? }
+
+variant_fields = { type_ ~ ("," ~ type_)* }
+
+interface_decl = { "interface" ~ identifier ~ ("extends" ~ identifier_list)? ~ "{" ~ method_sig ~ ("," ~ method_sig)* ~ "}" }
+
+method_sig = { (identifier | operator_symbol) ~ "(" ~ param_list? ~ ")" ~ "->" ~ type_ }
+
+operator_symbol = { "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "[]" | "or" | "and" | "!" }
+
+impl_block = { identifier ~ "for" ~ identifier ~ "{" ~ method_decl+ ~ "}" }
+
+method_decl = { "def" ~ (identifier | operator_symbol) ~ "(" ~ param_list? ~ ")" ~ "->" ~ type_ ~ block }
 
 // Types
 type_ = { union_type }

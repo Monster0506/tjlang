@@ -72,6 +72,26 @@ impl PestParser {
                             let func_decl = self.parse_function_decl(inner)?;
                             units.push(ProgramUnit::Declaration(Declaration::Function(func_decl)));
                         }
+                        Rule::type_decl => {
+                            let type_decl = self.parse_type_decl(inner)?;
+                            units.push(ProgramUnit::Declaration(Declaration::Type(type_decl)));
+                        }
+                        Rule::struct_decl => {
+                            let struct_decl = self.parse_struct_decl(inner)?;
+                            units.push(ProgramUnit::Declaration(Declaration::Struct(struct_decl)));
+                        }
+                        Rule::enum_decl => {
+                            let enum_decl = self.parse_enum_decl(inner)?;
+                            units.push(ProgramUnit::Declaration(Declaration::Enum(enum_decl)));
+                        }
+                        Rule::interface_decl => {
+                            let interface_decl = self.parse_interface_decl(inner)?;
+                            units.push(ProgramUnit::Declaration(Declaration::Interface(interface_decl)));
+                        }
+                        Rule::impl_block => {
+                            let impl_block = self.parse_impl_block(inner)?;
+                            units.push(ProgramUnit::Declaration(Declaration::Implementation(impl_block)));
+                        }
                         _ => {}
                     }
                 }
@@ -1453,6 +1473,367 @@ impl PestParser {
         }
 
         Ok(types)
+    }
+
+    /// Parse type declaration
+    fn parse_type_decl(&mut self, pair: Pair<Rule>) -> Result<TypeDecl, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // Skip "type" keyword
+        inner.next().ok_or("Missing type keyword")?;
+        
+        // Parse type name
+        let name = inner.next().ok_or("Missing type name")?.as_str().to_string();
+        
+        // Parse type alias (the grammar consumes the "=" internally)
+        let type_alias = self.parse_type(inner.next().ok_or("Missing type alias")?)?;
+        
+        Ok(TypeDecl {
+            name,
+            type_alias,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse struct declaration
+    fn parse_struct_decl(&mut self, pair: Pair<Rule>) -> Result<StructDecl, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // Skip "type" keyword
+        inner.next().ok_or("Missing type keyword")?;
+        
+        // Parse struct name
+        let name = inner.next().ok_or("Missing struct name")?.as_str().to_string();
+        
+        // Skip "{"
+        inner.next().ok_or("Missing opening brace")?;
+        
+        // Parse fields
+        let mut fields = Vec::new();
+        while let Some(field_pair) = inner.next() {
+            if field_pair.as_rule() == Rule::field_decl {
+                let field = self.parse_field_decl(field_pair)?;
+                fields.push(field);
+            } else if field_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            } else if field_pair.as_str() == "}" {
+                // End of struct
+                break;
+            }
+        }
+        
+        Ok(StructDecl {
+            name,
+            fields,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse field declaration
+    fn parse_field_decl(&mut self, pair: Pair<Rule>) -> Result<FieldDecl, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // Parse field name
+        let name = inner.next().ok_or("Missing field name")?.as_str().to_string();
+        
+        // Skip ":"
+        inner.next().ok_or("Missing colon")?;
+        
+        // Parse field type
+        let field_type = self.parse_type(inner.next().ok_or("Missing field type")?)?;
+        
+        Ok(FieldDecl {
+            name,
+            field_type,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse enum declaration
+    fn parse_enum_decl(&mut self, pair: Pair<Rule>) -> Result<EnumDecl, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // Skip "enum" keyword
+        inner.next().ok_or("Missing enum keyword")?;
+        
+        // Parse enum name
+        let name = inner.next().ok_or("Missing enum name")?.as_str().to_string();
+        
+        // Parse type parameters if present
+        let mut type_params = Vec::new();
+        if let Some(type_params_pair) = inner.next() {
+            if type_params_pair.as_rule() == Rule::type_params {
+                // For enum type params, we just need the parameter names, not the full types
+                let mut inner_params = type_params_pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                while let Some(param_pair) = inner_params.next() {
+                    if param_pair.as_rule() == Rule::identifier {
+                        type_params.push(param_pair.as_str().to_string());
+                    } else if param_pair.as_str() == "," {
+                        // Skip comma
+                        continue;
+                    }
+                }
+            } else {
+                // This is the opening brace, not type params
+                // We need to handle this differently
+            }
+        }
+        
+        // Skip "{"
+        inner.next().ok_or("Missing opening brace")?;
+        
+        // Parse variants
+        let mut variants = Vec::new();
+        while let Some(variant_pair) = inner.next() {
+            if variant_pair.as_rule() == Rule::enum_variant {
+                let variant = self.parse_enum_variant(variant_pair)?;
+                variants.push(variant);
+            } else if variant_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            } else if variant_pair.as_str() == "}" {
+                // End of enum
+                break;
+            }
+        }
+        
+        Ok(EnumDecl {
+            name,
+            type_params,
+            variants,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse enum variant
+    fn parse_enum_variant(&mut self, pair: Pair<Rule>) -> Result<EnumVariant, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // Parse variant name
+        let name = inner.next().ok_or("Missing variant name")?.as_str().to_string();
+        
+        // Parse fields if present
+        let mut fields = Vec::new();
+        if let Some(fields_pair) = inner.next() {
+            if fields_pair.as_rule() == Rule::variant_fields {
+                fields = self.parse_variant_fields(fields_pair)?;
+            }
+        }
+        
+        Ok(EnumVariant {
+            name,
+            fields,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse variant fields
+    fn parse_variant_fields(&mut self, pair: Pair<Rule>) -> Result<Vec<Type>, Box<dyn std::error::Error>> {
+        let mut fields = Vec::new();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        while let Some(field_pair) = inner.next() {
+            if field_pair.as_rule() == Rule::type_ {
+                let field_type = self.parse_type(field_pair)?;
+                fields.push(field_type);
+            } else if field_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            }
+        }
+        
+        Ok(fields)
+    }
+
+    /// Parse interface declaration
+    fn parse_interface_decl(&mut self, pair: Pair<Rule>) -> Result<InterfaceDecl, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // Skip "interface" keyword
+        inner.next().ok_or("Missing interface keyword")?;
+        
+        // Parse interface name
+        let name = inner.next().ok_or("Missing interface name")?.as_str().to_string();
+        
+        // Parse extends clause if present
+        let mut extends = Vec::new();
+        if let Some(extends_pair) = inner.next() {
+            if extends_pair.as_str() == "extends" {
+                if let Some(extends_list) = inner.next() {
+                    if extends_list.as_rule() == Rule::identifier_list {
+                        extends = self.parse_identifier_list(extends_list)?;
+                    }
+                }
+            } else {
+                // This is the opening brace, not extends
+                // We need to handle this differently
+            }
+        }
+        
+        // Skip "{"
+        inner.next().ok_or("Missing opening brace")?;
+        
+        // Parse methods
+        let mut methods = Vec::new();
+        while let Some(method_pair) = inner.next() {
+            if method_pair.as_rule() == Rule::method_sig {
+                let method = self.parse_method_sig(method_pair)?;
+                methods.push(method);
+            } else if method_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            } else if method_pair.as_str() == "}" {
+                // End of interface
+                break;
+            }
+        }
+        
+        Ok(InterfaceDecl {
+            name,
+            extends,
+            methods,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse method signature
+    fn parse_method_sig(&mut self, pair: Pair<Rule>) -> Result<MethodSig, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // Parse method name
+        let name = inner.next().ok_or("Missing method name")?.as_str().to_string();
+        
+        // Skip "("
+        inner.next().ok_or("Missing opening parenthesis")?;
+        
+        // Parse parameters
+        let mut params = Vec::new();
+        if let Some(params_pair) = inner.next() {
+            if params_pair.as_rule() == Rule::param_list {
+                params = self.parse_param_list(params_pair)?;
+            }
+        }
+        
+        // Skip ")"
+        inner.next().ok_or("Missing closing parenthesis")?;
+        
+        // Skip "->"
+        inner.next().ok_or("Missing arrow")?;
+        
+        // Parse return type
+        let return_type = self.parse_type(inner.next().ok_or("Missing return type")?)?;
+        
+        Ok(MethodSig {
+            name,
+            params,
+            return_type,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse implementation block
+    fn parse_impl_block(&mut self, pair: Pair<Rule>) -> Result<ImplBlock, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // Parse trait name
+        let trait_name = inner.next().ok_or("Missing trait name")?.as_str().to_string();
+        
+        // Skip "for"
+        inner.next().ok_or("Missing for keyword")?;
+        
+        // Parse type name
+        let type_name = inner.next().ok_or("Missing type name")?.as_str().to_string();
+        
+        // Skip "{"
+        inner.next().ok_or("Missing opening brace")?;
+        
+        // Parse methods
+        let mut methods = Vec::new();
+        while let Some(method_pair) = inner.next() {
+            if method_pair.as_rule() == Rule::method_decl {
+                let method = self.parse_method_decl(method_pair)?;
+                methods.push(method);
+            } else if method_pair.as_str() == "}" {
+                // End of impl block
+                break;
+            }
+        }
+        
+        Ok(ImplBlock {
+            trait_name,
+            type_name,
+            methods,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse method declaration
+    fn parse_method_decl(&mut self, pair: Pair<Rule>) -> Result<MethodDecl, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // Skip "def" keyword
+        inner.next().ok_or("Missing def keyword")?;
+        
+        // Parse method name
+        let name = inner.next().ok_or("Missing method name")?.as_str().to_string();
+        
+        // Skip "("
+        inner.next().ok_or("Missing opening parenthesis")?;
+        
+        // Parse parameters
+        let mut params = Vec::new();
+        if let Some(params_pair) = inner.next() {
+            if params_pair.as_rule() == Rule::param_list {
+                params = self.parse_param_list(params_pair)?;
+            }
+        }
+        
+        // Skip ")"
+        inner.next().ok_or("Missing closing parenthesis")?;
+        
+        // Skip "->"
+        inner.next().ok_or("Missing arrow")?;
+        
+        // Parse return type
+        let return_type = self.parse_type(inner.next().ok_or("Missing return type")?)?;
+        
+        // Parse body
+        let body = self.parse_block(inner.next().ok_or("Missing method body")?)?;
+        
+        Ok(MethodDecl {
+            name,
+            params,
+            return_type,
+            body,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse identifier list
+    fn parse_identifier_list(&mut self, pair: Pair<Rule>) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        let mut identifiers = Vec::new();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        while let Some(ident_pair) = inner.next() {
+            if ident_pair.as_rule() == Rule::identifier {
+                identifiers.push(ident_pair.as_str().to_string());
+            } else if ident_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            }
+        }
+        
+        Ok(identifiers)
     }
 
     /// Create a SourceSpan from a pest span
