@@ -28,6 +28,16 @@ impl PestParser {
         }
     }
 
+
+
+
+    /// Helper function to filter out whitespace from a pair's inner content
+    fn filter_whitespace(pair: Pair<Rule>) -> Vec<Pair<Rule>> {
+        pair.into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE)
+            .collect()
+    }
+
     /// Parse TJLang source code
     pub fn parse(&mut self, source: &str) -> Result<Program, Box<dyn std::error::Error>> {
         // Parse using pest
@@ -121,35 +131,41 @@ impl PestParser {
         })
     }
 
-    /// Parse variable declaration
-    fn parse_variable_decl(&mut self, pair: Pair<Rule>) -> Result<VariableDecl, Box<dyn std::error::Error>> {
-        let span = pair.as_span();
-        let mut inner = pair.into_inner();
-        
-        let name_pair = inner.next().ok_or("Missing variable name")?;
-        let name = name_pair.as_str().to_string();
-        
-        let _colon_pair = inner.next().ok_or("Missing colon")?;
-        
-        let type_pair = inner.next().ok_or("Missing type")?;
-        let type_ = self.parse_type(type_pair)?;
-        
-        let _equals_pair = inner.next().ok_or("Missing equals")?;
-        
-        let expr_pair = inner.next().ok_or("Missing expression")?;
-        let expression = self.parse_expression(expr_pair)?;
-        
-        Ok(VariableDecl {
-            name,
-            var_type: type_,
-            value: expression,
-            span: self.create_span(span),
-        })
-    }
+        /// Parse variable declaration
+        fn parse_variable_decl(&mut self, pair: Pair<Rule>) -> Result<VariableDecl, Box<dyn std::error::Error>> {
+            let span = pair.as_span();
+            let non_whitespace = Self::filter_whitespace(pair);
+            let mut iter = non_whitespace.into_iter();
+            
+            let name_pair = iter.next().ok_or("Missing variable name")?;
+            let name = name_pair.as_str().to_string();
+            
+            // Note: colon ":" is a literal in the grammar and not included in the parse tree
+            
+            let type_pair = iter.next().ok_or("Missing type")?;
+            let type_ = self.parse_type(type_pair)?;
+            
+            // Note: equals "=" is a literal in the grammar and not included in the parse tree
+            
+            let expr_pair = iter.next().ok_or("Missing expression")?;
+            let expression = self.parse_expression(expr_pair)?;
+            
+            Ok(VariableDecl {
+                name,
+                var_type: type_,
+                value: expression,
+                span: self.create_span(span),
+            })
+        }
 
     /// Parse type
     fn parse_type(&mut self, pair: Pair<Rule>) -> Result<Type, Box<dyn std::error::Error>> {
         match pair.as_rule() {
+            Rule::type_ => {
+                // For the top-level type rule, parse its inner content
+                let inner = pair.into_inner().next().ok_or("Empty type")?;
+                self.parse_type(inner)
+            }
             Rule::primitive_type => {
                 let type_str = pair.as_str();
                 let primitive_type = match type_str {
@@ -174,47 +190,289 @@ impl PestParser {
     fn parse_expression(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         
-        // Debug output (disabled)
-        // println!("Parsing expression rule: {:?}, content: '{}'", pair.as_rule(), pair.as_str());
-        
-        // Handle the precedence chain directly
-        let mut current = pair;
-        let mut depth = 0;
-        
-        while let Some(next) = current.into_inner().next() {
-            depth += 1;
-            // println!("  Depth {}: {:?}, content: '{}'", depth, next.as_rule(), next.as_str());
-            
-            if next.as_rule() == Rule::primary {
-                // println!("    Found primary! Checking inner...");
-                let inner = next.into_inner().next().ok_or("Empty primary expression")?;
-                // println!("      Primary inner: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+        match pair.as_rule() {
+            Rule::expression => {
+                // For the top-level expression rule, just parse its inner content
+                let inner = pair.into_inner().next().ok_or("Empty expression")?;
+                self.parse_expression(inner)
+            }
+            Rule::WHITESPACE => {
+                // Skip whitespace - this shouldn't happen with automatic whitespace handling
+                Err("Unexpected whitespace token".into())
+            }
+            Rule::assignment => {
+                let non_whitespace = Self::filter_whitespace(pair);
+                let mut iter = non_whitespace.into_iter();
+                
+                let left = self.parse_expression(iter.next().ok_or("Missing left operand")?)?;
+                
+                if let Some(assign_pair) = iter.next() {
+                    if assign_pair.as_str() == "=" {
+                        let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                        // For now, just return the right side since we don't have assignment expressions in AST yet
+                        Ok(right)
+                    } else {
+                        Ok(left)
+                    }
+                } else {
+                    Ok(left)
+                }
+            }
+            Rule::or_expr => {
+                let non_whitespace = Self::filter_whitespace(pair);
+                let mut iter = non_whitespace.into_iter();
+                
+                let mut left = self.parse_expression(iter.next().ok_or("Missing left operand")?)?;
+                
+                while let Some(op_pair) = iter.next() {
+                    if op_pair.as_str() == "or" {
+                        let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                        left = Expression::Binary {
+                            left: Box::new(left),
+                            operator: BinaryOperator::Or,
+                            right: Box::new(right),
+                            span: self.create_span(span),
+                        };
+                    } else {
+                        // This should be the next expression
+                        left = self.parse_expression(op_pair)?;
+                    }
+                }
+                Ok(left)
+            }
+            Rule::and_expr => {
+                let non_whitespace = Self::filter_whitespace(pair);
+                let mut iter = non_whitespace.into_iter();
+                
+                let mut left = self.parse_expression(iter.next().ok_or("Missing left operand")?)?;
+                
+                while let Some(op_pair) = iter.next() {
+                    if op_pair.as_str() == "and" {
+                        let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                        left = Expression::Binary {
+                            left: Box::new(left),
+                            operator: BinaryOperator::And,
+                            right: Box::new(right),
+                            span: self.create_span(span),
+                        };
+                    } else {
+                        left = self.parse_expression(op_pair)?;
+                    }
+                }
+                Ok(left)
+            }
+            Rule::equality => {
+                let non_whitespace = Self::filter_whitespace(pair);
+                let mut iter = non_whitespace.into_iter();
+                
+                let mut left = self.parse_expression(iter.next().ok_or("Missing left operand")?)?;
+                
+                while let Some(op_pair) = iter.next() {
+                    match op_pair.as_str() {
+                        "==" => {
+                            let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary {
+                                left: Box::new(left),
+                                operator: BinaryOperator::Equal,
+                                right: Box::new(right),
+                                span: self.create_span(span),
+                            };
+                        }
+                        "!=" => {
+                            let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary {
+                                left: Box::new(left),
+                                operator: BinaryOperator::NotEqual,
+                                right: Box::new(right),
+                                span: self.create_span(span),
+                            };
+                        }
+                        _ => {
+                            left = self.parse_expression(op_pair)?;
+                        }
+                    }
+                }
+                Ok(left)
+            }
+            Rule::relational => {
+                let non_whitespace = Self::filter_whitespace(pair);
+                let mut iter = non_whitespace.into_iter();
+                
+                let mut left = self.parse_expression(iter.next().ok_or("Missing left operand")?)?;
+                
+                while let Some(op_pair) = iter.next() {
+                    match op_pair.as_str() {
+                        "<" => {
+                            let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary {
+                                left: Box::new(left),
+                                operator: BinaryOperator::LessThan,
+                                right: Box::new(right),
+                                span: self.create_span(span),
+                            };
+                        }
+                        ">" => {
+                            let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary {
+                                left: Box::new(left),
+                                operator: BinaryOperator::GreaterThan,
+                                right: Box::new(right),
+                                span: self.create_span(span),
+                            };
+                        }
+                        "<=" => {
+                            let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary {
+                                left: Box::new(left),
+                                operator: BinaryOperator::LessThanEqual,
+                                right: Box::new(right),
+                                span: self.create_span(span),
+                            };
+                        }
+                        ">=" => {
+                            let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary {
+                                left: Box::new(left),
+                                operator: BinaryOperator::GreaterThanEqual,
+                                right: Box::new(right),
+                                span: self.create_span(span),
+                            };
+                        }
+                        _ => {
+                            left = self.parse_expression(op_pair)?;
+                        }
+                    }
+                }
+                Ok(left)
+            }
+            Rule::additive => {
+                let non_whitespace = Self::filter_whitespace(pair);
+                let mut iter = non_whitespace.into_iter();
+                
+                let mut left = self.parse_expression(iter.next().ok_or("Missing left operand")?)?;
+                
+                while let Some(op_pair) = iter.next() {
+                    match op_pair.as_str() {
+                        "+" => {
+                            let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary {
+                                left: Box::new(left),
+                                operator: BinaryOperator::Add,
+                                right: Box::new(right),
+                                span: self.create_span(span),
+                            };
+                        }
+                        "-" => {
+                            let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary {
+                                left: Box::new(left),
+                                operator: BinaryOperator::Subtract,
+                                right: Box::new(right),
+                                span: self.create_span(span),
+                            };
+                        }
+                        _ => {
+                            left = self.parse_expression(op_pair)?;
+                        }
+                    }
+                }
+                Ok(left)
+            }
+            Rule::multiplicative => {
+                let non_whitespace = Self::filter_whitespace(pair);
+                let mut iter = non_whitespace.into_iter();
+                
+                let mut left = self.parse_expression(iter.next().ok_or("Missing left operand")?)?;
+                
+                while let Some(op_pair) = iter.next() {
+                    match op_pair.as_str() {
+                        "*" => {
+                            let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary {
+                                left: Box::new(left),
+                                operator: BinaryOperator::Multiply,
+                                right: Box::new(right),
+                                span: self.create_span(span),
+                            };
+                        }
+                        "/" => {
+                            let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary {
+                                left: Box::new(left),
+                                operator: BinaryOperator::Divide,
+                                right: Box::new(right),
+                                span: self.create_span(span),
+                            };
+                        }
+                        "%" => {
+                            let right = self.parse_expression(iter.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary {
+                                left: Box::new(left),
+                                operator: BinaryOperator::Modulo,
+                                right: Box::new(right),
+                                span: self.create_span(span),
+                            };
+                        }
+                        _ => {
+                            left = self.parse_expression(op_pair)?;
+                        }
+                    }
+                }
+                Ok(left)
+            }
+            Rule::unary => {
+                let non_whitespace = Self::filter_whitespace(pair);
+                let mut iter = non_whitespace.into_iter();
+                
+                if let Some(op_pair) = iter.next() {
+                    match op_pair.as_str() {
+                        "-" => {
+                            let operand = self.parse_expression(iter.next().ok_or("Missing operand")?)?;
+                            Ok(Expression::Unary {
+                                operator: UnaryOperator::Negate,
+                                operand: Box::new(operand),
+                                span: self.create_span(span),
+                            })
+                        }
+                        "!" => {
+                            let operand = self.parse_expression(iter.next().ok_or("Missing operand")?)?;
+                            Ok(Expression::Unary {
+                                operator: UnaryOperator::Not,
+                                operand: Box::new(operand),
+                                span: self.create_span(span),
+                            })
+                        }
+                        _ => {
+                            // No unary operator, parse as primary
+                            self.parse_expression(op_pair)
+                        }
+                    }
+                } else {
+                    // No unary operator, parse as primary
+                    Err("Missing unary expression".into())
+                }
+            }
+            Rule::primary => {
+                let inner = pair.into_inner().next().ok_or("Empty primary expression")?;
                 match inner.as_rule() {
                     Rule::literal => {
-                        // println!("        Parsing literal...");
                         let literal = self.parse_literal(inner)?;
-                        return Ok(Expression::Literal(literal));
+                        Ok(Expression::Literal(literal))
                     }
                     Rule::identifier => {
                         let name = inner.as_str().to_string();
-                        return Ok(Expression::Variable(name));
+                        Ok(Expression::Variable(name))
                     }
                     Rule::expression => {
                         // This is for parenthesized expressions - parse the inner expression
                         let inner_expr = inner.into_inner().next().ok_or("Empty parenthesized expression")?;
-                        return self.parse_expression(inner_expr);
+                        self.parse_expression(inner_expr)
                     }
-                    _ => return Err(format!("Expected primary expression, got {:?}", inner.as_rule()).into())
+                    _ => Err(format!("Expected primary expression, got {:?}", inner.as_rule()).into())
                 }
             }
-            
-            current = next;
-            if depth > 20 { // Prevent infinite loop
-                return Err("Expression parsing depth exceeded".into());
-            }
+            _ => Err(format!("Expected expression, got {:?}", pair.as_rule()).into())
         }
-        
-        Err("Expression parsing failed".into())
     }
 
     /// Parse literal
@@ -224,11 +482,12 @@ impl PestParser {
         // println!("        Parsing literal inner: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
         
         match inner.as_rule() {
-            Rule::integer_literal => {
-                let value = inner.as_str().parse::<i64>()
-                    .map_err(|e| format!("Invalid integer: {}", e))?;
-                Ok(Literal::Int(value))
-            }
+                Rule::integer_literal => {
+                    let content = inner.as_str().trim();
+                    let value = content.parse::<i64>()
+                        .map_err(|e| format!("Invalid integer: {} (content: '{}')", e, content))?;
+                    Ok(Literal::Int(value))
+                }
             Rule::float_literal => {
                 let value = inner.as_str().parse::<f64>()
                     .map_err(|e| format!("Invalid float: {}", e))?;

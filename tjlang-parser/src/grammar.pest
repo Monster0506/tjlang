@@ -17,4 +17,4 @@ boolean_literal = { "true" | "false" }
 none_literal = { "none" }
 identifier = { (ASCII_ALPHA | "_") ~ ASCII_ALPHANUMERIC* }
 WHITESPACE = { " " | "\t" | "\r" | "\n" }
-COMMENT = { "//" ~ (!"\n" ~ ANY)* }
+COMMENT = { "#" ~ (!"\n" ~ ANY)* }

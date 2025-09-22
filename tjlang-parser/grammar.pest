@@ -1,4 +1,7 @@
 // TJLang Grammar for pest
+WHITESPACE = { " " | "\t" | "\r" | "\n" }
+COMMENT = { "#" ~ (!"\n" ~ ANY)* }
+
 program = { SOI ~ statement* ~ EOI }
 
 // Statements
@@ -14,13 +17,13 @@ variable_decl = { identifier ~ ":" ~ type_ ~ "=" ~ expression }
 type_ = { primitive_type | identifier }
 primitive_type = { "int" | "float" | "bool" | "str" | "any" }
 
-// Expressions (with proper precedence)
+// Expressions (with proper precedence - right associative to avoid left recursion)
 expression = { assignment }
 assignment = { or_expr ~ ("=" ~ expression)? }
 or_expr = { and_expr ~ ("or" ~ and_expr)* }
 and_expr = { equality ~ ("and" ~ equality)* }
 equality = { relational ~ (("==" | "!=") ~ relational)* }
-relational = { additive ~ (("<" | ">" | "<=" | ">=") ~ additive)* }
+relational = { additive ~ (("<=" | ">=" | "<" | ">") ~ additive)* }
 additive = { multiplicative ~ (("+" | "-") ~ multiplicative)* }
 multiplicative = { unary ~ (("*" | "/" | "%") ~ unary)* }
 unary = { ("-" | "!")? ~ primary }
@@ -36,7 +39,3 @@ none_literal = { "None" }
 
 // Identifiers
 identifier = { (ASCII_ALPHA | "_") ~ ASCII_ALPHANUMERIC* }
-
-// Whitespace and comments
-WHITESPACE = { " " | "\t" | "\r" | "\n" }
-COMMENT = { "#" ~ (!"\n" ~ ANY)* }
