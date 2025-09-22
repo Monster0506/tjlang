@@ -1229,16 +1229,36 @@ impl PestParser {
 
         // Check if this is a function type with parameters
         if let Some(first) = inner.next() {
-            if first.as_str() == "(" {
+            if first.as_rule() == Rule::type_list {
                 // This is a function type with parameters
-                let mut param_types = Vec::new();
+                let param_types = self.parse_type_list(first)?;
                 
-                // Check if there are parameters
-                if let Some(type_list_pair) = inner.next() {
-                    if type_list_pair.as_rule() == Rule::type_list {
-                        param_types = self.parse_type_list(type_list_pair)?;
+                // Skip whitespace
+                while let Some(next) = inner.next() {
+                    if next.as_rule() != Rule::WHITESPACE {
+                        // This should be the return type
+                        let return_type = match next.as_rule() {
+                            Rule::collection_type => {
+                                self.parse_collection_type(next)?
+                            }
+                            Rule::primary_type => {
+                                self.parse_primary_type(next)?
+                            }
+                            _ => return Err(format!("Expected collection_type or primary_type for return type, got {:?}", next.as_rule()).into())
+                        };
+                        
+                        return Ok(Type::Function {
+                            params: param_types,
+                            return_type: Box::new(return_type),
+                            span: self.create_span(span),
+                        });
                     }
                 }
+                
+                Err("Missing return type".into())
+            } else if first.as_str() == "(" {
+                // This is a function type with no parameters
+                let param_types = Vec::new();
                 
                 // Skip closing parenthesis
                 inner.next().ok_or("Missing closing parenthesis")?;
@@ -1254,6 +1274,9 @@ impl PestParser {
                     return_type: Box::new(return_type),
                     span: self.create_span(span),
                 })
+            } else if first.as_rule() == Rule::function_type {
+                // This is a nested function_type (like 'int' in '() -> int')
+                self.parse_function_type(first)
             } else {
                 // This is a collection_type or primary_type
                 match first.as_rule() {
@@ -1263,7 +1286,7 @@ impl PestParser {
                     Rule::primary_type => {
                         self.parse_primary_type(first)
                     }
-                    _ => Err(format!("Expected collection_type or primary_type, got {:?}", first.as_rule()).into())
+                    _ => Err(format!("Expected collection_type, primary_type, function_type, or type_list, got {:?}", first.as_rule()).into())
                 }
             }
         } else {

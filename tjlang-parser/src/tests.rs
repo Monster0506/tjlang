@@ -586,7 +586,7 @@ mod tests {
         use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
 
-        let source = "() -> int";
+        let source = "(int) -> str";
         let result = TJLangPestParser::parse(Rule::function_type, source);
 
         match result {
@@ -641,7 +641,7 @@ mod tests {
             // Collection types
             "[int]",
             "{str}",
-            // "Map<int, str>", // Temporarily disabled
+            "Map<int, str>",
             "(int, str, bool)",
             
             // Optional types
@@ -663,7 +663,7 @@ mod tests {
             "Result<int, str>",
             
             // Complex nested types
-            // "Map<str, [int]>", // Temporarily disabled
+            "Map<str, [int]>",
             "Option<Result<int, str>>",
             "?Map<int, str>",
             "Vec<Option<int>>",
