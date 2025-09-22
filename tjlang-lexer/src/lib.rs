@@ -146,6 +146,8 @@ pub enum TokenKind {
     And,
     #[token("!")]
     Bang,
+    #[token(";")]
+    Semicolon,
     // Literals
     #[regex(r"[0-9]+", |lex| lex.slice().parse::<i64>().ok())]
     IntLiteral(i64),
@@ -245,6 +247,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Or => write!(f, "or"),
             TokenKind::And => write!(f, "and"),
             TokenKind::Bang => write!(f, "!"),
+            TokenKind::Semicolon => write!(f, ";"),
             TokenKind::Underscore => write!(f, "_"),
 
             // Literals

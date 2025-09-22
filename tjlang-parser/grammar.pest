@@ -1,0 +1,20 @@
+// Minimal TJLang Grammar for pest
+program = { SOI ~ statement* ~ EOI }
+statement = { variable_decl ~ ";" | expression ~ ";" | block }
+block = { "{" ~ statement* ~ "}" }
+variable_decl = { identifier ~ ":" ~ type_ ~ "=" ~ expression }
+type_ = { primitive_type | identifier }
+primitive_type = { "int" | "float" | "bool" | "str" | "any" }
+expression = { literal | identifier | binary_expr }
+binary_expr = { primary ~ binary_op ~ primary }
+binary_op = { "+" | "-" | "*" | "/" | "==" | "!=" | "<" | ">" }
+primary = { literal | identifier | "(" ~ expression ~ ")" }
+literal = { integer_literal | float_literal | string_literal | boolean_literal | none_literal }
+integer_literal = { "-"? ~ ASCII_DIGIT+ }
+float_literal = { "-"? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+string_literal = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+boolean_literal = { "true" | "false" }
+none_literal = { "none" }
+identifier = { (ASCII_ALPHA | "_") ~ ASCII_ALPHANUMERIC* }
+WHITESPACE = { " " | "\t" | "\r" | "\n" }
+COMMENT = { "#" ~ (!"\n" ~ ANY)* }
