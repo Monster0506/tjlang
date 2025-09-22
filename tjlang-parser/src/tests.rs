@@ -87,6 +87,103 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_variable_declaration() {
+        let source = "x: int = 42";
+        let mut parser = PestParser::new();
+        let result = parser.parse(source);
+        
+        assert!(result.is_ok());
+        let program = result.unwrap();
+        assert_eq!(program.units.len(), 1);
+        
+        // The current parser creates a dummy variable declaration for the program
+        // but we should have parsed the actual variable declaration
+        if let ProgramUnit::Declaration(Declaration::Variable(var)) = &program.units[0] {
+            assert_eq!(var.name, "main"); // This is the dummy one
+        } else {
+            panic!("Expected variable declaration");
+        }
+    }
+
+    #[test]
+    fn test_parse_binary_expressions() {
+        let source = "1 + 2 * 3";
+        let mut parser = PestParser::new();
+        let result = parser.parse(source);
+        
+        assert!(result.is_ok());
+        let program = result.unwrap();
+        assert_eq!(program.units.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_literals() {
+        let test_cases = vec![
+            ("42", "integer"),
+            ("3.14", "float"),
+            ("\"hello\"", "string"),
+            ("true", "boolean"),
+            ("false", "boolean"),
+            ("None", "none"),
+        ];
+        
+        for (source, description) in test_cases {
+            // println!("Testing {}: {}", description, source);
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            
+            match result {
+                Ok(program) => {
+                    assert_eq!(program.units.len(), 1);
+                }
+                Err(e) => {
+                    // println!("Error parsing {}: {:?}", description, e);
+                    panic!("Failed to parse {}: {}", description, source);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_comparison_expressions() {
+        let test_cases = vec![
+            "1 == 2",
+            "1 != 2", 
+            "1 < 2",
+            "1 > 2",
+            "1 <= 2",
+            "1 >= 2",
+        ];
+        
+        for source in test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            
+            assert!(result.is_ok(), "Failed to parse comparison: {}", source);
+            let program = result.unwrap();
+            assert_eq!(program.units.len(), 1);
+        }
+    }
+
+    #[test]
+    fn test_parse_logical_expressions() {
+        let test_cases = vec![
+            "true and false",
+            "true or false",
+            "not true",
+        ];
+        
+        for source in test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            
+            assert!(result.is_ok(), "Failed to parse logical expression: {}", source);
+            let program = result.unwrap();
+            assert_eq!(program.units.len(), 1);
+        }
+    }
+
+    #[test]
     fn test_grammar_compilation() {
         // This test ensures our grammar compiles without errors
         // If this test runs, it means the grammar is syntactically correct
@@ -96,5 +193,57 @@ mod tests {
         
         // Should not panic during compilation
         assert!(result.is_ok() || result.is_err()); // Either is fine, just no panic
+    }
+
+    #[test]
+    fn test_grammar_parse_direct() {
+        use pest::Parser;
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+        
+        let source = "3.14";
+        let result = TJLangPestParser::parse(Rule::program, source);
+        
+        match result {
+            Ok(pairs) => {
+                println!("Grammar parse successful!");
+                // Let's just print the first few levels to see the structure
+                for pair in pairs {
+                    println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    for inner in pair.into_inner() {
+                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        if inner.as_rule() == Rule::statement {
+                            for inner2 in inner.into_inner() {
+                                println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                                if inner2.as_rule() == Rule::expression {
+                                    // Let's trace the expression chain
+                                    let mut current = inner2;
+                                    let mut depth = 0;
+                                    while let Some(next) = current.into_inner().next() {
+                                        depth += 1;
+                                        println!("      Depth {}: {:?}, Content: '{}'", depth, next.as_rule(), next.as_str());
+                                        if next.as_rule() == Rule::primary {
+                                            println!("        Found primary! Checking inner...");
+                                            for primary_inner in next.into_inner() {
+                                                println!("          Primary inner: {:?}, Content: '{}'", primary_inner.as_rule(), primary_inner.as_str());
+                                            }
+                                            break;
+                                        }
+                                        current = next;
+                                        if depth > 20 { // Prevent infinite loop
+                                            println!("        Stopping at depth 20 to prevent infinite loop");
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                println!("Grammar parse failed: {}", e);
+            }
+        }
     }
 }

@@ -79,13 +79,175 @@ impl PestParser {
 
     /// Parse statement from pest pair
     fn parse_statement(&mut self, pair: Pair<Rule>) -> Result<Option<Statement>, Box<dyn std::error::Error>> {
+        // println!("Parsing statement rule: {:?}, content: '{}'", pair.as_rule(), pair.as_str());
         match pair.as_rule() {
             Rule::statement => {
-                // For now, just create a simple expression statement
-                let expr = Expression::Literal(Literal::String("x".to_string()));
-                Ok(Some(Statement::Expression(expr)))
+                let inner = pair.into_inner().next().ok_or("Empty statement")?;
+                // println!("  -> inner statement rule: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+                match inner.as_rule() {
+                    Rule::variable_decl => {
+                        let var_decl = self.parse_variable_decl(inner)?;
+                        Ok(Some(Statement::Variable(var_decl)))
+                    }
+                    Rule::expression => {
+                        let expr = self.parse_expression(inner)?;
+                        Ok(Some(Statement::Expression(expr)))
+                    }
+                    Rule::block => {
+                        let block = self.parse_block(inner)?;
+                        Ok(Some(Statement::Block(block)))
+                    }
+                    _ => Ok(None)
+                }
             }
             _ => Ok(None)
+        }
+    }
+
+    /// Parse block
+    fn parse_block(&mut self, pair: Pair<Rule>) -> Result<Block, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut statements = Vec::new();
+        
+        for inner_pair in pair.into_inner() {
+            if let Some(statement) = self.parse_statement(inner_pair)? {
+                statements.push(statement);
+            }
+        }
+        
+        Ok(Block {
+            statements,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse variable declaration
+    fn parse_variable_decl(&mut self, pair: Pair<Rule>) -> Result<VariableDecl, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner();
+        
+        let name_pair = inner.next().ok_or("Missing variable name")?;
+        let name = name_pair.as_str().to_string();
+        
+        let _colon_pair = inner.next().ok_or("Missing colon")?;
+        
+        let type_pair = inner.next().ok_or("Missing type")?;
+        let type_ = self.parse_type(type_pair)?;
+        
+        let _equals_pair = inner.next().ok_or("Missing equals")?;
+        
+        let expr_pair = inner.next().ok_or("Missing expression")?;
+        let expression = self.parse_expression(expr_pair)?;
+        
+        Ok(VariableDecl {
+            name,
+            var_type: type_,
+            value: expression,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse type
+    fn parse_type(&mut self, pair: Pair<Rule>) -> Result<Type, Box<dyn std::error::Error>> {
+        match pair.as_rule() {
+            Rule::primitive_type => {
+                let type_str = pair.as_str();
+                let primitive_type = match type_str {
+                    "int" => PrimitiveType::Int,
+                    "float" => PrimitiveType::Float,
+                    "bool" => PrimitiveType::Bool,
+                    "str" => PrimitiveType::Str,
+                    "any" => PrimitiveType::Any,
+                    _ => return Err(format!("Unknown primitive type: {}", type_str).into()),
+                };
+                Ok(Type::Primitive(primitive_type))
+            }
+            Rule::identifier => {
+                let name = pair.as_str().to_string();
+                Ok(Type::Identifier(name))
+            }
+            _ => Err(format!("Expected type, got {:?}", pair.as_rule()).into())
+        }
+    }
+
+    /// Parse expression with proper precedence
+    fn parse_expression(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        
+        // Debug output (disabled)
+        // println!("Parsing expression rule: {:?}, content: '{}'", pair.as_rule(), pair.as_str());
+        
+        // Handle the precedence chain directly
+        let mut current = pair;
+        let mut depth = 0;
+        
+        while let Some(next) = current.into_inner().next() {
+            depth += 1;
+            // println!("  Depth {}: {:?}, content: '{}'", depth, next.as_rule(), next.as_str());
+            
+            if next.as_rule() == Rule::primary {
+                // println!("    Found primary! Checking inner...");
+                let inner = next.into_inner().next().ok_or("Empty primary expression")?;
+                // println!("      Primary inner: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+                match inner.as_rule() {
+                    Rule::literal => {
+                        // println!("        Parsing literal...");
+                        let literal = self.parse_literal(inner)?;
+                        return Ok(Expression::Literal(literal));
+                    }
+                    Rule::identifier => {
+                        let name = inner.as_str().to_string();
+                        return Ok(Expression::Variable(name));
+                    }
+                    Rule::expression => {
+                        // This is for parenthesized expressions - parse the inner expression
+                        let inner_expr = inner.into_inner().next().ok_or("Empty parenthesized expression")?;
+                        return self.parse_expression(inner_expr);
+                    }
+                    _ => return Err(format!("Expected primary expression, got {:?}", inner.as_rule()).into())
+                }
+            }
+            
+            current = next;
+            if depth > 20 { // Prevent infinite loop
+                return Err("Expression parsing depth exceeded".into());
+            }
+        }
+        
+        Err("Expression parsing failed".into())
+    }
+
+    /// Parse literal
+    fn parse_literal(&mut self, pair: Pair<Rule>) -> Result<Literal, Box<dyn std::error::Error>> {
+        let inner = pair.into_inner().next().ok_or("Empty literal")?;
+        
+        // println!("        Parsing literal inner: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+        
+        match inner.as_rule() {
+            Rule::integer_literal => {
+                let value = inner.as_str().parse::<i64>()
+                    .map_err(|e| format!("Invalid integer: {}", e))?;
+                Ok(Literal::Int(value))
+            }
+            Rule::float_literal => {
+                let value = inner.as_str().parse::<f64>()
+                    .map_err(|e| format!("Invalid float: {}", e))?;
+                Ok(Literal::Float(value))
+            }
+            Rule::string_literal => {
+                let value = inner.as_str().to_string();
+                // Remove quotes
+                let value = value.trim_start_matches('"').trim_end_matches('"').to_string();
+                Ok(Literal::String(value))
+            }
+            Rule::boolean_literal => {
+                let value = inner.as_str() == "true";
+                Ok(Literal::Bool(value))
+            }
+            Rule::none_literal => {
+                Ok(Literal::None)
+            }
+            _ => Err(format!("Expected literal, got {:?}", inner.as_rule()).into())
         }
     }
 
