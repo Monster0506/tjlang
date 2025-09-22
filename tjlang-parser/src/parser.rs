@@ -30,9 +30,6 @@ impl PestParser {
 
 
 
-
-
-
     /// Parse TJLang source code
     pub fn parse(&mut self, source: &str) -> Result<Program, Box<dyn std::error::Error>> {
         // Parse using pest
@@ -594,11 +591,12 @@ impl PestParser {
         let span = pair.as_span();
         let mut inner = pair.into_inner();
         
-        // Skip "if" keyword
-        inner.next().ok_or("Missing 'if' keyword")?;
+        // The "if" keyword is consumed by the grammar, so the first inner pair is the expression
+        let condition_pair = inner.next().ok_or("Missing condition")?;
+        let condition = self.parse_expression(condition_pair)?;
         
-        let condition = self.parse_expression(inner.next().ok_or("Missing condition")?)?;
-        let then_block = self.parse_block(inner.next().ok_or("Missing then block")?)?;
+        let block_pair = inner.next().ok_or("Missing then block")?;
+        let then_block = self.parse_block(block_pair)?;
         
         // Parse elif branches
         let mut elif_branches = Vec::new();
@@ -607,9 +605,7 @@ impl PestParser {
                 let branch_span = branch_pair.as_span();
                 let mut branch_inner = branch_pair.into_inner();
                 
-                // Skip "elif" keyword
-                branch_inner.next().ok_or("Missing 'elif' keyword")?;
-                
+                // The "elif" keyword is consumed by the grammar, so the first inner pair is the condition
                 let branch_condition = self.parse_expression(branch_inner.next().ok_or("Missing elif condition")?)?;
                 let branch_block = self.parse_block(branch_inner.next().ok_or("Missing elif block")?)?;
                 
@@ -629,9 +625,7 @@ impl PestParser {
             if else_pair.as_rule() == Rule::else_branch {
                 let mut else_inner = else_pair.into_inner();
                 
-                // Skip "else" keyword
-                else_inner.next().ok_or("Missing 'else' keyword")?;
-                
+                // The "else" keyword is consumed by the grammar, so the first inner pair is the block
                 Some(self.parse_block(else_inner.next().ok_or("Missing else block")?)?)
             } else {
                 None
@@ -654,9 +648,7 @@ impl PestParser {
         let span = pair.as_span();
         let mut inner = pair.into_inner();
         
-        // Skip "while" keyword
-        inner.next().ok_or("Missing 'while' keyword")?;
-        
+        // The "while" keyword is consumed by the grammar, so the first inner pair is the condition
         let condition = self.parse_expression(inner.next().ok_or("Missing condition")?)?;
         let body = self.parse_block(inner.next().ok_or("Missing body")?)?;
         
@@ -693,9 +685,7 @@ impl PestParser {
         let span = pair.as_span();
         let mut inner = pair.into_inner();
         
-        // Skip "return" keyword
-        inner.next().ok_or("Missing 'return' keyword")?;
-        
+        // The "return" keyword is consumed by the grammar, so check if there's an expression
         let value = if let Some(expr_pair) = inner.next() {
             Some(self.parse_expression(expr_pair)?)
         } else {
@@ -737,9 +727,7 @@ impl PestParser {
         let span = pair.as_span();
         let mut inner = pair.into_inner();
         
-        // Skip "raise" keyword
-        inner.next().ok_or("Missing 'raise' keyword")?;
-        
+        // The "raise" keyword is consumed by the grammar, so the first inner pair is the expression
         let value = self.parse_expression(inner.next().ok_or("Missing expression")?)?;
         
         Ok(RaiseStatement {
@@ -1479,73 +1467,42 @@ impl PestParser {
     fn parse_type_decl(&mut self, pair: Pair<Rule>) -> Result<TypeDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
-        // Skip "type" keyword
-        inner.next().ok_or("Missing type keyword")?;
-        
-        // Parse type name
+
+        // The grammar consumes literals; we expect: identifier, type_
         let name = inner.next().ok_or("Missing type name")?.as_str().to_string();
-        
-        // Parse type alias (the grammar consumes the "=" internally)
-        let type_alias = self.parse_type(inner.next().ok_or("Missing type alias")?)?;
-        
-        Ok(TypeDecl {
-            name,
-            type_alias,
-            span: self.create_span(span),
-        })
+        let type_pair = inner.next().ok_or("Missing type alias")?;
+        let type_alias = self.parse_type(type_pair)?;
+
+        Ok(TypeDecl { name, type_alias, span: self.create_span(span) })
     }
 
     /// Parse struct declaration
     fn parse_struct_decl(&mut self, pair: Pair<Rule>) -> Result<StructDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
-        // Skip "type" keyword
-        inner.next().ok_or("Missing type keyword")?;
-        
-        // Parse struct name
+
+        // Expect: identifier, then zero or more field_decl entries (grammar enforces at least one)
         let name = inner.next().ok_or("Missing struct name")?.as_str().to_string();
-        
-        // Skip "{"
-        inner.next().ok_or("Missing opening brace")?;
-        
-        // Parse fields
         let mut fields = Vec::new();
-        while let Some(field_pair) = inner.next() {
-            if field_pair.as_rule() == Rule::field_decl {
-                let field = self.parse_field_decl(field_pair)?;
-                fields.push(field);
-            } else if field_pair.as_str() == "," {
-                // Skip comma
-                continue;
-            } else if field_pair.as_str() == "}" {
-                // End of struct
-                break;
+        for p in inner {
+            if p.as_rule() == Rule::field_decl {
+                fields.push(self.parse_field_decl(p)?);
             }
         }
-        
-        Ok(StructDecl {
-            name,
-            fields,
-            span: self.create_span(span),
-        })
+
+        Ok(StructDecl { name, fields, span: self.create_span(span) })
     }
 
     /// Parse field declaration
     fn parse_field_decl(&mut self, pair: Pair<Rule>) -> Result<FieldDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
-        // Parse field name
+
+        // Expect: identifier then type_
         let name = inner.next().ok_or("Missing field name")?.as_str().to_string();
-        
-        // Skip ":"
-        inner.next().ok_or("Missing colon")?;
-        
-        // Parse field type
-        let field_type = self.parse_type(inner.next().ok_or("Missing field type")?)?;
-        
+        let ty_pair = inner.next().ok_or("Missing field type")?;
+        let field_type = self.parse_type(ty_pair)?;
+
         Ok(FieldDecl {
             name,
             field_type,
@@ -1557,57 +1514,49 @@ impl PestParser {
     fn parse_enum_decl(&mut self, pair: Pair<Rule>) -> Result<EnumDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+
         // Skip "enum" keyword
         inner.next().ok_or("Missing enum keyword")?;
-        
+
         // Parse enum name
         let name = inner.next().ok_or("Missing enum name")?.as_str().to_string();
-        
-        // Parse type parameters if present
+
+        // Parse identifier generic param names if present
         let mut type_params = Vec::new();
-        if let Some(type_params_pair) = inner.next() {
-            if type_params_pair.as_rule() == Rule::type_params {
-                // For enum type params, we just need the parameter names, not the full types
-                let mut inner_params = type_params_pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                while let Some(param_pair) = inner_params.next() {
-                    if param_pair.as_rule() == Rule::identifier {
-                        type_params.push(param_pair.as_str().to_string());
-                    } else if param_pair.as_str() == "," {
-                        // Skip comma
-                        continue;
+        if let Some(next_pair) = inner.next() {
+            if next_pair.as_rule() == Rule::type_param_names {
+                let mut names = next_pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                while let Some(tok) = names.next() {
+                    if tok.as_rule() == Rule::identifier {
+                        type_params.push(tok.as_str().to_string());
                     }
                 }
             } else {
-                // This is the opening brace, not type params
-                // We need to handle this differently
+                // put it back by handling downstream
+                // next_pair should be the first enum body element "{...}"
+                // We proceed using this as the first element when iterating further
+                // To do so, create an iterator starting from this pair
+                let mut rest = std::iter::once(next_pair).chain(inner);
+                // Expect variants list between braces handled by grammar; just iterate enum_variant entries
+                let mut variants = Vec::new();
+                while let Some(variant_pair) = rest.next() {
+                    if variant_pair.as_rule() == Rule::enum_variant {
+                        variants.push(self.parse_enum_variant(variant_pair)?);
+                    }
+                }
+                return Ok(EnumDecl { name, type_params, variants, span: self.create_span(span) });
             }
         }
-        
-        // Skip "{"
-        inner.next().ok_or("Missing opening brace")?;
-        
-        // Parse variants
+
+        // Collect variants
         let mut variants = Vec::new();
-        while let Some(variant_pair) = inner.next() {
+        for variant_pair in inner {
             if variant_pair.as_rule() == Rule::enum_variant {
-                let variant = self.parse_enum_variant(variant_pair)?;
-                variants.push(variant);
-            } else if variant_pair.as_str() == "," {
-                // Skip comma
-                continue;
-            } else if variant_pair.as_str() == "}" {
-                // End of enum
-                break;
+                variants.push(self.parse_enum_variant(variant_pair)?);
             }
         }
-        
-        Ok(EnumDecl {
-            name,
-            type_params,
-            variants,
-            span: self.create_span(span),
-        })
+
+        Ok(EnumDecl { name, type_params, variants, span: self.create_span(span) })
     }
 
     /// Parse enum variant
@@ -1655,161 +1604,110 @@ impl PestParser {
     fn parse_interface_decl(&mut self, pair: Pair<Rule>) -> Result<InterfaceDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+
         // Skip "interface" keyword
         inner.next().ok_or("Missing interface keyword")?;
-        
+
         // Parse interface name
         let name = inner.next().ok_or("Missing interface name")?.as_str().to_string();
-        
+
+        // Optional generic param names
+        if let Some(next) = inner.clone().next() {
+            if next.as_rule() == Rule::type_param_names {
+                // consume
+                let _ = inner.next();
+            }
+        }
+
         // Parse extends clause if present
         let mut extends = Vec::new();
-        if let Some(extends_pair) = inner.next() {
-            if extends_pair.as_str() == "extends" {
-                if let Some(extends_list) = inner.next() {
-                    if extends_list.as_rule() == Rule::identifier_list {
-                        extends = self.parse_identifier_list(extends_list)?;
-                    }
-                }
-            } else {
-                // This is the opening brace, not extends
-                // We need to handle this differently
+        if let Some(next_pair) = inner.clone().next() {
+            if next_pair.as_rule() == Rule::identifier_list {
+                let _ = inner.next();
+                extends = self.parse_identifier_list(next_pair)?;
             }
         }
-        
-        // Skip "{"
-        inner.next().ok_or("Missing opening brace")?;
-        
-        // Parse methods
+
+        // Methods
         let mut methods = Vec::new();
-        while let Some(method_pair) = inner.next() {
-            if method_pair.as_rule() == Rule::method_sig {
-                let method = self.parse_method_sig(method_pair)?;
-                methods.push(method);
-            } else if method_pair.as_str() == "," {
-                // Skip comma
-                continue;
-            } else if method_pair.as_str() == "}" {
-                // End of interface
-                break;
-            }
-        }
-        
-        Ok(InterfaceDecl {
-            name,
-            extends,
-            methods,
-            span: self.create_span(span),
-        })
+        for p in inner { if p.as_rule() == Rule::method_sig { methods.push(self.build_method_sig(p)?); } }
+
+        Ok(InterfaceDecl { name, extends, methods, span: self.create_span(span) })
     }
 
-    /// Parse method signature
-    fn parse_method_sig(&mut self, pair: Pair<Rule>) -> Result<MethodSig, Box<dyn std::error::Error>> {
+    fn build_method_sig(&mut self, pair: Pair<Rule>) -> Result<MethodSig, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
-        // Parse method name
         let name = inner.next().ok_or("Missing method name")?.as_str().to_string();
-        
-        // Skip "("
-        inner.next().ok_or("Missing opening parenthesis")?;
-        
-        // Parse parameters
         let mut params = Vec::new();
-        if let Some(params_pair) = inner.next() {
-            if params_pair.as_rule() == Rule::param_list {
-                params = self.parse_param_list(params_pair)?;
-            }
-        }
-        
-        // Skip ")"
-        inner.next().ok_or("Missing closing parenthesis")?;
-        
-        // Skip "->"
-        inner.next().ok_or("Missing arrow")?;
-        
-        // Parse return type
-        let return_type = self.parse_type(inner.next().ok_or("Missing return type")?)?;
-        
-        Ok(MethodSig {
-            name,
-            params,
-            return_type,
-            span: self.create_span(span),
-        })
+
+        // Next can be param_list or ARROW
+        let next = inner.next().ok_or("Missing method signature tail")?;
+        let after_arrow_pair = if next.as_rule() == Rule::param_list {
+            params = self.parse_param_list(next)?;
+            // Expect ARROW next
+            let arrow = inner.next().ok_or("Missing arrow in method signature")?;
+            if arrow.as_rule() != Rule::ARROW { return Err("Expected arrow in method signature".into()); }
+            inner.next().ok_or("Missing return type in method signature")?
+        } else {
+            // Must be ARROW directly
+            if next.as_rule() != Rule::ARROW { return Err("Expected arrow or param list in method signature".into()); }
+            inner.next().ok_or("Missing return type in method signature")?
+        };
+
+        let return_type = self.parse_type(after_arrow_pair)?;
+        Ok(MethodSig { name, params, return_type, span: self.create_span(span) })
     }
 
     /// Parse implementation block
     fn parse_impl_block(&mut self, pair: Pair<Rule>) -> Result<ImplBlock, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
-        // Parse trait name
+
+        // The grammar yields: impl_kw, identifier (trait), for_kw, identifier (type), then method_decl*
+        // Skip impl_kw
+        inner.next().ok_or("Missing impl keyword")?;
         let trait_name = inner.next().ok_or("Missing trait name")?.as_str().to_string();
-        
-        // Skip "for"
+        // Skip for_kw
         inner.next().ok_or("Missing for keyword")?;
-        
-        // Parse type name
         let type_name = inner.next().ok_or("Missing type name")?.as_str().to_string();
-        
-        // Skip "{"
-        inner.next().ok_or("Missing opening brace")?;
-        
-        // Parse methods
+
         let mut methods = Vec::new();
-        while let Some(method_pair) = inner.next() {
-            if method_pair.as_rule() == Rule::method_decl {
-                let method = self.parse_method_decl(method_pair)?;
-                methods.push(method);
-            } else if method_pair.as_str() == "}" {
-                // End of impl block
-                break;
-            }
+        for p in inner {
+            if p.as_rule() == Rule::method_decl { methods.push(self.parse_method_decl(p)?); }
         }
-        
-        Ok(ImplBlock {
-            trait_name,
-            type_name,
-            methods,
-            span: self.create_span(span),
-        })
+
+        Ok(ImplBlock { trait_name, type_name, methods, span: self.create_span(span) })
     }
 
     /// Parse method declaration
     fn parse_method_decl(&mut self, pair: Pair<Rule>) -> Result<MethodDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
-        // Skip "def" keyword
-        inner.next().ok_or("Missing def keyword")?;
-        
+
         // Parse method name
         let name = inner.next().ok_or("Missing method name")?.as_str().to_string();
-        
-        // Skip "("
-        inner.next().ok_or("Missing opening parenthesis")?;
-        
-        // Parse parameters
+
+        // Next can be param_list or ARROW
         let mut params = Vec::new();
-        if let Some(params_pair) = inner.next() {
-            if params_pair.as_rule() == Rule::param_list {
-                params = self.parse_param_list(params_pair)?;
-            }
-        }
-        
-        // Skip ")"
-        inner.next().ok_or("Missing closing parenthesis")?;
-        
-        // Skip "->"
-        inner.next().ok_or("Missing arrow")?;
-        
+        let next = inner.next().ok_or("Missing method declaration tail")?;
+        let after_arrow_pair = if next.as_rule() == Rule::param_list {
+            params = self.parse_param_list(next)?;
+            // Expect ARROW
+            let arrow = inner.next().ok_or("Missing arrow in method declaration")?;
+            if arrow.as_rule() != Rule::ARROW { return Err("Expected arrow in method declaration".into()); }
+            inner.next().ok_or("Missing return type in method declaration")?
+        } else {
+            if next.as_rule() != Rule::ARROW { return Err("Expected arrow or param list in method declaration".into()); }
+            inner.next().ok_or("Missing return type in method declaration")?
+        };
+
         // Parse return type
-        let return_type = self.parse_type(inner.next().ok_or("Missing return type")?)?;
-        
+        let return_type = self.parse_type(after_arrow_pair)?;
+
         // Parse body
         let body = self.parse_block(inner.next().ok_or("Missing method body")?)?;
-        
+
         Ok(MethodDecl {
             name,
             params,

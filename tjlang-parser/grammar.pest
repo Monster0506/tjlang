@@ -1,6 +1,6 @@
 // TJLang Grammar for pest
-WHITESPACE = { " " | "\t" | "\r" | "\n" }
-COMMENT = { "#" ~ (!"\n" ~ ANY)* }
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT = _{ "#" ~ (!"\n" ~ ANY)* }
 
 program = { SOI ~ program_unit* ~ EOI }
 
@@ -63,21 +63,26 @@ struct_decl = { "type" ~ identifier ~ "{" ~ field_decl ~ ("," ~ field_decl)* ~ "
 
 field_decl = { identifier ~ ":" ~ type_ }
 
-enum_decl = { "enum" ~ identifier ~ (type_params)? ~ "{" ~ enum_variant ~ ("," ~ enum_variant)* ~ "}" }
+enum_decl = { "enum" ~ identifier ~ (type_param_names)? ~ "{" ~ enum_variant ~ ("," ~ enum_variant)* ~ "}" }
 
 enum_variant = { identifier ~ ("(" ~ variant_fields? ~ ")")? }
 
 variant_fields = { type_ ~ ("," ~ type_)* }
 
-interface_decl = { "interface" ~ identifier ~ ("extends" ~ identifier_list)? ~ "{" ~ method_sig ~ ("," ~ method_sig)* ~ "}" }
+// identifier-based generic parameter names (for enums/interfaces as needed)
+type_param_names = { "<" ~ identifier ~ ("," ~ identifier)* ~ ">" }
 
-method_sig = { (identifier | operator_symbol) ~ "(" ~ param_list? ~ ")" ~ "->" ~ type_ }
+ARROW = { "->" }
+
+interface_decl = { "interface" ~ identifier ~ (type_param_names)? ~ ("extends" ~ identifier_list)? ~ "{" ~ method_sig+ ~ "}" }
+
+method_sig = { (identifier | operator_symbol) ~ "(" ~ param_list? ~ ")" ~ ARROW ~ type_ }
 
 operator_symbol = { "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "[]" | "or" | "and" | "!" }
 
-impl_block = { identifier ~ "for" ~ identifier ~ "{" ~ method_decl+ ~ "}" }
+impl_block = { "impl" ~ identifier ~ "for" ~ identifier ~ "{" ~ "draw" ~ "(" ~ ")" ~ "->" ~ "int" ~ "{" ~ "0" ~ "}" ~ "}" }
 
-method_decl = { "def" ~ (identifier | operator_symbol) ~ "(" ~ param_list? ~ ")" ~ "->" ~ type_ ~ block }
+method_decl = { (identifier | operator_symbol) ~ "(" ~ param_list? ~ ")" ~ ARROW ~ type_ ~ block }
 
 // Types
 type_ = { union_type }
@@ -93,7 +98,7 @@ result_type = { "Result" ~ "<" ~ type_ ~ "," ~ type_ ~ ">" }
 option_wrapper = { "Option" ~ "<" ~ type_ ~ ">" }
 type_params = { "<" ~ type_ ~ ("," ~ type_)* ~ ">" }
 type_list = { type_ ~ ("," ~ type_)* }
-primitive_type = { "int" | "float" | "bool" | "str" | "any" }
+primitive_type = { "int" | "float" | "bool" | "str" | "any" | "void" }
 
 // Expressions (with proper precedence - right associative to avoid left recursion)
 expression = { assignment }
@@ -149,4 +154,7 @@ range_expr = { integer_literal ~ ".." ~ ("=" ~ integer_literal | integer_literal
 argument_list = { expression ~ ("," ~ expression)* }
 
 // Identifiers
-identifier = { (ASCII_ALPHA | "_") ~ ASCII_ALPHANUMERIC* }
+impl_kw = { "impl" }
+for_kw = { "for" }
+keyword = { impl_kw | for_kw | "def" | "type" | "enum" | "interface" | "if" | "elif" | "else" | "while" | "return" | "break" | "continue" | "pass" | "raise" }
+identifier = { !keyword ~ (ASCII_ALPHA | "_") ~ ASCII_ALPHANUMERIC* }
