@@ -32,16 +32,6 @@ impl PestParser {
 
 
 
-    /// Helper function to skip whitespace tokens
-    fn skip_whitespace(iter: &mut std::iter::Peekable<std::slice::Iter<'_, pest::iterators::Pair<'_, Rule>>>) {
-        while let Some(pair) = iter.peek() {
-            if pair.as_rule() == Rule::WHITESPACE {
-                iter.next();
-            } else {
-                break;
-            }
-        }
-    }
 
     /// Parse TJLang source code
     pub fn parse(&mut self, source: &str) -> Result<Program, Box<dyn std::error::Error>> {
@@ -171,7 +161,7 @@ impl PestParser {
         /// Parse variable declaration
         fn parse_variable_decl(&mut self, pair: Pair<Rule>) -> Result<VariableDecl, Box<dyn std::error::Error>> {
             let span = pair.as_span();
-            let mut inner = pair.into_inner();
+            let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
             
             let name_pair = inner.next().ok_or("Missing variable name")?;
             let name = name_pair.as_str().to_string();
@@ -233,7 +223,7 @@ impl PestParser {
                 self.parse_expression(inner)
             }
             Rule::assignment => {
-                let mut inner = pair.into_inner();
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 
                 if let Some(assign_pair) = inner.next() {
@@ -249,7 +239,7 @@ impl PestParser {
                 }
             }
             Rule::or_expr => {
-                let mut inner = pair.into_inner();
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 
                 while let Some(op_pair) = inner.next() {
@@ -269,7 +259,7 @@ impl PestParser {
                 Ok(left)
             }
             Rule::and_expr => {
-                let mut inner = pair.into_inner();
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 
                 while let Some(op_pair) = inner.next() {
@@ -288,7 +278,7 @@ impl PestParser {
                 Ok(left)
             }
             Rule::equality => {
-                let mut inner = pair.into_inner();
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 
                 while let Some(op_pair) = inner.next() {
@@ -319,7 +309,7 @@ impl PestParser {
                 Ok(left)
             }
             Rule::relational => {
-                let mut inner = pair.into_inner();
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 
                 while let Some(op_pair) = inner.next() {
@@ -368,7 +358,7 @@ impl PestParser {
                 Ok(left)
             }
             Rule::additive => {
-                let mut inner = pair.into_inner();
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 
                 while let Some(op_pair) = inner.next() {
@@ -399,7 +389,7 @@ impl PestParser {
                 Ok(left)
             }
             Rule::multiplicative => {
-                let mut inner = pair.into_inner();
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 
                 while let Some(op_pair) = inner.next() {
@@ -439,7 +429,7 @@ impl PestParser {
                 Ok(left)
             }
             Rule::unary => {
-                let mut inner = pair.into_inner();
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 
                 if let Some(op_pair) = inner.next() {
                     match op_pair.as_str() {
@@ -490,6 +480,7 @@ impl PestParser {
             }
             Rule::WHITESPACE => {
                 // Skip whitespace tokens - they should be handled automatically by pest
+                // This shouldn't happen, but if it does, just skip it
                 Err("Unexpected whitespace in expression".into())
             }
             _ => Err(format!("Expected expression, got {:?}", pair.as_rule()).into())
@@ -614,34 +605,11 @@ impl PestParser {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
         
-        println!("Debug: for_stmt pairs (filtered):");
-        let inner_vec: Vec<_> = inner.collect();
-        for (i, p) in inner_vec.iter().enumerate() {
-            println!("  {}: {:?} = '{}'", i, p.as_rule(), p.as_str());
-        }
-        let mut inner = inner_vec.into_iter();
-        
-        // Skip "for" keyword
-        inner.next().ok_or("Missing 'for' keyword")?;
-        
-        // Skip "("
-        inner.next().ok_or("Missing '('")?;
-        
-        let var_name = inner.next().ok_or("Missing variable name")?.as_str().to_string();
-        
-        // Skip ":"
-        inner.next().ok_or("Missing ':'")?;
-        
+        // The grammar produces: identifier, type_, expression, block
+        // (the literal tokens are consumed by the grammar)
+        let var_name = inner.next().ok_or("Missing variable name")?.as_str().trim().to_string();
         let var_type = self.parse_type(inner.next().ok_or("Missing variable type")?)?;
-        
-        // Skip "|"
-        inner.next().ok_or("Missing '|'")?;
-        
         let iterable = self.parse_expression(inner.next().ok_or("Missing iterable")?)?;
-        
-        // Skip ")"
-        inner.next().ok_or("Missing ')'")?;
-        
         let body = self.parse_block(inner.next().ok_or("Missing body")?)?;
         
         Ok(ForStatement {
