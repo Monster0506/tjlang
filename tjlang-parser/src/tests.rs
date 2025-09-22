@@ -328,9 +328,165 @@ mod tests {
         let source = "if true { pass } elif false { pass } else { pass }";
         let mut parser = PestParser::new();
         let result = parser.parse(source);
-        
+
         assert!(result.is_ok(), "Failed to parse if statement with elif and else");
         let program = result.unwrap();
         assert_eq!(program.units.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_function_declaration() {
+        let test_cases = vec![
+            "def main() -> int { return 42 }",
+            "def add(x: int, y: int) -> int { return x + y }",
+            "def greet(name: str) -> str { return \"Hello \" + name }",
+        ];
+
+        for source in test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+
+            match &result {
+                Ok(program) => {
+                    println!("Successfully parsed: {}", source);
+                    println!("Program units: {}", program.units.len());
+                }
+                Err(e) => {
+                    println!("Failed to parse '{}': {}", source, e);
+                }
+            }
+
+            assert!(result.is_ok(), "Failed to parse function declaration: {}", source);
+            let program = result.unwrap();
+            assert_eq!(program.units.len(), 1);
+            
+            // Verify it's a function declaration
+            match &program.units[0] {
+                ProgramUnit::Declaration(Declaration::Function(func)) => {
+                    assert!(!func.name.is_empty(), "Function name should not be empty");
+                }
+                _ => panic!("Expected function declaration, got {:?}", program.units[0]),
+            }
+        }
+    }
+
+    #[test]
+    fn test_grammar_parse_function() {
+        use pest::Parser;
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+
+        let source = "def add(x: int, y: int) -> int { return x + y }";
+        let result = TJLangPestParser::parse(Rule::function_decl, source);
+
+        match result {
+            Ok(pairs) => {
+                println!("Function grammar parse successful!");
+                for pair in pairs {
+                    println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    for inner in pair.into_inner() {
+                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        for inner2 in inner.into_inner() {
+                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                        }
+                    }
+                }
+                assert!(true, "Function grammar should parse successfully");
+            }
+            Err(e) => {
+                println!("Function grammar parse failed: {}", e);
+                panic!("Function grammar should parse successfully");
+            }
+        }
+    }
+
+    #[test]
+    fn test_grammar_parse_simple_function() {
+        use pest::Parser;
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+
+        let source = "def main() -> int { return 42 }";
+        let result = TJLangPestParser::parse(Rule::function_decl, source);
+
+        match result {
+            Ok(pairs) => {
+                println!("Simple function grammar parse successful!");
+                for pair in pairs {
+                    println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    for inner in pair.into_inner() {
+                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        for inner2 in inner.into_inner() {
+                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                        }
+                    }
+                }
+                assert!(true, "Simple function grammar should parse successfully");
+            }
+            Err(e) => {
+                println!("Simple function grammar parse failed: {}", e);
+                panic!("Simple function grammar should parse successfully");
+            }
+        }
+    }
+
+    #[test]
+    fn test_grammar_parse_program_with_function() {
+        use pest::Parser;
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+
+        let source = "def main() -> int { return 42 }";
+        let result = TJLangPestParser::parse(Rule::program, source);
+
+        match result {
+            Ok(pairs) => {
+                println!("Program with function grammar parse successful!");
+                for pair in pairs {
+                    println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    for inner in pair.into_inner() {
+                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        for inner2 in inner.into_inner() {
+                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                        }
+                    }
+                }
+                assert!(true, "Program with function grammar should parse successfully");
+            }
+            Err(e) => {
+                println!("Program with function grammar parse failed: {}", e);
+                panic!("Program with function grammar should parse successfully");
+            }
+        }
+    }
+
+    #[test]
+    fn test_grammar_parse_program_unit() {
+        use pest::Parser;
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+
+        let source = "def main() -> int { return 42 }";
+        let result = TJLangPestParser::parse(Rule::program_unit, source);
+
+        match result {
+            Ok(pairs) => {
+                println!("Program unit grammar parse successful!");
+                for pair in pairs {
+                    println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    for inner in pair.into_inner() {
+                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        for inner2 in inner.into_inner() {
+                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                        }
+                    }
+                }
+                assert!(true, "Program unit grammar should parse successfully");
+            }
+            Err(e) => {
+                println!("Program unit grammar parse failed: {}", e);
+                panic!("Program unit grammar should parse successfully");
+            }
+        }
     }
 }

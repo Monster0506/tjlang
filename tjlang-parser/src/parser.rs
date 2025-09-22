@@ -50,12 +50,29 @@ impl PestParser {
         let program_pair = pairs.next().ok_or("No program found")?;
         let span = program_pair.as_span();
         
-        let mut statements = Vec::new();
+        let mut units = Vec::new();
         for pair in program_pair.into_inner() {
             match pair.as_rule() {
-                Rule::statement => {
-                    if let Some(statement) = self.parse_statement(pair)? {
-                        statements.push(statement);
+                Rule::program_unit => {
+                    let inner = pair.into_inner().next().ok_or("Empty program unit")?;
+                    match inner.as_rule() {
+                        Rule::statement => {
+                            if let Some(statement) = self.parse_statement(inner)? {
+                                // For now, wrap statements in a simple program unit
+                                // In a real implementation, we'd have a proper main function
+                                units.push(ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
+                                    name: "main".to_string(),
+                                    var_type: Type::Primitive(PrimitiveType::Any),
+                                    value: Expression::Literal(Literal::None),
+                                    span: self.create_span(span),
+                                })));
+                            }
+                        }
+                        Rule::function_decl => {
+                            let func_decl = self.parse_function_decl(inner)?;
+                            units.push(ProgramUnit::Declaration(Declaration::Function(func_decl)));
+                        }
+                        _ => {}
                     }
                 }
                 Rule::EOI => break, // End of input
@@ -63,19 +80,8 @@ impl PestParser {
             }
         }
 
-        // Create a simple program with just statements
-        // For now, we'll create a single block containing all statements
-        let _block = Block {
-            statements,
-            span: self.create_span(span),
-        };
         let program = Program {
-            units: vec![ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
-                name: "main".to_string(),
-                var_type: Type::Primitive(PrimitiveType::Any),
-                value: Expression::Literal(Literal::None),
-                span: self.create_span(span),
-            }))],
+            units,
             span: self.create_span(span),
         };
         
@@ -677,6 +683,195 @@ impl PestParser {
         
         Ok(RaiseStatement {
             value,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse function declaration
+    fn parse_function_decl(&mut self, pair: Pair<Rule>) -> Result<FunctionDecl, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // Skip "def" keyword
+        inner.next().ok_or("Missing 'def' keyword")?;
+        
+        // Parse function name
+        let name = inner.next().ok_or("Missing function name")?.as_str().to_string();
+        
+        // Parse generic parameters (optional)
+        let mut generic_params = Vec::new();
+        let mut params = Vec::new();
+        
+        // Look for generic parameters first
+        if let Some(gen_pair) = inner.next() {
+            if gen_pair.as_rule() == Rule::generic_params {
+                generic_params = self.parse_generic_params(gen_pair)?;
+                // After generic params, we should have the opening parenthesis
+                // Skip it
+                inner.next().ok_or("Missing opening parenthesis after generic params")?;
+                
+                // Parse parameter list (optional)
+                if let Some(param_pair) = inner.next() {
+                    if param_pair.as_rule() == Rule::param_list {
+                        params = self.parse_param_list(param_pair)?;
+                    }
+                }
+                
+                // Skip closing parenthesis
+                if let Some(close_paren) = inner.next() {
+                    if close_paren.as_str() != ")" {
+                        return Err("Expected closing parenthesis".into());
+                    }
+                } else {
+                    return Err("Missing closing parenthesis".into());
+                }
+            } else if gen_pair.as_rule() == Rule::type_ {
+                // No generic params, no parameters, this is the return type
+                let return_type = self.parse_type(gen_pair)?;
+                // Parse function body
+                let body = self.parse_block(inner.next().ok_or("Missing function body")?)?;
+                
+                return Ok(FunctionDecl {
+                    name,
+                    generic_params,
+                    params,
+                    return_type,
+                    body,
+                    span: self.create_span(span),
+                });
+            } else {
+                // This should be the opening parenthesis for parameters
+                // Skip it and look for parameters
+                if let Some(param_pair) = inner.next() {
+                    if param_pair.as_rule() == Rule::param_list {
+                        params = self.parse_param_list(param_pair)?;
+                    }
+                }
+                
+                // Skip closing parenthesis
+                if let Some(close_paren) = inner.next() {
+                    if close_paren.as_str() != ")" {
+                        return Err("Expected closing parenthesis".into());
+                    }
+                } else {
+                    return Err("Missing closing parenthesis".into());
+                }
+            }
+        }
+        
+        // Skip arrow
+        inner.next().ok_or("Missing '->' arrow")?;
+        
+        // Parse return type
+        let return_type = self.parse_type(inner.next().ok_or("Missing return type")?)?;
+        
+        // Parse function body
+        let body = self.parse_block(inner.next().ok_or("Missing function body")?)?;
+        
+        Ok(FunctionDecl {
+            name,
+            generic_params,
+            params,
+            return_type,
+            body,
+            span: self.create_span(span),
+        })
+    }
+    
+    /// Parse generic parameters
+    fn parse_generic_params(&mut self, pair: Pair<Rule>) -> Result<Vec<GenericParam>, Box<dyn std::error::Error>> {
+        let mut params = Vec::new();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // Skip opening angle bracket
+        inner.next().ok_or("Missing opening '<'")?;
+        
+        while let Some(param_pair) = inner.next() {
+            if param_pair.as_rule() == Rule::generic_param {
+                let param = self.parse_generic_param(param_pair)?;
+                params.push(param);
+            } else if param_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            } else if param_pair.as_str() == ">" {
+                // End of generic parameters
+                break;
+            }
+        }
+        
+        Ok(params)
+    }
+    
+    /// Parse single generic parameter
+    fn parse_generic_param(&mut self, pair: Pair<Rule>) -> Result<GenericParam, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        let name = inner.next().ok_or("Missing generic parameter name")?.as_str().to_string();
+        
+        // Skip colon
+        inner.next().ok_or("Missing ':'")?;
+        
+        // Skip "Implements" keyword
+        inner.next().ok_or("Missing 'Implements' keyword")?;
+        
+        // Skip opening bracket
+        inner.next().ok_or("Missing opening '['")?;
+        
+        // Parse bounds
+        let mut bounds = Vec::new();
+        while let Some(bound_pair) = inner.next() {
+            if bound_pair.as_rule() == Rule::identifier {
+                bounds.push(bound_pair.as_str().to_string());
+            } else if bound_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            } else if bound_pair.as_str() == "]" {
+                // End of bounds
+                break;
+            }
+        }
+        
+        Ok(GenericParam {
+            name,
+            bounds,
+            span: self.create_span(span),
+        })
+    }
+    
+    /// Parse parameter list
+    fn parse_param_list(&mut self, pair: Pair<Rule>) -> Result<Vec<Parameter>, Box<dyn std::error::Error>> {
+        let mut params = Vec::new();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        while let Some(param_pair) = inner.next() {
+            if param_pair.as_rule() == Rule::param {
+                let param = self.parse_param(param_pair)?;
+                params.push(param);
+            } else if param_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            }
+        }
+        
+        Ok(params)
+    }
+    
+    /// Parse single parameter
+    fn parse_param(&mut self, pair: Pair<Rule>) -> Result<Parameter, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        let name = inner.next().ok_or("Missing parameter name")?.as_str().to_string();
+        
+        // Skip colon
+        inner.next().ok_or("Missing ':'")?;
+        
+        let param_type = self.parse_type(inner.next().ok_or("Missing parameter type")?)?;
+        
+        Ok(Parameter {
+            name,
+            param_type,
             span: self.create_span(span),
         })
     }
