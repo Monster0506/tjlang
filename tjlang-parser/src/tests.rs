@@ -264,4 +264,73 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_parse_control_flow_statements() {
+        let test_cases = vec![
+            "if true { pass }",
+            "while true { pass }",
+            "return 42",
+            "break",
+            "continue", 
+            "pass",
+            "raise \"error\"",
+        ];
+        
+        for source in test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            
+            assert!(result.is_ok(), "Failed to parse control flow statement: {}", source);
+            let program = result.unwrap();
+            assert_eq!(program.units.len(), 1);
+        }
+    }
+
+    #[test]
+    fn test_parse_for_loop() {
+        use pest::Parser;
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+        
+        let source = "for ( x : int | 42 ) { pass }";
+        let result = TJLangPestParser::parse(Rule::statement, source);
+        
+        match result {
+            Ok(pairs) => {
+                println!("Grammar parse successful for for_stmt!");
+                for pair in pairs {
+                    println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                }
+            }
+            Err(e) => {
+                println!("Grammar parse failed for for_stmt: {}", e);
+            }
+        }
+        
+        // Now test the full program
+        let mut parser = PestParser::new();
+        let result = parser.parse(source);
+        
+        match result {
+            Ok(program) => {
+                assert_eq!(program.units.len(), 1);
+            }
+            Err(e) => {
+                println!("Error parsing for loop: {:?}", e);
+                panic!("Failed to parse for loop: {}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_if_statement_with_elif_else() {
+        let source = "if true { pass } elif false { pass } else { pass }";
+        let mut parser = PestParser::new();
+        let result = parser.parse(source);
+        
+        assert!(result.is_ok(), "Failed to parse if statement with elif and else");
+        let program = result.unwrap();
+        assert_eq!(program.units.len(), 1);
+    }
 }

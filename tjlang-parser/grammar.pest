@@ -5,13 +5,41 @@ COMMENT = { "#" ~ (!"\n" ~ ANY)* }
 program = { SOI ~ statement* ~ EOI }
 
 // Statements
-statement = { variable_decl | expression | block }
+statement = { 
+    if_stmt |
+    while_stmt |
+    for_stmt |
+    return_stmt |
+    break_stmt |
+    continue_stmt |
+    pass_stmt |
+    raise_stmt |
+    variable_decl | 
+    expression | 
+    block
+}
 
 // Blocks
 block = { "{" ~ statement* ~ "}" }
 
 // Variable declarations
 variable_decl = { identifier ~ ":" ~ type_ ~ "=" ~ expression }
+
+// Control flow statements
+if_stmt = { "if" ~ expression ~ block ~ elif_branch* ~ else_branch? }
+elif_branch = { "elif" ~ expression ~ block }
+else_branch = { "else" ~ block }
+
+while_stmt = { "while" ~ expression ~ block }
+
+for_stmt = { "for" ~ "(" ~ identifier ~ ":" ~ type_ ~ "|" ~ expression ~ ")" ~ block }
+
+// Simple statements
+return_stmt = { "return" ~ expression? }
+break_stmt = { "break" }
+continue_stmt = { "continue" }
+pass_stmt = { "pass" }
+raise_stmt = { "raise" ~ expression }
 
 // Types
 type_ = { primitive_type | identifier }
