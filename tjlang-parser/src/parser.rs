@@ -208,6 +208,21 @@ impl PestParser {
                 let inner = pair.into_inner().next().ok_or("Empty type")?;
                 self.parse_type(inner)
             }
+            Rule::union_type => {
+                self.parse_union_type(pair)
+            }
+            Rule::option_type => {
+                self.parse_option_type(pair)
+            }
+            Rule::function_type => {
+                self.parse_function_type(pair)
+            }
+            Rule::collection_type => {
+                self.parse_collection_type(pair)
+            }
+            Rule::primary_type => {
+                self.parse_primary_type(pair)
+            }
             Rule::primitive_type => {
                 let type_str = pair.as_str();
                 let primitive_type = match type_str {
@@ -1148,6 +1163,273 @@ impl PestParser {
         }
 
         Ok(args)
+    }
+
+    /// Parse union type
+    fn parse_union_type(&mut self, pair: Pair<Rule>) -> Result<Type, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut types = Vec::new();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        while let Some(type_pair) = inner.next() {
+            if type_pair.as_rule() == Rule::option_type {
+                let option_type = self.parse_option_type(type_pair)?;
+                types.push(option_type);
+            } else if type_pair.as_str() == "|" {
+                // Skip union operator
+                continue;
+            }
+        }
+
+        if types.len() == 1 {
+            Ok(types.into_iter().next().unwrap())
+        } else {
+            Ok(Type::Union {
+                types,
+                span: self.create_span(span),
+            })
+        }
+    }
+
+    /// Parse option type
+    fn parse_option_type(&mut self, pair: Pair<Rule>) -> Result<Type, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        // Check if this is an optional type
+        let is_optional = if let Some(first) = inner.next() {
+            if first.as_str() == "?" {
+                true
+            } else {
+                // This is the function_type, not the optional marker
+                let function_type = self.parse_function_type(first)?;
+                return Ok(function_type);
+            }
+        } else {
+            false
+        };
+
+        // Parse the function type
+        let function_type = self.parse_function_type(inner.next().ok_or("Missing function type")?)?;
+
+        if is_optional {
+            Ok(Type::Option {
+                inner: Box::new(function_type),
+                span: self.create_span(span),
+            })
+        } else {
+            Ok(function_type)
+        }
+    }
+
+    /// Parse function type
+    fn parse_function_type(&mut self, pair: Pair<Rule>) -> Result<Type, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        // Check if this is a function type with parameters
+        if let Some(first) = inner.next() {
+            if first.as_str() == "(" {
+                // This is a function type with parameters
+                let mut param_types = Vec::new();
+                
+                // Check if there are parameters
+                if let Some(type_list_pair) = inner.next() {
+                    if type_list_pair.as_rule() == Rule::type_list {
+                        param_types = self.parse_type_list(type_list_pair)?;
+                    }
+                }
+                
+                // Skip closing parenthesis
+                inner.next().ok_or("Missing closing parenthesis")?;
+                
+                // Skip arrow
+                inner.next().ok_or("Missing arrow")?;
+                
+                // Parse return type
+                let return_type = self.parse_type(inner.next().ok_or("Missing return type")?)?;
+                
+                Ok(Type::Function {
+                    params: param_types,
+                    return_type: Box::new(return_type),
+                    span: self.create_span(span),
+                })
+            } else {
+                // This is a collection_type or primary_type
+                match first.as_rule() {
+                    Rule::collection_type => {
+                        self.parse_collection_type(first)
+                    }
+                    Rule::primary_type => {
+                        self.parse_primary_type(first)
+                    }
+                    _ => Err(format!("Expected collection_type or primary_type, got {:?}", first.as_rule()).into())
+                }
+            }
+        } else {
+            Err("Empty function type".into())
+        }
+    }
+
+    /// Parse collection type
+    fn parse_collection_type(&mut self, pair: Pair<Rule>) -> Result<Type, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let inner = pair.into_inner().next().ok_or("Empty collection type")?;
+
+        match inner.as_rule() {
+            Rule::vec_type => {
+                let element_type = self.parse_type(inner.into_inner().next().ok_or("Missing vec element type")?)?;
+                Ok(Type::Vec {
+                    element_type: Box::new(element_type),
+                    span: self.create_span(span),
+                })
+            }
+            Rule::set_type => {
+                let element_type = self.parse_type(inner.into_inner().next().ok_or("Missing set element type")?)?;
+                Ok(Type::Set {
+                    element_type: Box::new(element_type),
+                    span: self.create_span(span),
+                })
+            }
+            Rule::tuple_type => {
+                let mut types = Vec::new();
+                let mut inner = inner.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                
+                while let Some(type_pair) = inner.next() {
+                    if type_pair.as_rule() == Rule::type_ {
+                        let tuple_type = self.parse_type(type_pair)?;
+                        types.push(tuple_type);
+                    } else if type_pair.as_str() == "," {
+                        // Skip comma
+                        continue;
+                    }
+                }
+                
+                Ok(Type::Tuple {
+                    types,
+                    span: self.create_span(span),
+                })
+            }
+            _ => Err(format!("Expected collection type, got {:?}", inner.as_rule()).into())
+        }
+    }
+
+    /// Parse primary type
+    fn parse_primary_type(&mut self, pair: Pair<Rule>) -> Result<Type, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let inner = pair.into_inner().next().ok_or("Empty primary type")?;
+
+        match inner.as_rule() {
+            Rule::primitive_type => {
+                let type_str = inner.as_str();
+                let primitive_type = match type_str {
+                    "int" => PrimitiveType::Int,
+                    "float" => PrimitiveType::Float,
+                    "bool" => PrimitiveType::Bool,
+                    "str" => PrimitiveType::Str,
+                    "any" => PrimitiveType::Any,
+                    _ => return Err(format!("Unknown primitive type: {}", type_str).into()),
+                };
+                Ok(Type::Primitive(primitive_type))
+            }
+            Rule::identifier => {
+                let name = inner.as_str().to_string();
+                // Check if there are type parameters
+                if let Some(type_params_pair) = inner.into_inner().next() {
+                    if type_params_pair.as_rule() == Rule::type_params {
+                        let type_params = self.parse_type_params(type_params_pair)?;
+                        
+                        // Special handling for Map type
+                        if name == "Map" && type_params.len() == 2 {
+                            Ok(Type::Map {
+                                key_type: Box::new(type_params[0].clone()),
+                                value_type: Box::new(type_params[1].clone()),
+                                span: self.create_span(span),
+                            })
+                        } else {
+                            Ok(Type::Generic {
+                                name,
+                                type_args: type_params,
+                                span: self.create_span(span),
+                            })
+                        }
+                    } else {
+                        Ok(Type::Identifier(name))
+                    }
+                } else {
+                    Ok(Type::Identifier(name))
+                }
+            }
+            Rule::result_type => {
+                let mut inner = inner.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                // Skip "Result"
+                inner.next().ok_or("Missing Result keyword")?;
+                // Skip "<"
+                inner.next().ok_or("Missing opening angle bracket")?;
+                let ok_type = self.parse_type(inner.next().ok_or("Missing Result ok type")?)?;
+                // Skip ","
+                inner.next().ok_or("Missing comma")?;
+                let err_type = self.parse_type(inner.next().ok_or("Missing Result error type")?)?;
+                // Skip ">"
+                inner.next().ok_or("Missing closing angle bracket")?;
+                Ok(Type::Result {
+                    ok_type: Box::new(ok_type),
+                    error_type: Box::new(err_type),
+                    span: self.create_span(span),
+                })
+            }
+            Rule::option_wrapper => {
+                let mut inner = inner.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                // Skip "Option"
+                inner.next().ok_or("Missing Option keyword")?;
+                // Skip "<"
+                inner.next().ok_or("Missing opening angle bracket")?;
+                let inner_type = self.parse_type(inner.next().ok_or("Missing Option inner type")?)?;
+                // Skip ">"
+                inner.next().ok_or("Missing closing angle bracket")?;
+                Ok(Type::Option {
+                    inner: Box::new(inner_type),
+                    span: self.create_span(span),
+                })
+            }
+            _ => Err(format!("Expected primary type, got {:?}", inner.as_rule()).into())
+        }
+    }
+
+    /// Parse type list
+    fn parse_type_list(&mut self, pair: Pair<Rule>) -> Result<Vec<Type>, Box<dyn std::error::Error>> {
+        let mut types = Vec::new();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        while let Some(type_pair) = inner.next() {
+            if type_pair.as_rule() == Rule::type_ {
+                let type_ = self.parse_type(type_pair)?;
+                types.push(type_);
+            } else if type_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            }
+        }
+
+        Ok(types)
+    }
+
+    /// Parse type parameters
+    fn parse_type_params(&mut self, pair: Pair<Rule>) -> Result<Vec<Type>, Box<dyn std::error::Error>> {
+        let mut types = Vec::new();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        while let Some(type_pair) = inner.next() {
+            if type_pair.as_rule() == Rule::type_ {
+                let type_ = self.parse_type(type_pair)?;
+                types.push(type_);
+            } else if type_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            }
+        }
+
+        Ok(types)
     }
 
     /// Create a SourceSpan from a pest span

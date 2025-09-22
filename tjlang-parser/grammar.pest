@@ -57,7 +57,19 @@ param = { identifier ~ ":" ~ type_ }
 identifier_list = { identifier ~ ("," ~ identifier)* }
 
 // Types
-type_ = { primitive_type | identifier }
+type_ = { union_type }
+union_type = { option_type ~ ("|" ~ option_type)* }
+option_type = { "?"? ~ function_type }
+function_type = { "(" ~ type_list? ~ ")" ~ "->" ~ function_type | collection_type | primary_type }
+collection_type = { vec_type | set_type | tuple_type }
+vec_type = { "[" ~ type_ ~ "]" }
+set_type = { "{" ~ type_ ~ "}" }
+tuple_type = { "(" ~ type_ ~ ("," ~ type_)+ ~ ")" }
+primary_type = { primitive_type | identifier ~ type_params? | result_type | option_wrapper }
+result_type = { "Result" ~ "<" ~ type_ ~ "," ~ type_ ~ ">" }
+option_wrapper = { "Option" ~ "<" ~ type_ ~ ">" }
+type_params = { "<" ~ type_ ~ ("," ~ type_)* ~ ">" }
+type_list = { type_ ~ ("," ~ type_)* }
 primitive_type = { "int" | "float" | "bool" | "str" | "any" }
 
 // Expressions (with proper precedence - right associative to avoid left recursion)

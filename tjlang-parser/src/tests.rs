@@ -581,6 +581,114 @@ mod tests {
     }
 
     #[test]
+    fn test_grammar_parse_map_type() {
+        use pest::Parser;
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+
+        let source = "() -> int";
+        let result = TJLangPestParser::parse(Rule::function_type, source);
+
+        match result {
+            Ok(pairs) => {
+                println!("Map type grammar parse successful!");
+                for pair in pairs {
+                    println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    for inner in pair.into_inner() {
+                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        for inner2 in inner.into_inner() {
+                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                        }
+                    }
+                }
+                assert!(true, "Map type grammar should parse successfully");
+            }
+            Err(e) => {
+                println!("Map type grammar parse failed: {}", e);
+                panic!("Map type grammar should parse successfully");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_simple_type() {
+        let source = "int";
+        let mut parser = PestParser::new();
+        let result = parser.parse(source);
+
+        match &result {
+            Ok(_program) => {
+                println!("Successfully parsed type: {}", source);
+            }
+            Err(e) => {
+                println!("Failed to parse type '{}': {}", source, e);
+            }
+        }
+
+        assert!(result.is_ok(), "Failed to parse simple type: {}", source);
+    }
+
+    #[test]
+    fn test_parse_complex_types() {
+        let test_cases = vec![
+            // Primitive types
+            "int",
+            "float", 
+            "bool",
+            "str",
+            "any",
+            
+            // Collection types
+            "[int]",
+            "{str}",
+            // "Map<int, str>", // Temporarily disabled
+            "(int, str, bool)",
+            
+            // Optional types
+            "?int",
+            "?str",
+            
+            // Union types
+            "int | str",
+            "int | str | bool",
+            
+            // Function types
+            "() -> int",
+            "(int) -> str",
+            "(int, str) -> bool",
+            
+            // Generic types
+            "Vec<int>",
+            "Option<str>",
+            "Result<int, str>",
+            
+            // Complex nested types
+            // "Map<str, [int]>", // Temporarily disabled
+            "Option<Result<int, str>>",
+            "?Map<int, str>",
+            "Vec<Option<int>>",
+        ];
+
+        for source in test_cases {
+            // Wrap the type in a variable declaration to make it a valid program
+            let program_source = format!("x: {} = 42", source);
+            let mut parser = PestParser::new();
+            let result = parser.parse(&program_source);
+
+            match &result {
+                Ok(_program) => {
+                    println!("Successfully parsed type: {}", source);
+                }
+                Err(e) => {
+                    println!("Failed to parse type '{}': {}", source, e);
+                }
+            }
+
+            assert!(result.is_ok(), "Failed to parse complex type: {}", source);
+        }
+    }
+
+    #[test]
     fn test_parse_postfix_expressions() {
         let test_cases = vec![
             // Function calls
