@@ -70,15 +70,33 @@ relational = { additive ~ (("<=" | ">=" | "<" | ">") ~ additive)* }
 additive = { multiplicative ~ (("+" | "-") ~ multiplicative)* }
 multiplicative = { unary ~ (("*" | "/" | "%") ~ unary)* }
 unary = { ("-" | "!")? ~ primary }
-primary = { literal | identifier | "(" ~ expression ~ ")" }
+primary = { literal | identifier | collection_literal | "(" ~ expression ~ ")" }
 
 // Literals
-literal = { float_literal | integer_literal | string_literal | boolean_literal | none_literal }
+literal = { 
+    float_literal | 
+    integer_literal | 
+    string_literal | 
+    boolean_literal | 
+    none_literal
+}
+
+// Basic literals
 integer_literal = { "-"? ~ ASCII_DIGIT+ }
 float_literal = { "-"? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 string_literal = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 boolean_literal = { "true" | "false" }
 none_literal = { "None" }
+
+// Collection literals
+collection_literal = { vec_literal | map_literal | set_literal | tuple_literal }
+
+vec_literal = { "[" ~ (expression ~ ("," ~ expression)*)? ~ "]" }
+set_literal = { "{" ~ (expression ~ ("," ~ expression)*)? ~ "}" }
+map_literal = { "{" ~ (map_entry ~ ("," ~ map_entry)*)? ~ "}" }
+tuple_literal = { "(" ~ expression ~ ("," ~ expression)+ ~ ")" }
+
+map_entry = { expression ~ ":" ~ expression }
 
 // Identifiers
 identifier = { (ASCII_ALPHA | "_") ~ ASCII_ALPHANUMERIC* }

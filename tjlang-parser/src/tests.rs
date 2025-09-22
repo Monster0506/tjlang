@@ -489,4 +489,77 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_grammar_parse_map_literal() {
+        use pest::Parser;
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+
+        let source = "{\"key\": \"value\"}";
+        let result = TJLangPestParser::parse(Rule::collection_literal, source);
+
+        match result {
+            Ok(pairs) => {
+                println!("Map literal grammar parse successful!");
+                for pair in pairs {
+                    println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    for inner in pair.into_inner() {
+                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        for inner2 in inner.into_inner() {
+                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                        }
+                    }
+                }
+                assert!(true, "Map literal grammar should parse successfully");
+            }
+            Err(e) => {
+                println!("Map literal grammar parse failed: {}", e);
+                panic!("Map literal grammar should parse successfully");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_collection_literals() {
+        let test_cases = vec![
+            // Vector literals
+            "[]",
+            "[1, 2, 3]",
+            "[\"hello\", \"world\"]",
+            "[1 + 2, 3 * 4]",
+            
+            // Set literals
+            "{}",
+            "{1, 2, 3}",
+            "{\"a\", \"b\", \"c\"}",
+            
+            // Map literals
+            "{}",
+            "{\"key\": \"value\"}",
+            "{1: \"one\", 2: \"two\"}",
+            "{\"a\": 1, \"b\": 2, \"c\": 3}",
+            
+            // Tuple literals
+            "(1, 2)",
+            "(\"hello\", 42, true)",
+            "(1 + 2, 3 * 4)",
+        ];
+
+        for source in test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+
+            match &result {
+                Ok(program) => {
+                    println!("Successfully parsed: {}", source);
+                }
+                Err(e) => {
+                    println!("Failed to parse '{}': {}", source, e);
+                }
+            }
+
+            assert!(result.is_ok(), "Failed to parse collection literal: {}", source);
+        }
+    }
 }

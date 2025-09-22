@@ -486,6 +486,9 @@ impl PestParser {
                         let name = inner.as_str().to_string();
                         Ok(Expression::Variable(name))
                     }
+                    Rule::collection_literal => {
+                        self.parse_collection_literal(inner)
+                    }
                     Rule::expression => {
                         // This is for parenthesized expressions - parse the inner expression
                         let inner_expr = inner.into_inner().next().ok_or("Empty parenthesized expression")?;
@@ -533,6 +536,10 @@ impl PestParser {
             }
             Rule::none_literal => {
                 Ok(Literal::None)
+            }
+            Rule::collection_literal => {
+                // Collection literals should be handled as expressions, not basic literals
+                Err("Collection literals should be parsed as expressions".into())
             }
             _ => Err(format!("Expected literal, got {:?}", inner.as_rule()).into())
         }
@@ -849,6 +856,126 @@ impl PestParser {
         Ok(Parameter {
             name,
             param_type,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse collection literal
+    fn parse_collection_literal(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let inner = pair.into_inner().next().ok_or("Empty collection literal")?;
+
+        match inner.as_rule() {
+            Rule::vec_literal => self.parse_vec_literal(inner),
+            Rule::set_literal => self.parse_set_literal(inner),
+            Rule::map_literal => self.parse_map_literal(inner),
+            Rule::tuple_literal => self.parse_tuple_literal(inner),
+            _ => Err("Unknown collection literal type".into())
+        }
+    }
+
+    /// Parse vector literal
+    fn parse_vec_literal(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut elements = Vec::new();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        while let Some(element_pair) = inner.next() {
+            if element_pair.as_rule() == Rule::expression {
+                let element = self.parse_expression(element_pair)?;
+                elements.push(element);
+            } else if element_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            }
+        }
+
+        Ok(Expression::VecLiteral {
+            elements,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse set literal
+    fn parse_set_literal(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut elements = Vec::new();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        while let Some(element_pair) = inner.next() {
+            if element_pair.as_rule() == Rule::expression {
+                let element = self.parse_expression(element_pair)?;
+                elements.push(element);
+            } else if element_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            }
+        }
+
+        Ok(Expression::SetLiteral {
+            elements,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse map literal
+    fn parse_map_literal(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut entries = Vec::new();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        while let Some(entry_pair) = inner.next() {
+            if entry_pair.as_rule() == Rule::map_entry {
+                let entry = self.parse_map_entry(entry_pair)?;
+                entries.push(entry);
+            } else if entry_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            }
+        }
+
+        Ok(Expression::MapLiteral {
+            entries,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse tuple literal
+    fn parse_tuple_literal(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut elements = Vec::new();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        while let Some(element_pair) = inner.next() {
+            if element_pair.as_rule() == Rule::expression {
+                let element = self.parse_expression(element_pair)?;
+                elements.push(element);
+            } else if element_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            }
+        }
+
+        Ok(Expression::TupleLiteral {
+            elements,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse map entry
+    fn parse_map_entry(&mut self, pair: Pair<Rule>) -> Result<MapEntry, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        let key = inner.next().ok_or("Missing map key")?;
+        let key_expr = self.parse_expression(key)?;
+
+        let value = inner.next().ok_or("Missing map value")?;
+        let value_expr = self.parse_expression(value)?;
+
+        Ok(MapEntry {
+            key: key_expr,
+            value: value_expr,
             span: self.create_span(span),
         })
     }
