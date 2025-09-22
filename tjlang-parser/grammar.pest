@@ -69,8 +69,9 @@ equality = { relational ~ (("==" | "!=") ~ relational)* }
 relational = { additive ~ (("<=" | ">=" | "<" | ">") ~ additive)* }
 additive = { multiplicative ~ (("+" | "-") ~ multiplicative)* }
 multiplicative = { unary ~ (("*" | "/" | "%") ~ unary)* }
-unary = { ("-" | "!")? ~ primary }
-primary = { literal | identifier | collection_literal | "(" ~ expression ~ ")" }
+unary = { ("-" | "!")? ~ postfix_expr }
+postfix_expr = { primary ~ (call_suffix | index_suffix | member_suffix)* }
+primary = { literal | identifier | collection_literal | lambda_expr | range_expr | "(" ~ expression ~ ")" }
 
 // Literals
 literal = { 
@@ -97,6 +98,20 @@ map_literal = { "{" ~ (map_entry ~ ("," ~ map_entry)*)? ~ "}" }
 tuple_literal = { "(" ~ expression ~ ("," ~ expression)+ ~ ")" }
 
 map_entry = { expression ~ ":" ~ expression }
+
+// Postfix expressions
+call_suffix = { "(" ~ argument_list? ~ ")" }
+index_suffix = { "[" ~ expression ~ "]" }
+member_suffix = { "." ~ identifier }
+
+// Lambda expressions
+lambda_expr = { "|" ~ param_list? ~ "|" ~ expression }
+
+// Range expressions
+range_expr = { integer_literal ~ ".." ~ ("=" ~ integer_literal | integer_literal)? }
+
+// Argument lists
+argument_list = { expression ~ ("," ~ expression)* }
 
 // Identifiers
 identifier = { (ASCII_ALPHA | "_") ~ ASCII_ALPHANUMERIC* }

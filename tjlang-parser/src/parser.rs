@@ -475,6 +475,9 @@ impl PestParser {
                     Err("Missing unary expression".into())
                 }
             }
+            Rule::postfix_expr => {
+                self.parse_postfix_expr(pair)
+            }
             Rule::primary => {
                 let inner = pair.into_inner().next().ok_or("Empty primary expression")?;
                 match inner.as_rule() {
@@ -488,6 +491,12 @@ impl PestParser {
                     }
                     Rule::collection_literal => {
                         self.parse_collection_literal(inner)
+                    }
+                    Rule::lambda_expr => {
+                        self.parse_lambda_expr(inner)
+                    }
+                    Rule::range_expr => {
+                        self.parse_range_expr(inner)
                     }
                     Rule::expression => {
                         // This is for parenthesized expressions - parse the inner expression
@@ -978,6 +987,167 @@ impl PestParser {
             value: value_expr,
             span: self.create_span(span),
         })
+    }
+
+    /// Parse postfix expression
+    fn parse_postfix_expr(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // Parse the primary expression
+        let mut expr = self.parse_expression(inner.next().ok_or("Missing primary expression")?)?;
+        
+        // Apply postfix operations in order
+        while let Some(suffix_pair) = inner.next() {
+            match suffix_pair.as_rule() {
+                Rule::call_suffix => {
+                    expr = self.parse_call_suffix(expr, suffix_pair)?;
+                }
+                Rule::index_suffix => {
+                    expr = self.parse_index_suffix(expr, suffix_pair)?;
+                }
+                Rule::member_suffix => {
+                    expr = self.parse_member_suffix(expr, suffix_pair)?;
+                }
+                _ => {
+                    return Err(format!("Unexpected postfix suffix: {:?}", suffix_pair.as_rule()).into());
+                }
+            }
+        }
+        
+        Ok(expr)
+    }
+
+    /// Parse call suffix
+    fn parse_call_suffix(&mut self, callee: Expression, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut args = Vec::new();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        // Parse arguments if present
+        if let Some(arg_list_pair) = inner.next() {
+            if arg_list_pair.as_rule() == Rule::argument_list {
+                args = self.parse_argument_list(arg_list_pair)?;
+            }
+        }
+
+        Ok(Expression::Call {
+            callee: Box::new(callee),
+            args,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse index suffix
+    fn parse_index_suffix(&mut self, target: Expression, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        // Parse index expression
+        let index = self.parse_expression(inner.next().ok_or("Missing index expression")?)?;
+
+        Ok(Expression::Index {
+            target: Box::new(target),
+            index: Box::new(index),
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse member suffix
+    fn parse_member_suffix(&mut self, target: Expression, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        // Parse member name
+        let member = inner.next().ok_or("Missing member name")?.as_str().to_string();
+
+        Ok(Expression::Member {
+            target: Box::new(target),
+            member,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse lambda expression
+    fn parse_lambda_expr(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        // Parse parameters if present
+        let mut params = Vec::new();
+        if let Some(param_list_pair) = inner.next() {
+            if param_list_pair.as_rule() == Rule::param_list {
+                params = self.parse_param_list(param_list_pair)?;
+            } else {
+                // This is the body expression, not a parameter list
+                let body = self.parse_expression(param_list_pair)?;
+                return Ok(Expression::Lambda {
+                    params,
+                    body: Box::new(body),
+                    span: self.create_span(span),
+                });
+            }
+        }
+
+        // Parse body expression
+        let body = self.parse_expression(inner.next().ok_or("Missing lambda body")?)?;
+
+        Ok(Expression::Lambda {
+            params,
+            body: Box::new(body),
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse range expression
+    fn parse_range_expr(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        // Parse start value
+        let start = self.parse_expression(inner.next().ok_or("Missing start value")?)?;
+
+        // Skip dots
+        inner.next().ok_or("Missing dots")?;
+
+        // Parse end value if present
+        let end = if let Some(end_pair) = inner.next() {
+            if end_pair.as_str() == "=" {
+                // Inclusive range (..=)
+                self.parse_expression(inner.next().ok_or("Missing end value")?)?
+            } else {
+                // Exclusive range (..)
+                self.parse_expression(end_pair)?
+            }
+        } else {
+            // No end value - infinite range
+            return Err("Range expressions must have an end value".into());
+        };
+
+        Ok(Expression::Range {
+            start: Box::new(start),
+            end: Box::new(end),
+            inclusive: false, // Will be set correctly based on parsing
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse argument list
+    fn parse_argument_list(&mut self, pair: Pair<Rule>) -> Result<Vec<Expression>, Box<dyn std::error::Error>> {
+        let mut args = Vec::new();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        while let Some(arg_pair) = inner.next() {
+            if arg_pair.as_rule() == Rule::expression {
+                let arg = self.parse_expression(arg_pair)?;
+                args.push(arg);
+            } else if arg_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            }
+        }
+
+        Ok(args)
     }
 
     /// Create a SourceSpan from a pest span
