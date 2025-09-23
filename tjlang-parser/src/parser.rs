@@ -1580,7 +1580,7 @@ impl PestParser {
         // Parse identifier generic param names if present
         let mut type_params = Vec::new();
         if let Some(next_pair) = inner.next() {
-            if next_pair.as_rule() == Rule::type_param_names {
+            if next_pair.as_rule() == Rule::type_param_list {
                 let mut names = next_pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 while let Some(tok) = names.next() {
                     if tok.as_rule() == Rule::identifier {
@@ -1669,7 +1669,7 @@ impl PestParser {
 
         // Optional generic param names
         if let Some(next) = inner.clone().next() {
-            if next.as_rule() == Rule::type_param_names {
+            if next.as_rule() == Rule::type_param_list {
                 // consume
                 let _ = inner.next();
             }
