@@ -1399,4 +1399,24 @@ mod tests {
             assert!(result.is_err(), "Expected failure for invalid spawn usage: {}", source);
         }
     }
+
+    #[test]
+    fn test_parse_map_types() {
+        use crate::parser::PestParser;
+
+        let ok_cases = vec![
+            // Simple map type in declaration
+            "x: Map<int, str> = 42",
+            // Nested key/value types
+            "x: Map<str, [int]> = 42",
+            // With identifier key type
+            "x: MyMap<int, int> = 42",
+        ];
+
+        for source in ok_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            assert!(result.is_ok(), "Failed to parse map type: {}", source);
+        }
+    }
 }
