@@ -955,6 +955,49 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_range_expressions() {
+        use crate::parser::{PestParser, TJLangPestParser, Rule};
+        use pest::Parser;
+
+        // Test the grammar rule directly first
+        let range_test_cases = vec![
+            "0..10",     // Exclusive range
+            "0..=10",    // Inclusive range
+            "1..5",      // Simple range
+            "10..=20",   // Inclusive range with different numbers
+        ];
+
+        for source in range_test_cases {
+            // Test grammar rule directly
+            let grammar_result = TJLangPestParser::parse(Rule::range_expr, source);
+            match &grammar_result {
+                Ok(_pairs) => {
+                    println!("✓ Grammar rule parsed range: {}", source);
+                }
+                Err(e) => {
+                    println!("✗ Grammar rule failed for range '{}': {}", source, e);
+                }
+            }
+
+            // Test as program
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+
+            match &result {
+                Ok(_program) => {
+                    println!("✓ Program parsed range: {}", source);
+                }
+                Err(e) => {
+                    println!("✗ Program failed for range '{}': {}", source, e);
+                }
+            }
+
+            // For now, just test that the grammar rule works
+            assert!(grammar_result.is_ok(), "Failed to parse range expression grammar rule: {}", source);
+        }
+    }
+
+    #[test]
     fn test_parse_complex_types() {
         let test_cases = vec![
             // Primitive types
