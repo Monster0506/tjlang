@@ -116,7 +116,8 @@ additive = { multiplicative ~ (("+" | "-") ~ multiplicative)* }
 multiplicative = { unary ~ (("*" | "/" | "%") ~ unary)* }
 unary = { ("-" | "!")? ~ postfix_expr }
 postfix_expr = { primary ~ (call_suffix | index_suffix | member_suffix)* }
-primary = { range_expr | literal | identifier | collection_literal | lambda_expr | "(" ~ expression ~ ")" }
+primary = { spawn_expr | range_expr | literal | identifier | collection_literal | lambda_expr | "(" ~ expression ~ ")" }
+spawn_expr = { "spawn" ~ expression }
 
 // Literals
 literal = { 
@@ -161,5 +162,5 @@ argument_list = { expression ~ ("," ~ expression)* }
 // Identifiers
 impl_kw = { "impl" }
 for_kw = { "for" }
-keyword = { impl_kw | for_kw | "do" | "def" | "type" | "enum" | "interface" | "if" | "elif" | "else" | "while" | "return" | "break" | "continue" | "pass" | "raise" }
+keyword = { impl_kw | for_kw | "do" | "spawn" | "def" | "type" | "enum" | "interface" | "if" | "elif" | "else" | "while" | "return" | "break" | "continue" | "pass" | "raise" }
 identifier = { !keyword ~ (ASCII_ALPHA | "_") ~ ASCII_ALPHANUMERIC* }

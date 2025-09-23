@@ -565,6 +565,16 @@ impl PestParser {
                         let inner_expr = inner.into_inner().next().ok_or("Empty parenthesized expression")?;
                         self.parse_expression(inner_expr)
                     }
+                    Rule::spawn_expr => {
+                        let span = inner.as_span();
+                        let mut it = inner.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                        let expr_pair = it.next().ok_or("Missing expression to spawn")?;
+                        let expression = self.parse_expression(expr_pair)?;
+                        Ok(Expression::Spawn {
+                            expression: Box::new(expression),
+                            span: self.create_span(span),
+                        })
+                    }
                     _ => Err(format!("Expected primary expression, got {:?}", inner.as_rule()).into())
                 }
             }
