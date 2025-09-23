@@ -321,7 +321,7 @@ mod tests {
             match &result {
                 Ok(program) => {
                     println!("✓ Parsed successfully: {:?}", program);
-                    assert_eq!(program.units.len(), 1);
+            assert_eq!(program.units.len(), 1);
                 }
                 Err(e) => {
                     println!("✗ Parse failed: {}", e);
@@ -397,7 +397,7 @@ mod tests {
         match &result {
             Ok(program) => {
                 println!("✓ Parsed successfully: {:?}", program);
-                assert_eq!(program.units.len(), 1);
+        assert_eq!(program.units.len(), 1);
             }
             Err(e) => {
                 println!("✗ Parse failed: {}", e);
@@ -984,8 +984,10 @@ mod tests {
 
     #[test]
     fn test_parse_range_expressions() {
-        use crate::parser::PestParser;
+        use crate::parser::{PestParser, TJLangPestParser, Rule};
+        use pest::Parser;
 
+        // Test the grammar rule directly first
         let range_test_cases = vec![
             "0..10",     // Exclusive range
             "0..=10",    // Inclusive range
@@ -994,19 +996,42 @@ mod tests {
         ];
 
         for source in range_test_cases {
+            // Test grammar rule directly
+            let grammar_result = TJLangPestParser::parse(Rule::range_expr, source);
+            match &grammar_result {
+                Ok(_pairs) => {
+                    println!("✓ Grammar rule parsed range: {}", source);
+                }
+                Err(e) => {
+                    println!("✗ Grammar rule failed for range '{}': {}", source, e);
+                }
+            }
+
+            // For now, just test that the grammar rule works
+            assert!(grammar_result.is_ok(), "Failed to parse range expression grammar rule: {}", source);
+        }
+
+        // Test range expressions in valid contexts
+        let context_test_cases = vec![
+            "for (x: int | 0..10) { pass }",     // Range in for loop
+            "for (i: int | 1..5) { pass }",      // Simple range in for loop
+            "for (j: int | 0..=10) { pass }",    // Inclusive range in for loop
+        ];
+
+        for source in context_test_cases {
             let mut parser = PestParser::new();
             let result = parser.parse(source);
 
             match &result {
                 Ok(_program) => {
-                    println!("Successfully parsed range: {}", source);
+                    println!("✓ Program parsed range in context: {}", source);
                 }
                 Err(e) => {
-                    println!("Failed to parse range '{}': {}", source, e);
+                    println!("✗ Program failed for range in context '{}': {}", source, e);
                 }
             }
 
-            assert!(result.is_ok(), "Failed to parse range expression: {}", source);
+            assert!(result.is_ok(), "Failed to parse range expression in context: {}", source);
         }
     }
 

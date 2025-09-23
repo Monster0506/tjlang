@@ -113,7 +113,7 @@ additive = { multiplicative ~ (("+" | "-") ~ multiplicative)* }
 multiplicative = { unary ~ (("*" | "/" | "%") ~ unary)* }
 unary = { ("-" | "!")? ~ postfix_expr }
 postfix_expr = { primary ~ (call_suffix | index_suffix | member_suffix)* }
-primary = { literal | identifier | collection_literal | lambda_expr | range_expr | "(" ~ expression ~ ")" }
+primary = { range_expr | literal | identifier | collection_literal | lambda_expr | "(" ~ expression ~ ")" }
 
 // Literals
 literal = { 
