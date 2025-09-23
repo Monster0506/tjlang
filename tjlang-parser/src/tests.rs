@@ -1399,4 +1399,57 @@ mod tests {
             assert!(result.is_err(), "Expected failure for invalid spawn usage: {}", source);
         }
     }
+
+    #[test]
+    #[ignore]
+    fn test_parse_fstring_literals_placeholder() {
+        use crate::parser::PestParser;
+        // Placeholder tests until f-strings are supported in grammar and parser
+        let cases = vec![
+            "def main() -> int { x = f\"hello {1 + 1}\" }",
+            "def main() -> int { y = f\"point: {x},{y}\" }",
+        ];
+        for source in cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            assert!(result.is_ok(), "Expected f-string to parse once implemented: {}", source);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_parse_modules_imports_exports_placeholder() {
+        use crate::parser::PestParser;
+        // Placeholder syntax examples subject to final grammar for modules/import/export
+        let cases = vec![
+            "module graphics",
+            "import math as m",
+            "import { sin, cos } from math",
+            "export draw",
+            "export { draw, fill }",
+        ];
+        for source in cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            assert!(result.is_ok(), "Expected module/import/export to parse once implemented: {}", source);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_parse_match_statements_placeholder() {
+        use crate::parser::PestParser;
+        // Placeholder match patterns and guards per @Grammar.g4 intent
+        let cases = vec![
+            "match x { 1 => pass, _ => pass }",
+            "match t { (a, b) => pass, _ => pass }",
+            "match v { Point{x, y} => pass, _ => pass }",
+            "match n { _ if n > 0 => pass, _ => pass }",
+        ];
+        for source in cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            assert!(result.is_ok(), "Expected match to parse once implemented: {}", source);
+        }
+    }
 }
