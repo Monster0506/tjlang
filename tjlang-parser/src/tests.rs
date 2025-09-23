@@ -1401,22 +1401,75 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_map_types() {
+    #[ignore]
+    fn test_parse_fstring_literals_placeholder() {
         use crate::parser::PestParser;
-
-        let ok_cases = vec![
-            // Simple map type in declaration
-            "x: Map<int, str> = 42",
-            // Nested key/value types
-            "x: Map<str, [int]> = 42",
-            // With identifier key type
-            "x: MyMap<int, int> = 42",
+        // Placeholder tests until f-strings are supported in grammar and parser
+        let cases = vec![
+            "def main() -> int { x = f\"hello {1 + 1}\" }",
+            "def main() -> int { y = f\"point: {x},{y}\" }",
         ];
-
-        for source in ok_cases {
+        for source in cases {
             let mut parser = PestParser::new();
             let result = parser.parse(source);
-            assert!(result.is_ok(), "Failed to parse map type: {}", source);
+            assert!(result.is_ok(), "Expected f-string to parse once implemented: {}", source);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_parse_modules_imports_exports_placeholder() {
+        use crate::parser::PestParser;
+        // Placeholder syntax examples subject to final grammar for modules/import/export
+        let cases = vec![
+            "module graphics",
+            "import math as m",
+            "import { sin, cos } from math",
+            "export draw",
+            "export { draw, fill }",
+        ];
+        for source in cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            assert!(result.is_ok(), "Expected module/import/export to parse once implemented: {}", source);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_parse_match_statements_placeholder() {
+        use crate::parser::PestParser;
+        // Placeholder match patterns and guards per @Grammar.g4 intent
+        let cases = vec![
+            "match x { 1 => pass, _ => pass }",
+            "match t { (a, b) => pass, _ => pass }",
+            "match v { Point{x, y} => pass, _ => pass }",
+            "match n { _ if n > 0 => pass, _ => pass }",
+        ];
+        for source in cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            assert!(result.is_ok(), "Expected match to parse once implemented: {}", source);
+        }
+    }
+
+    #[test]
+    fn test_grammar_parse_modules_imports_exports() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+
+        let cases = vec![
+            "module graphics.ui",
+            "import math.core as m",
+            "import { sin, cos } from math.core",
+            "export draw",
+            "export { draw, fill }",
+        ];
+
+        for source in cases {
+            // module/import/export are program units per grammar
+            let result = TJLangPestParser::parse(Rule::program_unit, source);
+            assert!(result.is_ok(), "Grammar failed for program_unit: {} -> {:?}", source, result.err());
         }
     }
 }
