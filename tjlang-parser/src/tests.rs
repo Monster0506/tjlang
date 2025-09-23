@@ -983,6 +983,34 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_range_expressions() {
+        use crate::parser::PestParser;
+
+        let range_test_cases = vec![
+            "0..10",     // Exclusive range
+            "0..=10",    // Inclusive range
+            "1..5",      // Simple range
+            "10..=20",   // Inclusive range with different numbers
+        ];
+
+        for source in range_test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+
+            match &result {
+                Ok(_program) => {
+                    println!("Successfully parsed range: {}", source);
+                }
+                Err(e) => {
+                    println!("Failed to parse range '{}': {}", source, e);
+                }
+            }
+
+            assert!(result.is_ok(), "Failed to parse range expression: {}", source);
+        }
+    }
+
+    #[test]
     fn test_parse_complex_types() {
         let test_cases = vec![
             // Primitive types
