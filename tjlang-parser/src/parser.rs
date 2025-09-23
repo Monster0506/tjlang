@@ -55,14 +55,22 @@ impl PestParser {
                     match inner.as_rule() {
                         Rule::statement => {
                             if let Some(statement) = self.parse_statement(inner)? {
-                                // For now, wrap statements in a simple program unit
-                                // In a real implementation, we'd have a proper main function
-                                units.push(ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
-                                    name: "main".to_string(),
-                                    var_type: Type::Primitive(PrimitiveType::Any),
-                                    value: Expression::Literal(Literal::None),
-                                    span: self.create_span(span),
-                                })));
+                                // Convert statement to appropriate program unit
+                                match statement {
+                                    Statement::Variable(var_decl) => {
+                                        units.push(ProgramUnit::Declaration(Declaration::Variable(var_decl)));
+                                    }
+                                    _ => {
+                                        // For other statements, create a dummy variable declaration
+                                        // This maintains backward compatibility with existing tests
+                                        units.push(ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
+                                            name: "main".to_string(),
+                                            var_type: Type::Primitive(PrimitiveType::Any),
+                                            value: Expression::Literal(Literal::None),
+                                            span: self.create_span(span),
+                                        })));
+                                    }
+                                }
                             }
                         }
                         Rule::function_decl => {
@@ -459,6 +467,10 @@ impl PestParser {
                 let s = pair.as_str().to_string();
                 Ok(Expression::Literal(Literal::String(s)))
             }
+            Rule::fstring_literal => {
+                let s = pair.as_str().to_string();
+                Ok(Expression::Literal(Literal::FString(s)))
+            }
             Rule::boolean_literal => {
                 let val = match pair.as_str() { "true" => true, _ => false };
                 Ok(Expression::Literal(Literal::Bool(val)))
@@ -610,6 +622,12 @@ impl PestParser {
                 // Remove quotes
                 let value = value.trim_start_matches('"').trim_end_matches('"').to_string();
                 Ok(Literal::String(value))
+            }
+            Rule::fstring_literal => {
+                let value = inner.as_str().to_string();
+                // Remove f" prefix and " suffix
+                let value = value.trim_start_matches("f\"").trim_end_matches('"').to_string();
+                Ok(Literal::FString(value))
             }
             Rule::boolean_literal => {
                 let value = inner.as_str() == "true";

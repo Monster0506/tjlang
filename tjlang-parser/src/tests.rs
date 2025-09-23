@@ -96,10 +96,15 @@ mod tests {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
                 
-                // The current parser creates a dummy variable declaration for the program
-                // but we should have parsed the actual variable declaration
+                // The parser should now parse the actual variable declaration
                 if let ProgramUnit::Declaration(Declaration::Variable(var)) = &program.units[0] {
-                    assert_eq!(var.name, "main"); // This is the dummy one
+                    assert_eq!(var.name, "x"); // This should be the actual variable name
+                    assert_eq!(var.var_type, Type::Primitive(PrimitiveType::Int));
+                    if let Expression::Literal(Literal::Int(value)) = &var.value {
+                        assert_eq!(*value, 42);
+                    } else {
+                        panic!("Expected integer literal 42, got: {:?}", var.value);
+                    }
                 } else {
                     panic!("Expected variable declaration");
                 }
@@ -1401,19 +1406,127 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
-    fn test_parse_fstring_literals_placeholder() {
-        use crate::parser::PestParser;
-        // Placeholder tests until f-strings are supported in grammar and parser
-        let cases = vec![
-            "def main() -> int { x = f\"hello {1 + 1}\" }",
-            "def main() -> int { y = f\"point: {x},{y}\" }",
+    fn test_grammar_parse_fstring_literals() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+        
+        // Test f-string literal grammar rule directly
+        let test_cases = vec![
+            "f\"Hello world\"",
+            "f\"Hello {name}\"",
+            "f\"Value: {x + y}\"",
+            "f\"Multiple: {a}, {b}\"",
+            "f\"Escaped: {{brace}}\"",
         ];
-        for source in cases {
-            let mut parser = PestParser::new();
-            let result = parser.parse(source);
-            assert!(result.is_ok(), "Expected f-string to parse once implemented: {}", source);
+        
+        for source in test_cases {
+            let result = TJLangPestParser::parse(Rule::fstring_literal, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ F-string literal parsed successfully: {}", source);
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    }
+                }
+                Err(e) => panic!("Failed to parse f-string literal '{}': {}", source, e),
+            }
         }
+        
+        println!("✓ All f-string literal grammar tests passed");
+    }
+
+    #[test]
+    fn test_parse_fstring_literals() {
+        use crate::parser::PestParser;
+        
+        let mut parser = PestParser::new();
+        
+        // Test basic f-string literal in variable declaration
+        let result = parser.parse("x: str = f\"Hello world\"");
+        match result {
+            Ok(program) => {
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
+                    if let Expression::Literal(Literal::FString(content)) = &var_decl.value {
+                        assert_eq!(content, "Hello world");
+                    } else {
+                        panic!("Expected FString literal, got: {:?}", var_decl.value);
+                    }
+                } else {
+                    panic!("Expected variable declaration, got: {:?}", program.units);
+                }
+            }
+            Err(e) => panic!("Failed to parse f-string literal: {}", e),
+        }
+        
+        // Test f-string with interpolation syntax (parser doesn't validate, just captures)
+        let result = parser.parse("y: str = f\"Hello {name}\"");
+        match result {
+            Ok(program) => {
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
+                    if let Expression::Literal(Literal::FString(content)) = &var_decl.value {
+                        assert_eq!(content, "Hello {name}");
+                    } else {
+                        panic!("Expected FString literal, got: {:?}", var_decl.value);
+                    }
+                } else {
+                    panic!("Expected variable declaration, got: {:?}", program.units);
+                }
+            }
+            Err(e) => panic!("Failed to parse f-string with interpolation: {}", e),
+        }
+        
+        // Test f-string with complex interpolation
+        let result = parser.parse("z: str = f\"Value: {x + y}\"");
+        match result {
+            Ok(program) => {
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
+                    if let Expression::Literal(Literal::FString(content)) = &var_decl.value {
+                        assert_eq!(content, "Value: {x + y}");
+                    } else {
+                        panic!("Expected FString literal, got: {:?}", var_decl.value);
+                    }
+                } else {
+                    panic!("Expected variable declaration, got: {:?}", program.units);
+                }
+            }
+            Err(e) => panic!("Failed to parse f-string with complex interpolation: {}", e),
+        }
+        
+        // Test f-string with multiple interpolations
+        let result = parser.parse("msg: str = f\"Multiple: {a}, {b}\"");
+        match result {
+            Ok(program) => {
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
+                    if let Expression::Literal(Literal::FString(content)) = &var_decl.value {
+                        assert_eq!(content, "Multiple: {a}, {b}");
+                    } else {
+                        panic!("Expected FString literal, got: {:?}", var_decl.value);
+                    }
+                } else {
+                    panic!("Expected variable declaration, got: {:?}", program.units);
+                }
+            }
+            Err(e) => panic!("Failed to parse f-string with multiple interpolations: {}", e),
+        }
+        
+        // Test f-string with escaped braces
+        let result = parser.parse("escaped: str = f\"Escaped: {{brace}}\"");
+        match result {
+            Ok(program) => {
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
+                    if let Expression::Literal(Literal::FString(content)) = &var_decl.value {
+                        assert_eq!(content, "Escaped: {{brace}}");
+                    } else {
+                        panic!("Expected FString literal, got: {:?}", var_decl.value);
+                    }
+                } else {
+                    panic!("Expected variable declaration, got: {:?}", program.units);
+                }
+            }
+            Err(e) => panic!("Failed to parse f-string with escaped braces: {}", e),
+        }
+        
+        println!("✓ All f-string literal parsing tests passed");
     }
 
     #[test]

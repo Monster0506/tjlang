@@ -143,6 +143,7 @@ literal = {
     float_literal | 
     integer_literal | 
     string_literal | 
+    fstring_literal |
     boolean_literal | 
     none_literal
 }
@@ -151,6 +152,7 @@ literal = {
 integer_literal = { "-"? ~ ASCII_DIGIT+ }
 float_literal = { "-"? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 string_literal = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+fstring_literal = { "f\"" ~ (!"\"" ~ ANY)* ~ "\""}
 boolean_literal = { "true" | "false" }
 none_literal = { "None" }
 
