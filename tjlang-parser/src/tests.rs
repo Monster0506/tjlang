@@ -1417,21 +1417,20 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
-    fn test_parse_modules_imports_exports_placeholder() {
-        use crate::parser::PestParser;
-        // Placeholder syntax examples subject to final grammar for modules/import/export
+    fn test_grammar_parse_modules_imports_exports() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+        // Grammar-level tests for modules/import/export
         let cases = vec![
-            "module graphics",
-            "import math as m",
-            "import { sin, cos } from math",
+            "module graphics.ui",
+            "import math.core as m",
+            "import { sin, cos } from math.core",
             "export draw",
             "export { draw, fill }",
         ];
         for source in cases {
-            let mut parser = PestParser::new();
-            let result = parser.parse(source);
-            assert!(result.is_ok(), "Expected module/import/export to parse once implemented: {}", source);
+            let result = TJLangPestParser::parse(Rule::program_unit, source);
+            assert!(result.is_ok(), "Grammar failed for program_unit: {} -> {:?}", source, result.err());
         }
     }
 
