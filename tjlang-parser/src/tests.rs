@@ -1356,4 +1356,47 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_parse_spawn_expressions() {
+        use crate::parser::PestParser;
+
+        // Valid spawn expressions in various contexts
+        let ok_cases = vec![
+            // Bare spawn of an identifier
+            "spawn task",
+            // Spawn of a call
+            "spawn run()",
+            // Spawn of a binary expression
+            "spawn (1 + 2)",
+            // Spawn chained with member and call
+            "spawn worker.start()",
+            // Spawn inside an index
+            "[spawn 1, 2, 3]",
+            // Spawn inside a map literal value
+            "{ 1: spawn 2 }",
+            // Spawn inside a function body (no semicolons in grammar)
+            "def main() -> int { spawn run() return 0 }",
+        ];
+
+        for source in ok_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            assert!(result.is_ok(), "Failed to parse spawn expression: {}", source);
+        }
+
+        // Invalid spawn usage should fail
+        let err_cases = vec![
+            // Missing expression
+            "spawn",
+            // Keyword follows spawn
+            "spawn return 1",
+        ];
+
+        for source in err_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            assert!(result.is_err(), "Expected failure for invalid spawn usage: {}", source);
+        }
+    }
 }
