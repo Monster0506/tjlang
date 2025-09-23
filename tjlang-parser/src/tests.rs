@@ -321,7 +321,7 @@ mod tests {
             match &result {
                 Ok(program) => {
                     println!("✓ Parsed successfully: {:?}", program);
-                    assert_eq!(program.units.len(), 1);
+            assert_eq!(program.units.len(), 1);
                 }
                 Err(e) => {
                     println!("✗ Parse failed: {}", e);
@@ -397,7 +397,7 @@ mod tests {
         match &result {
             Ok(program) => {
                 println!("✓ Parsed successfully: {:?}", program);
-                assert_eq!(program.units.len(), 1);
+        assert_eq!(program.units.len(), 1);
             }
             Err(e) => {
                 println!("✗ Parse failed: {}", e);
@@ -598,7 +598,7 @@ mod tests {
         use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
 
-        let source = "|| 42";
+        let source = "() -> 42";
         let result = TJLangPestParser::parse(Rule::lambda_expr, source);
 
         match result {
@@ -955,6 +955,34 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_lambda_expressions() {
+        use crate::parser::PestParser;
+
+        let lambda_test_cases = vec![
+            "() -> 42",                      // No parameters
+            "(x: int) -> x + 1",             // Single parameter
+            "(x: int, y: int) -> x + y",     // Multiple parameters
+            "(x: int) -> x * 2",             // Single typed parameter
+        ];
+
+        for source in lambda_test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+
+            match &result {
+                Ok(_program) => {
+                    println!("Successfully parsed lambda: {}", source);
+                }
+                Err(e) => {
+                    println!("Failed to parse lambda '{}': {}", source, e);
+                }
+            }
+
+            assert!(result.is_ok(), "Failed to parse lambda expression: {}", source);
+        }
+    }
+
+    #[test]
     fn test_parse_range_expressions() {
         use crate::parser::{PestParser, TJLangPestParser, Rule};
         use pest::Parser;
@@ -979,21 +1007,31 @@ mod tests {
                 }
             }
 
-            // Test as program
+            // For now, just test that the grammar rule works
+            assert!(grammar_result.is_ok(), "Failed to parse range expression grammar rule: {}", source);
+        }
+
+        // Test range expressions in valid contexts
+        let context_test_cases = vec![
+            "for (x: int | 0..10) { pass }",     // Range in for loop
+            "for (i: int | 1..5) { pass }",      // Simple range in for loop
+            "for (j: int | 0..=10) { pass }",    // Inclusive range in for loop
+        ];
+
+        for source in context_test_cases {
             let mut parser = PestParser::new();
             let result = parser.parse(source);
 
             match &result {
                 Ok(_program) => {
-                    println!("✓ Program parsed range: {}", source);
+                    println!("✓ Program parsed range in context: {}", source);
                 }
                 Err(e) => {
-                    println!("✗ Program failed for range '{}': {}", source, e);
+                    println!("✗ Program failed for range in context '{}': {}", source, e);
                 }
             }
 
-            // For now, just test that the grammar rule works
-            assert!(grammar_result.is_ok(), "Failed to parse range expression grammar rule: {}", source);
+            assert!(result.is_ok(), "Failed to parse range expression in context: {}", source);
         }
     }
 
@@ -1084,7 +1122,7 @@ mod tests {
             // Lambda expressions (temporarily disabled due to whitespace issues)
             // "| x | x + 1",
             // "| x, y | x + y",
-            "|| 42",
+            "() -> 42",
             
             // Range expressions (temporarily disabled due to whitespace issues)
             // "0..10",

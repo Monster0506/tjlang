@@ -405,10 +405,10 @@ impl PestParser {
                 }
                 Ok(left)
             }
+            // NEW: handle additive level
             Rule::additive => {
                 let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
-                
                 while let Some(op_pair) = inner.next() {
                     match op_pair.as_str() {
                         "+" => {
@@ -435,6 +435,32 @@ impl PestParser {
                     }
                 }
                 Ok(left)
+            }
+            // NEW: allow literals at any expression level
+            Rule::literal => {
+                let lit = self.parse_literal(pair)?;
+                Ok(Expression::Literal(lit))
+            }
+            Rule::integer_literal => {
+                let content = pair.as_str().trim();
+                let value = content.parse::<i64>()?;
+                Ok(Expression::Literal(Literal::Int(value)))
+            }
+            Rule::float_literal => {
+                let content = pair.as_str().trim();
+                let value = content.parse::<f64>()?;
+                Ok(Expression::Literal(Literal::Float(value)))
+            }
+            Rule::string_literal => {
+                let s = pair.as_str().to_string();
+                Ok(Expression::Literal(Literal::String(s)))
+            }
+            Rule::boolean_literal => {
+                let val = match pair.as_str() { "true" => true, _ => false };
+                Ok(Expression::Literal(Literal::Bool(val)))
+            }
+            Rule::none_literal => {
+                Ok(Expression::Literal(Literal::None))
             }
             Rule::multiplicative => {
                 let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
@@ -1125,32 +1151,21 @@ impl PestParser {
     /// Parse range expression
     fn parse_range_expr(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
+        let text = pair.as_str();
+        let inclusive = text.contains("..=");
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // Parse start value
         let start = self.parse_expression(inner.next().ok_or("Missing start value")?)?;
 
-        // Skip dots
-        inner.next().ok_or("Missing dots")?;
-
-        // Parse end value if present
-        let end = if let Some(end_pair) = inner.next() {
-            if end_pair.as_str() == "=" {
-                // Inclusive range (..=)
-                self.parse_expression(inner.next().ok_or("Missing end value")?)?
-            } else {
-                // Exclusive range (..)
-                self.parse_expression(end_pair)?
-            }
-        } else {
-            // No end value - infinite range
-            return Err("Range expressions must have an end value".into());
-        };
+        // Parse end value (must exist for our current semantics)
+        let end_pair = inner.next().ok_or("Missing end value")?;
+        let end = self.parse_expression(end_pair)?;
 
         Ok(Expression::Range {
             start: Box::new(start),
             end: Box::new(end),
-            inclusive: false, // Will be set correctly based on parsing
+            inclusive,
             span: self.create_span(span),
         })
     }
