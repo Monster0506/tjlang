@@ -143,6 +143,10 @@ impl PestParser {
                         let while_stmt = self.parse_while_stmt(inner)?;
                         Ok(Some(Statement::While(while_stmt)))
                     }
+                    Rule::do_while_stmt => {
+                        let do_while = self.parse_do_while_stmt(inner)?;
+                        Ok(Some(Statement::DoWhile(do_while)))
+                    }
                     Rule::for_stmt => {
                         let for_stmt = self.parse_for_stmt(inner)?;
                         Ok(Some(Statement::For(for_stmt)))
@@ -681,6 +685,20 @@ impl PestParser {
         Ok(WhileStatement {
             condition,
             body,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse do-while statement
+    fn parse_do_while_stmt(&mut self, pair: Pair<Rule>) -> Result<DoWhileStatement, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        // Grammar: "do" block "while" expression — literals consumed
+        let body = self.parse_block(inner.next().ok_or("Missing do-while body block")?)?;
+        let condition = self.parse_expression(inner.next().ok_or("Missing do-while condition")?)?;
+        Ok(DoWhileStatement {
+            body,
+            condition,
             span: self.create_span(span),
         })
     }
