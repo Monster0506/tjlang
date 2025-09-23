@@ -781,6 +781,162 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_impl_blocks_comprehensive() {
+        use crate::parser::PestParser;
+
+        // Test various trait and type name combinations (avoiding generic types for now)
+        let trait_type_combinations = vec![
+            ("Display", "String"),
+            ("Clone", "User"),
+            ("Serialize", "Data"),
+            ("Debug", "Point"),
+            ("PartialEq", "Version"),
+            ("Iterator", "Range"),
+            ("FromStr", "Number"),
+            ("ToString", "Date"),
+            ("Hash", "UUID"),
+            ("Ord", "Version"),
+        ];
+
+        for (trait_name, type_name) in trait_type_combinations {
+            let source = format!("impl {}:{} {{ method() -> int {{ 42 }} }}", trait_name, type_name);
+            let mut parser = PestParser::new();
+            let result = parser.parse(&source);
+
+            assert!(result.is_ok(), "Failed to parse impl block with trait '{}' and type '{}': {}", 
+                trait_name, type_name, result.unwrap_err());
+        }
+    }
+
+    #[test]
+    fn test_parse_impl_blocks_different_methods() {
+        use crate::parser::PestParser;
+
+        // Test different method signatures (single method per impl block)
+        let method_cases = vec![
+            "impl Drawable:Point { draw() -> int { 0 } }",
+            "impl Renderer:Canvas { render() -> str { None } }",
+            "impl Iterator:List { next() -> Option<T> { None } }",
+            "impl Clone:Data { clone() -> Data { None } }",
+            "impl Validator:Email { validate() -> bool { true } }",
+        ];
+
+        for source in method_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+
+            assert!(result.is_ok(), "Failed to parse impl block with method: {}", source);
+        }
+    }
+
+    #[test]
+    fn test_parse_impl_blocks_complex_methods() {
+        use crate::parser::PestParser;
+
+        let complex_method_cases = vec![
+            // Method with multiple parameters
+            "impl Math:Calculator { add(a: int, b: int) -> int { 0 } }",
+            // Method with single parameter
+            "impl Validator:EmailValidator { validate(email: str) -> bool { true } }",
+            // Method with no parameters
+            "impl Factory:Builder { create() -> Product { None } }",
+            // Method with complex return type
+            "impl Parser:JsonParser { parse(input: str) -> Result { None } }",
+            // Method with different parameter types
+            "impl Converter:StringConverter { convert(value: int) -> str { None } }",
+        ];
+
+        for source in complex_method_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+
+            assert!(result.is_ok(), "Failed to parse impl block with complex methods: {}", source);
+        }
+    }
+
+    #[test]
+    fn test_parse_impl_blocks_edge_cases() {
+        use crate::parser::PestParser;
+
+        let edge_case_cases = vec![
+            // Single character names
+            "impl A:B { c() -> int { 0 } }",
+            // Names with underscores
+            "impl _Private:Public { method() -> int { 0 } }",
+            // Names starting with underscore
+            "impl _Trait:_Type { _method() -> int { 0 } }",
+            // Mixed case names
+            "impl XMLParser:HTMLDocument { parseXML() -> XMLNode { None } }",
+            // Long names
+            "impl VeryLongTraitName:VeryLongTypeName { veryLongMethodName() -> int { 0 } }",
+        ];
+
+        for source in edge_case_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+
+            assert!(result.is_ok(), "Failed to parse impl block edge case: {}", source);
+        }
+    }
+
+    #[test]
+    fn test_parse_impl_blocks_invalid_syntax() {
+        use crate::parser::PestParser;
+
+        let invalid_cases = vec![
+            // Missing impl keyword
+            "Drawable:Point { draw() -> int { 0 } }",
+            // Missing colon
+            "impl Drawable Point { draw() -> int { 0 } }",
+            // Missing opening brace
+            "impl Drawable:Point draw() -> int { 0 } }",
+            // Missing closing brace
+            "impl Drawable:Point { draw() -> int { 0 }",
+            // Invalid trait name (starts with number)
+            "impl 123Trait:Point { draw() -> int { 0 } }",
+            // Invalid type name (starts with number)
+            "impl Drawable:123Type { draw() -> int { 0 } }",
+            // Missing method
+            "impl Drawable:Point { }",
+        ];
+
+        for source in invalid_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+
+            assert!(result.is_err(), "Expected parsing to fail for invalid syntax: {}", source);
+        }
+    }
+
+    #[test]
+    fn test_parse_impl_blocks_grammar_rules() {
+        use crate::parser::{TJLangPestParser, Rule};
+        use pest::Parser;
+
+        // Test individual grammar rules
+        let grammar_tests = vec![
+            ("impl_trait_name", "Display"),
+            ("impl_trait_name", "XMLParser"),
+            ("impl_trait_name", "_Private"),
+            ("impl_type_name", "String"),
+            ("impl_type_name", "Vec<T>"),
+            ("impl_type_name", "_Internal"),
+        ];
+
+        for (rule_name, input) in grammar_tests {
+            let rule = match rule_name {
+                "impl_trait_name" => Rule::impl_trait_name,
+                "impl_type_name" => Rule::impl_type_name,
+                _ => panic!("Unknown rule: {}", rule_name),
+            };
+
+            let result = TJLangPestParser::parse(rule, input);
+            assert!(result.is_ok(), "Failed to parse {} rule with input '{}': {:?}", 
+                rule_name, input, result);
+        }
+    }
+
+    #[test]
     fn test_parse_simple_type() {
         let source = "int";
         let mut parser = PestParser::new();
