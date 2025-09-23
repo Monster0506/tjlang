@@ -1435,20 +1435,53 @@ mod tests {
     }
 
     #[test]
+    fn test_grammar_parse_match_statements() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+
+        let cases = vec![
+            // Basic match with literals - start simple
+            "match x { 1: { pass } }",
+            // Match with wildcard
+            "match x { _: { pass } }",
+            // Match with variable patterns
+            "match result { Ok(value): { pass } }",
+            // Match with constructor patterns
+            "match point { Point(x, y): { pass } }",
+            // Match with tuple patterns
+            "match pair { (a, b): { pass } }",
+            // Match with multiple arms
+            "match x { 1: { pass }, 2: { pass } }",
+            // Match with guards
+            "match x { n: int if n > 0: { pass } }",
+            // Match with trait patterns
+            "match obj { drawable: implements [Drawable]: { pass } }",
+        ];
+
+        for source in cases {
+            // match statements are statements per grammar
+            let result = TJLangPestParser::parse(Rule::statement, source);
+            if let Err(e) = &result {
+                println!("Failed to parse '{}': {:?}", source, e);
+            }
+            assert!(result.is_ok(), "Failed to parse match statement: {}", source);
+        }
+    }
+
+    #[test]
     #[ignore]
     fn test_parse_match_statements_placeholder() {
         use crate::parser::PestParser;
-        // Placeholder match patterns and guards per @Grammar.g4 intent
+        // Placeholder tests until match statements are supported in parser AST
         let cases = vec![
-            "match x { 1 => pass, _ => pass }",
-            "match t { (a, b) => pass, _ => pass }",
-            "match v { Point{x, y} => pass, _ => pass }",
-            "match n { _ if n > 0 => pass, _ => pass }",
+            "match x { 1: { pass }, 2: { pass }, _: { pass } }",
+            "match result { Ok(value): { pass }, Err(error): { pass } }",
+            "match point { Point(x, y): { pass } }",
         ];
         for source in cases {
             let mut parser = PestParser::new();
             let result = parser.parse(source);
-            assert!(result.is_ok(), "Expected match to parse once implemented: {}", source);
+            assert!(result.is_ok(), "Expected match statement to parse once implemented: {}", source);
         }
     }
 }

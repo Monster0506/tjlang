@@ -12,6 +12,7 @@ statement = {
     while_stmt |
     do_while_stmt |
     for_stmt |
+    match_stmt |
     return_stmt |
     break_stmt |
     continue_stmt |
@@ -38,6 +39,23 @@ while_stmt = { "while" ~ expression ~ block }
 do_while_stmt = { "do" ~ block ~ "while" ~ expression }
 
 for_stmt = { "for" ~ "(" ~ identifier ~ ":" ~ type_ ~ "|" ~ expression ~ ")" ~ block }
+
+// Match statements
+match_stmt = { "match" ~ expression ~ "{" ~ match_arm ~ ("," ~ match_arm)* ~ "}" }
+match_arm = { pattern ~ ("if" ~ expression)? ~ ":" ~ block }
+
+// Patterns
+pattern = { 
+    literal |
+    identifier ~ ":" ~ type_ |
+    identifier ~ ":" ~ "implements" ~ "[" ~ identifier ~ "]" |
+    constructor_pattern |
+    "(" ~ pattern ~ ("," ~ pattern)* ~ ")" |
+    "_"
+}
+
+constructor_pattern = { identifier ~ ("(" ~ pattern_fields? ~ ")")? }
+pattern_fields = { pattern ~ ("," ~ pattern)* }
 
 // Simple statements
 return_stmt = { "return" ~ expression? }
@@ -163,7 +181,7 @@ argument_list = { expression ~ ("," ~ expression)* }
 // Identifiers
 impl_kw = { "impl" }
 for_kw = { "for" }
-keyword = { impl_kw | for_kw | "module" | "import" | "from" | "export" | "as" | "do" | "spawn" | "def" | "type" | "enum" | "interface" | "if" | "elif" | "else" | "while" | "return" | "break" | "continue" | "pass" | "raise" }
+keyword = { impl_kw | for_kw | "module" | "import" | "from" | "export" | "as" | "do" | "spawn" | "def" | "type" | "enum" | "interface" | "if" | "elif" | "else" | "while" | "match" | "return" | "break" | "continue" | "pass" | "raise" | "implements" }
 identifier = { !keyword ~ (ASCII_ALPHA | "_") ~ ASCII_ALPHANUMERIC* }
 
 // Qualified names (for modules/imports)
