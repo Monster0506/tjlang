@@ -147,7 +147,7 @@ index_suffix = { "[" ~ expression ~ "]" }
 member_suffix = { "." ~ identifier }
 
 // Lambda expressions
-lambda_expr = { "|" ~ param_list? ~ "|" ~ expression }
+lambda_expr = { "(" ~ param_list? ~ ")" ~ "->" ~ expression }
 
 // Range expressions
 range_expr = { integer_literal ~ ".." ~ ("=" ~ integer_literal | integer_literal)? }

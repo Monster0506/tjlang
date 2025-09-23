@@ -598,7 +598,7 @@ mod tests {
         use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
 
-        let source = "|| 42";
+        let source = "() -> 42";
         let result = TJLangPestParser::parse(Rule::lambda_expr, source);
 
         match result {
@@ -955,6 +955,34 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_lambda_expressions() {
+        use crate::parser::PestParser;
+
+        let lambda_test_cases = vec![
+            "() -> 42",                      // No parameters
+            "(x: int) -> x + 1",             // Single parameter
+            "(x: int, y: int) -> x + y",     // Multiple parameters
+            "(x: int) -> x * 2",             // Single typed parameter
+        ];
+
+        for source in lambda_test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+
+            match &result {
+                Ok(_program) => {
+                    println!("Successfully parsed lambda: {}", source);
+                }
+                Err(e) => {
+                    println!("Failed to parse lambda '{}': {}", source, e);
+                }
+            }
+
+            assert!(result.is_ok(), "Failed to parse lambda expression: {}", source);
+        }
+    }
+
+    #[test]
     fn test_parse_complex_types() {
         let test_cases = vec![
             // Primitive types
@@ -1041,7 +1069,7 @@ mod tests {
             // Lambda expressions (temporarily disabled due to whitespace issues)
             // "| x | x + 1",
             // "| x, y | x + y",
-            "|| 42",
+            "() -> 42",
             
             // Range expressions (temporarily disabled due to whitespace issues)
             // "0..10",
