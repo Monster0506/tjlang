@@ -734,10 +734,6 @@ mod tests {
             "interface Drawable { draw() -> int }",
             "interface Comparable<T> { compare(other: T) -> int }",
             "interface Iterator<T> { next() -> Option<T> }",
-            
-            // Implementation blocks
-            "Drawable for Point { draw() -> int { 0 } }",
-            // "Comparable<Point> for Point { def compare(other: Point): int { 0 } }",  // Disabled for now since impl_block is hardcoded
         ];
 
         for source in test_cases {
@@ -754,6 +750,33 @@ mod tests {
             }
 
             assert!(result.is_ok(), "Failed to parse custom type declaration: {}", source);
+        }
+    }
+
+    #[test]
+    fn test_parse_impl_blocks() {
+        use crate::parser::PestParser;
+
+        let impl_test_cases = vec![
+            "impl Drawable:Point { draw() -> int { 0 } }",
+            "impl Comparable:Point { compare(other: Point) -> int { 0 } }",
+            "impl Iterator:List { next() -> Option<T> { None } }",
+        ];
+
+        for source in impl_test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+
+            match &result {
+                Ok(_program) => {
+                    println!("Successfully parsed impl block: {}", source);
+                }
+                Err(e) => {
+                    println!("Failed to parse impl block '{}': {}", source, e);
+                }
+            }
+
+            assert!(result.is_ok(), "Failed to parse impl block: {}", source);
         }
     }
 
@@ -936,7 +959,7 @@ mod tests {
         use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
 
-        let source = "Drawable for Point { draw() -> int { 0 } }";
+        let source = "impl Drawable:Point { draw() -> int { 0 } }";
         println!("=== DEBUGGING IMPL BLOCK PARSING ===");
         println!("Source: '{}'", source);
         println!("Source length: {}", source.len());
@@ -1026,7 +1049,7 @@ mod tests {
         
         // Let's test a minimal impl_block with a simple method
         println!("\n--- Testing minimal impl_block ---");
-        let minimal_impl = "A for B { c() -> int { 0 } }";
+        let minimal_impl = "impl A:B { c() -> int { 0 } }";
         let minimal_result = TJLangPestParser::parse(Rule::impl_block, minimal_impl);
         println!("Minimal impl_block test: {:?}", minimal_result);
         
@@ -1060,8 +1083,18 @@ mod tests {
         println!("Method test: {:?}", method_test);
         
         // Test the final impl_block rule
-        let combined_test = TJLangPestParser::parse(Rule::impl_block, "Drawable for Point { draw() -> int { 0 } }");
+        let combined_test = TJLangPestParser::parse(Rule::impl_block, "impl Drawable:Point { draw() -> int { 0 } }");
         println!("impl_block result: {:?}", combined_test);
+        
+        // Test with different trait and type names
+        let test1 = TJLangPestParser::parse(Rule::impl_block, "impl Comparable:Point { compare(other: Point) -> int { 0 } }");
+        println!("Different names test 1: {:?}", test1);
+        
+        let test2 = TJLangPestParser::parse(Rule::impl_block, "impl Iterator:List { next() -> Option<T> { None } }");
+        println!("Different names test 2: {:?}", test2);
+        
+        let test3 = TJLangPestParser::parse(Rule::impl_block, "impl Serializable:User { serialize() -> string { \"{}\" } }");
+        println!("Different names test 3: {:?}", test3);
         
         println!("\n--- Testing full impl_block ---");
         let result = TJLangPestParser::parse(Rule::impl_block, source);

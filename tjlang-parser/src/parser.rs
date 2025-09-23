@@ -1664,14 +1664,16 @@ impl PestParser {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
 
-        // The grammar yields: "Drawable", "for", "Point", then method_decl*
-        // For now, we'll hardcode the values since the grammar is hardcoded
-        let trait_name = "Drawable".to_string();
-        let type_name = "Point".to_string();
+        // The grammar yields: impl_trait_name, impl_type_name, then method_decl*
+        // The "impl" keyword and ":" separator are consumed by the grammar but don't appear as separate pairs
+        let trait_name = inner.next().ok_or("Missing trait name")?.as_str().to_string();
+        let type_name = inner.next().ok_or("Missing type name")?.as_str().to_string();
 
         let mut methods = Vec::new();
         for p in inner {
-            if p.as_rule() == Rule::method_decl { methods.push(self.parse_method_decl(p)?); }
+            if p.as_rule() == Rule::method_decl { 
+                methods.push(self.parse_method_decl(p)?); 
+            }
         }
 
         Ok(ImplBlock { trait_name, type_name, methods, span: self.create_span(span) })
