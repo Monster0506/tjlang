@@ -4,7 +4,7 @@ COMMENT = _{ "#" ~ (!"\n" ~ ANY)* }
 
 program = { SOI ~ program_unit* ~ EOI }
 
-program_unit = { function_decl | type_decl | struct_decl | enum_decl | interface_decl | impl_block | statement }
+program_unit = { module_decl | import_decl | export_decl | function_decl | type_decl | struct_decl | enum_decl | interface_decl | impl_block | statement }
 
 // Statements
 statement = { 
@@ -163,5 +163,21 @@ argument_list = { expression ~ ("," ~ expression)* }
 // Identifiers
 impl_kw = { "impl" }
 for_kw = { "for" }
-keyword = { impl_kw | for_kw | "do" | "spawn" | "def" | "type" | "enum" | "interface" | "if" | "elif" | "else" | "while" | "return" | "break" | "continue" | "pass" | "raise" }
+keyword = { impl_kw | for_kw | "module" | "import" | "from" | "export" | "as" | "do" | "spawn" | "def" | "type" | "enum" | "interface" | "if" | "elif" | "else" | "while" | "return" | "break" | "continue" | "pass" | "raise" }
 identifier = { !keyword ~ (ASCII_ALPHA | "_") ~ ASCII_ALPHANUMERIC* }
+
+// Qualified names (for modules/imports)
+qualified_name = { identifier ~ ("." ~ identifier)* }
+
+// Module/import/export declarations
+module_decl = { "module" ~ qualified_name }
+
+import_decl = { "import" ~ (
+    // Selective import: import { a, b } from pkg.name
+    "{" ~ identifier_list ~ "}" ~ "from" ~ qualified_name
+    |
+    // Simple import with optional alias: import pkg.name [as alias]
+    qualified_name ~ ("as" ~ identifier)?
+) }
+
+export_decl = { "export" ~ ( identifier | "{" ~ identifier_list ~ "}" ) }
