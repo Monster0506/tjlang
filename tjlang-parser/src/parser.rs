@@ -1365,24 +1365,19 @@ impl PestParser {
                     span: self.create_span(span),
                 })
             }
+            Rule::map_type => {
+                let mut it = inner.into_inner();
+                let key_type = self.parse_type(it.next().ok_or("Missing map key type")?)?;
+                let value_type = self.parse_type(it.next().ok_or("Missing map value type")?)?;
+                Ok(Type::Map { key_type: Box::new(key_type), value_type: Box::new(value_type), span: self.create_span(span) })
+            }
             Rule::tuple_type => {
                 let mut types = Vec::new();
-                let mut inner = inner.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                
-                while let Some(type_pair) = inner.next() {
-                    if type_pair.as_rule() == Rule::type_ {
-                        let tuple_type = self.parse_type(type_pair)?;
-                        types.push(tuple_type);
-                    } else if type_pair.as_str() == "," {
-                        // Skip comma
-                        continue;
-                    }
+                for type_pair in inner.into_inner() {
+                    let ty = self.parse_type(type_pair)?;
+                    types.push(ty);
                 }
-                
-                Ok(Type::Tuple {
-                    types,
-                    span: self.create_span(span),
-                })
+                Ok(Type::Tuple { types, span: self.create_span(span) })
             }
             _ => Err(format!("Expected collection type, got {:?}", inner.as_rule()).into())
         }
