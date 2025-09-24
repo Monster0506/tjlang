@@ -337,6 +337,45 @@ impl PestParser {
                 }
                 Ok(left)
             }
+            Rule::bit_or_expr => {
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                while let Some(op_pair) = inner.next() {
+                    if op_pair.as_str() == "|" {
+                        let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                        left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::BitOr, right: Box::new(right), span: self.create_span(span) };
+                    } else {
+                        left = self.parse_expression(op_pair)?;
+                    }
+                }
+                Ok(left)
+            }
+            Rule::bit_xor_expr => {
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                while let Some(op_pair) = inner.next() {
+                    if op_pair.as_str() == "^" {
+                        let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                        left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::BitXor, right: Box::new(right), span: self.create_span(span) };
+                    } else {
+                        left = self.parse_expression(op_pair)?;
+                    }
+                }
+                Ok(left)
+            }
+            Rule::bit_and_expr => {
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                while let Some(op_pair) = inner.next() {
+                    if op_pair.as_str() == "&" {
+                        let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                        left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::BitAnd, right: Box::new(right), span: self.create_span(span) };
+                    } else {
+                        left = self.parse_expression(op_pair)?;
+                    }
+                }
+                Ok(left)
+            }
             Rule::equality => {
                 let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
@@ -478,6 +517,24 @@ impl PestParser {
             Rule::none_literal => {
                 Ok(Expression::Literal(Literal::None))
             }
+            Rule::shift_expr => {
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                while let Some(op_pair) = inner.next() {
+                    match op_pair.as_str() {
+                        "<<" => {
+                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::ShiftLeft, right: Box::new(right), span: self.create_span(span) };
+                        }
+                        ">>" => {
+                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::ShiftRight, right: Box::new(right), span: self.create_span(span) };
+                        }
+                        _ => { left = self.parse_expression(op_pair)?; }
+                    }
+                }
+                Ok(left)
+            }
             Rule::multiplicative => {
                 let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
@@ -518,6 +575,20 @@ impl PestParser {
                 }
                 Ok(left)
             }
+            Rule::power => {
+                // right-associative **
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                if let Some(op_pair) = inner.next() {
+                    if op_pair.as_str() == "**" {
+                        let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                        return Ok(Expression::Binary { left: Box::new(left), operator: BinaryOperator::Power, right: Box::new(right), span: self.create_span(span) });
+                    } else {
+                        return self.parse_expression(op_pair);
+                    }
+                }
+                Ok(left)
+            }
             Rule::unary => {
                 let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 
@@ -538,6 +609,10 @@ impl PestParser {
                                 operand: Box::new(operand),
                                 span: self.create_span(span),
                             })
+                        }
+                        "~" => {
+                            let operand = self.parse_expression(inner.next().ok_or("Missing operand")?)?;
+                            Ok(Expression::Unary { operator: UnaryOperator::BitNot, operand: Box::new(operand), span: self.create_span(span) })
                         }
                         _ => {
                             // No unary operator, parse as primary
