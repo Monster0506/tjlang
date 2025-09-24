@@ -1530,6 +1530,175 @@ mod tests {
     }
 
     #[test]
+    fn test_grammar_parse_struct_literals() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+        
+        // Test struct literal grammar rule directly
+        let test_cases = vec![
+            "Point { x: 1, y: 2 }",
+            "Person { name: \"Alice\", age: 30 }",
+            "Config { debug: true, port: 8080 }",
+            "Single { value: 42 }",
+        ];
+        
+        for source in test_cases {
+            let result = TJLangPestParser::parse(Rule::struct_literal, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Struct literal parsed successfully: {}", source);
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    }
+                }
+                Err(e) => panic!("Failed to parse struct literal '{}': {}", source, e),
+            }
+        }
+        
+        println!("✓ All struct literal grammar tests passed");
+    }
+
+    #[test]
+    fn test_grammar_parse_field_initialization() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+        
+        // Test field initialization grammar rule directly
+        let test_cases = vec![
+            "x: 42",
+            "name: \"hello\"",
+            "enabled: true",
+            "value: x + y",
+        ];
+        
+        for source in test_cases {
+            let result = TJLangPestParser::parse(Rule::field_init, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Field initialization parsed successfully: {}", source);
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    }
+                }
+                Err(e) => panic!("Failed to parse field initialization '{}': {}", source, e),
+            }
+        }
+        
+        println!("✓ All field initialization grammar tests passed");
+    }
+
+    #[test]
+    fn test_grammar_parse_match_statements_no_commas() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+        
+        // Test match statement with no commas between arms (corrected syntax)
+        let test_cases = vec![
+            "match x { 1: { pass } 2: { pass } _: { pass } }",
+            "match value { true: { return 1 } false: { return 0 } }",
+            "match status { \"ok\": { pass } \"error\": { raise \"failed\" } }",
+        ];
+        
+        for source in test_cases {
+            let result = TJLangPestParser::parse(Rule::match_stmt, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Match statement parsed successfully: {}", source);
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    }
+                }
+                Err(e) => panic!("Failed to parse match statement '{}': {}", source, e),
+            }
+        }
+        
+        println!("✓ All match statement grammar tests passed");
+    }
+
+    #[test]
+    fn test_grammar_parse_identifier_list() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+        
+        // Test identifier list parsing
+        let test_cases = vec![
+            "Printable",
+            "Printable, Serializable",
+            "A, B, C",
+        ];
+        
+        for source in test_cases {
+            let result = TJLangPestParser::parse(Rule::identifier_list, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Identifier list parsed successfully: {}", source);
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    }
+                }
+                Err(e) => panic!("Failed to parse identifier list '{}': {}", source, e),
+            }
+        }
+        
+        println!("✓ All identifier list grammar tests passed");
+    }
+
+    #[test]
+    fn test_grammar_parse_interface_extends() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+        
+        // Test interface with extends clause
+        let test_cases = vec![
+            "interface Drawable { draw() -> int }",
+            "interface Drawable extends Printable { draw() -> int }",
+        ];
+        
+        for source in test_cases {
+            let result = TJLangPestParser::parse(Rule::interface_decl, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Interface declaration parsed successfully: {}", source);
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    }
+                }
+                Err(e) => panic!("Failed to parse interface declaration '{}': {}", source, e),
+            }
+        }
+        
+        println!("✓ All interface declaration grammar tests passed");
+    }
+
+    #[test]
+    fn test_grammar_parse_enum_type_parameters() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+        
+        // Test enum with type parameters (corrected syntax)
+        let test_cases = vec![
+            "enum Option { Some(T), None }",
+            "enum Result { Ok(T), Err(E) }",
+            "enum Color { Red, Green, Blue }",
+        ];
+        
+        for source in test_cases {
+            let result = TJLangPestParser::parse(Rule::enum_decl, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Enum declaration parsed successfully: {}", source);
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    }
+                }
+                Err(e) => panic!("Failed to parse enum declaration '{}': {}", source, e),
+            }
+        }
+        
+        println!("✓ All enum declaration grammar tests passed");
+    }
+
+    #[test]
     fn test_grammar_parse_modules_imports_exports() {
         use pest::Parser;
         use crate::parser::{TJLangPestParser, Rule};
