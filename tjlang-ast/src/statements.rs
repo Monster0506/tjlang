@@ -150,12 +150,21 @@ pub struct DoWhileStatement {
 
 /// For statement
 #[derive(Debug, Clone, PartialEq)]
-pub struct ForStatement {
-    pub var_name: String,
-    pub var_type: Type,
-    pub iterable: Expression,
-    pub body: Block,
-    pub span: SourceSpan,
+pub enum ForStatement {
+    ForEach {
+        var_name: String,
+        var_type: Type,
+        iterable: Expression,
+        body: Block,
+        span: SourceSpan,
+    },
+    CStyle {
+        initializer: Option<Box<Statement>>,
+        condition: Option<Expression>,
+        increment: Option<Expression>,
+        body: Block,
+        span: SourceSpan,
+    },
 }
 
 /// Match statement

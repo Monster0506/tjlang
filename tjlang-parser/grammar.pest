@@ -38,7 +38,9 @@ while_stmt = { "while" ~ expression ~ block }
 
 do_while_stmt = { "do" ~ block ~ "while" ~ expression }
 
-for_stmt = { "for" ~ "(" ~ identifier ~ ":" ~ type_ ~ "|" ~ expression ~ ")" ~ block }
+for_stmt = { "for" ~ "(" ~ ( for_each_clause | c_style_clause ) ~ ")" ~ block }
+for_each_clause = { identifier ~ ":" ~ type_ ~ "|" ~ expression }
+c_style_clause = { statement? ~ ";" ~ expression? ~ ";" ~ expression? }
 
 // Match statements
 match_stmt = { "match" ~ expression ~ "{" ~ match_arm+ ~ "}" }
@@ -221,4 +223,4 @@ import_decl = { "import" ~ (
     qualified_name ~ ("as" ~ identifier)?
 ) }
 
-export_decl = { "export" ~ ( function_decl | type_decl | interface_decl ) }
+export_decl = { "export" ~ ( function_decl | type_decl | interface_decl | identifier | "{" ~ identifier_list ~ "}" ) }

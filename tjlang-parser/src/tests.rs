@@ -2273,7 +2273,7 @@ mod tests {
     #[test]
     fn test_parse_impl_multiple_methods() {
         use crate::parser::PestParser;
-        use tjlang_ast::{ProgramUnit, Declaration};
+        use tjlang_ast::{ProgramUnit, Declaration, ExportDecl};
         let mut p = PestParser::new();
         let result = p.parse("impl Drawable: Point { draw() -> int { return 1 } clear() -> int { return 0 } }");
         match result {
@@ -2355,7 +2355,7 @@ mod tests {
     #[test]
     fn test_parse_export_function() {
         use crate::parser::PestParser;
-        use tjlang_ast::{ProgramUnit, Declaration};
+        use tjlang_ast::{ProgramUnit, Declaration, ExportDecl};
         let mut p = PestParser::new();
         let result = p.parse("export def my_func() -> int { return 42 }");
         match result {
@@ -2363,8 +2363,8 @@ mod tests {
                 assert_eq!(program.units.len(), 1);
                 match &program.units[0] {
                     ProgramUnit::Export(export_decl) => {
-                        match &export_decl.item {
-                            Declaration::Function(func_decl) => {
+                        match export_decl {
+                            ExportDecl::Declaration(Declaration::Function(func_decl)) => {
                                 assert_eq!(func_decl.name, "my_func");
                             }
                             _ => panic!("Expected Function declaration in export"),
@@ -2380,7 +2380,7 @@ mod tests {
     #[test]
     fn test_parse_export_interface() {
         use crate::parser::PestParser;
-        use tjlang_ast::{ProgramUnit, Declaration};
+        use tjlang_ast::{ProgramUnit, Declaration, ExportDecl};
         let mut p = PestParser::new();
         let result = p.parse("export interface Drawable { draw() -> int }");
         match result {
@@ -2388,8 +2388,8 @@ mod tests {
                 assert_eq!(program.units.len(), 1);
                 match &program.units[0] {
                     ProgramUnit::Export(export_decl) => {
-                        match &export_decl.item {
-                            Declaration::Interface(interface_decl) => {
+                        match export_decl {
+                            ExportDecl::Declaration(Declaration::Interface(interface_decl)) => {
                                 assert_eq!(interface_decl.name, "Drawable");
                             }
                             _ => panic!("Expected Interface declaration in export"),
@@ -2405,7 +2405,7 @@ mod tests {
     #[test]
     fn test_parse_export_type() {
         use crate::parser::PestParser;
-        use tjlang_ast::{ProgramUnit, Declaration};
+        use tjlang_ast::{ProgramUnit, Declaration, ExportDecl};
         let mut p = PestParser::new();
         let result = p.parse("export type MyType = int");
         match result {
@@ -2413,8 +2413,8 @@ mod tests {
                 assert_eq!(program.units.len(), 1);
                 match &program.units[0] {
                     ProgramUnit::Export(export_decl) => {
-                        match &export_decl.item {
-                            Declaration::Type(type_decl) => {
+                        match export_decl {
+                            ExportDecl::Declaration(Declaration::Type(type_decl)) => {
                                 assert_eq!(type_decl.name, "MyType");
                             }
                             _ => panic!("Expected Type declaration in export"),
@@ -2494,6 +2494,8 @@ mod tests {
             "module graphics.ui",
             "import math.core as m",
             "import { sin, cos } from math.core",
+            "export def draw() -> int { return 0 }",
+            "export interface Drawable { draw() -> int }",
             "export draw",
             "export { draw, fill }",
         ];
@@ -2538,19 +2540,139 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
-    fn test_parse_match_statements_placeholder() {
+    fn test_parse_export_identifier() {
         use crate::parser::PestParser;
-        // Placeholder tests until match statements are supported in parser AST
-        let cases = vec![
-            "match x { 1: { pass }, 2: { pass }, _: { pass } }",
-            "match result { Ok(value): { pass }, Err(error): { pass } }",
-            "match point { Point(x, y): { pass } }",
-        ];
-        for source in cases {
-            let mut parser = PestParser::new();
-            let result = parser.parse(source);
-            assert!(result.is_ok(), "Expected match statement to parse once implemented: {}", source);
+        use tjlang_ast::{ProgramUnit, ExportDecl};
+        let mut p = PestParser::new();
+        let result = p.parse("export draw");
+        match result {
+            Ok(program) => {
+                assert_eq!(program.units.len(), 1);
+                match &program.units[0] {
+                    ProgramUnit::Export(export_decl) => {
+                        match export_decl {
+                            ExportDecl::Identifier(name) => {
+                                assert_eq!(name, "draw");
+                            }
+                            _ => panic!("Expected Identifier export, got {:?}", export_decl),
+                        }
+                    }
+                    _ => panic!("Expected Export, got {:?}", program.units[0]),
+                }
+            }
+            Err(e) => panic!("Failed to parse export identifier: {}", e),
         }
     }
+
+    #[test]
+    fn test_parse_export_identifier_list() {
+        use crate::parser::PestParser;
+        use tjlang_ast::{ProgramUnit, ExportDecl};
+        let mut p = PestParser::new();
+        let result = p.parse("export { draw, fill }");
+        match result {
+            Ok(program) => {
+                assert_eq!(program.units.len(), 1);
+                match &program.units[0] {
+                    ProgramUnit::Export(export_decl) => {
+                        match export_decl {
+                            ExportDecl::IdentifierList(identifiers) => {
+                                assert_eq!(identifiers.len(), 2);
+                                assert_eq!(identifiers[0], "draw");
+                                assert_eq!(identifiers[1], "fill");
+                            }
+                            _ => panic!("Expected IdentifierList export, got {:?}", export_decl),
+                        }
+                    }
+                    _ => panic!("Expected Export, got {:?}", program.units[0]),
+                }
+            }
+            Err(e) => panic!("Failed to parse export identifier list: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_grammar_parse_c_style_for_loops() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+        
+        let cases = vec![
+            // Basic C-style for loop
+            "for (i = 0; i < 10; i = i + 1) { pass }",
+            // For loop with no initializer
+            "for (; i < 10; i = i + 1) { pass }",
+            // For loop with no condition
+            "for (i = 0; ; i = i + 1) { pass }",
+            // For loop with no increment
+            "for (i = 0; i < 10; ) { pass }",
+            // For loop with only semicolons
+            "for (;;) { pass }",
+        ];
+        
+        for source in cases {
+            let result = TJLangPestParser::parse(Rule::for_stmt, source);
+            assert!(result.is_ok(), "Grammar failed for C-style for loop: {} -> {:?}", source, result.err());
+        }
+    }
+
+    #[test]
+    fn test_parse_c_style_for_loop() {
+        use crate::parser::PestParser;
+        use tjlang_ast::{ProgramUnit, Declaration, Statement, ForStatement};
+        
+        let mut p = PestParser::new();
+        let result = p.parse("def test() -> int { for (i = 0; i < 10; i = i + 1) { pass } return 0 }");
+        
+        match result {
+            Ok(program) => {
+                assert_eq!(program.units.len(), 1);
+                match &program.units[0] {
+                    ProgramUnit::Declaration(Declaration::Function(func_decl)) => {
+                        assert_eq!(func_decl.body.statements.len(), 2);
+                        match &func_decl.body.statements[0] {
+                            Statement::For(ForStatement::CStyle { initializer, condition, increment, .. }) => {
+                                assert!(initializer.is_some(), "Expected initializer");
+                                assert!(condition.is_some(), "Expected condition");
+                                assert!(increment.is_some(), "Expected increment");
+                            }
+                            _ => panic!("Expected CStyle for loop"),
+                        }
+                    }
+                    _ => panic!("Expected function declaration"),
+                }
+            }
+            Err(e) => panic!("Failed to parse C-style for loop: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_parse_c_style_for_loop_minimal() {
+        use crate::parser::PestParser;
+        use tjlang_ast::{ProgramUnit, Declaration, Statement, ForStatement};
+        
+        let mut p = PestParser::new();
+        let result = p.parse("def test() -> int { for (;;) { pass } return 0 }");
+        
+        match result {
+            Ok(program) => {
+                assert_eq!(program.units.len(), 1);
+                match &program.units[0] {
+                    ProgramUnit::Declaration(Declaration::Function(func_decl)) => {
+                        assert_eq!(func_decl.body.statements.len(), 2);
+                        match &func_decl.body.statements[0] {
+                            Statement::For(ForStatement::CStyle { initializer, condition, increment, .. }) => {
+                                assert!(initializer.is_none(), "Expected no initializer");
+                                assert!(condition.is_none(), "Expected no condition");
+                                assert!(increment.is_none(), "Expected no increment");
+                            }
+                            _ => panic!("Expected CStyle for loop"),
+                        }
+                    }
+                    _ => panic!("Expected function declaration"),
+                }
+            }
+            Err(e) => panic!("Failed to parse minimal C-style for loop: {}", e),
+        }
+    }
+
 }

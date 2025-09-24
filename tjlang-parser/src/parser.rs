@@ -964,20 +964,75 @@ impl PestParser {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
         
-        // The grammar produces: identifier, type_, expression, block
-        // (the literal tokens are consumed by the grammar)
-        let var_name = inner.next().ok_or("Missing variable name")?.as_str().trim().to_string();
-        let var_type = self.parse_type(inner.next().ok_or("Missing variable type")?)?;
-        let iterable = self.parse_expression(inner.next().ok_or("Missing iterable")?)?;
+        // Get the clause (either for_each_clause or c_style_clause)
+        let clause = inner.next().ok_or("Missing for clause")?;
         let body = self.parse_block(inner.next().ok_or("Missing body")?)?;
         
-        Ok(ForStatement {
-            var_name,
-            var_type,
-            iterable,
-            body,
-            span: self.create_span(span),
-        })
+        match clause.as_rule() {
+            Rule::for_each_clause => {
+                let mut clause_inner = clause.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let var_name = clause_inner.next().ok_or("Missing variable name")?.as_str().trim().to_string();
+                let var_type = self.parse_type(clause_inner.next().ok_or("Missing variable type")?)?;
+                let iterable = self.parse_expression(clause_inner.next().ok_or("Missing iterable")?)?;
+                
+                Ok(ForStatement::ForEach {
+                    var_name,
+                    var_type,
+                    iterable,
+                    body,
+                    span: self.create_span(span),
+                })
+            }
+            Rule::c_style_clause => {
+                let mut clause_inner = clause.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                
+                // Parse initializer (optional statement)
+                let initializer = if let Some(init_pair) = clause_inner.next() {
+                    if init_pair.as_rule() == Rule::statement {
+                        if let Some(stmt) = self.parse_statement(init_pair)? {
+                            Some(Box::new(stmt))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                // Parse condition (optional expression)
+                let condition = if let Some(cond_pair) = clause_inner.next() {
+                    if cond_pair.as_rule() == Rule::expression {
+                        Some(self.parse_expression(cond_pair)?)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                // Parse increment (optional expression)
+                let increment = if let Some(inc_pair) = clause_inner.next() {
+                    if inc_pair.as_rule() == Rule::expression {
+                        Some(self.parse_expression(inc_pair)?)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                Ok(ForStatement::CStyle {
+                    initializer,
+                    condition,
+                    increment,
+                    body,
+                    span: self.create_span(span),
+                })
+            }
+            _ => Err(format!("Expected for_each_clause or c_style_clause, got {:?}", clause.as_rule()).into()),
+        }
     }
 
     /// Parse return statement
@@ -2090,26 +2145,29 @@ impl PestParser {
         let span = pair.as_span();
         let inner = pair.into_inner().next().ok_or("Empty export declaration")?;
         
-        let item = match inner.as_rule() {
+        match inner.as_rule() {
             Rule::function_decl => {
                 let func_decl = self.parse_function_decl(inner)?;
-                Declaration::Function(func_decl)
+                Ok(ExportDecl::Declaration(Declaration::Function(func_decl)))
             }
             Rule::type_decl => {
                 let type_decl = self.parse_type_decl(inner)?;
-                Declaration::Type(type_decl)
+                Ok(ExportDecl::Declaration(Declaration::Type(type_decl)))
             }
             Rule::interface_decl => {
                 let interface_decl = self.parse_interface_decl(inner)?;
-                Declaration::Interface(interface_decl)
+                Ok(ExportDecl::Declaration(Declaration::Interface(interface_decl)))
             }
-            _ => return Err(format!("Expected function_decl, type_decl, or interface_decl in export, got {:?}", inner.as_rule()).into()),
-        };
-        
-        Ok(ExportDecl {
-            item,
-            span: self.create_span(span),
-        })
+            Rule::identifier => {
+                let name = inner.as_str().to_string();
+                Ok(ExportDecl::Identifier(name))
+            }
+            Rule::identifier_list => {
+                let identifiers = self.parse_identifier_list(inner)?;
+                Ok(ExportDecl::IdentifierList(identifiers))
+            }
+            _ => return Err(format!("Expected function_decl, type_decl, interface_decl, identifier, or identifier_list in export, got {:?}", inner.as_rule()).into()),
+        }
     }
 
     /// Create a SourceSpan from a pest span
