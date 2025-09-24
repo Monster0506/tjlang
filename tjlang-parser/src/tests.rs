@@ -2229,6 +2229,27 @@ mod tests {
         parse_ok_program_helper("def main() -> int { p: Point = Point{ x: 1, y: 2 } match p { Point{ x: 0, y: y: int }: { return y } Point{ x: x: int, y: y: int }: { return x + y } } }");
     }
 
+    // Nested patterns
+    #[test]
+    fn test_grammar_match_nested_constructor_struct() {
+        parse_match_stmt_ok("match res { Ok(Point{ x: 0, y: y: int }): { pass } Ok(Point{ x: x: int, y: y: int }): { pass } Err(e: str): { pass } }");
+    }
+
+    #[test]
+    fn test_parse_match_nested_constructor_struct() {
+        parse_ok_program_helper("def main() -> int { p: Point = Point{ x: 0, y: 5 } match Ok(p) { Ok(Point{ x: 0, y: y: int }): { return y } Ok(Point{ x: x: int, y: y: int }): { return x + y } Err(e: str): { return 0 } } }");
+    }
+
+    #[test]
+    fn test_grammar_match_nested_option_tuple() {
+        parse_match_stmt_ok("match v { Some((a: int, b: int)): { pass } None: { pass } }");
+    }
+
+    #[test]
+    fn test_parse_match_nested_option_tuple() {
+        parse_ok_program_helper("def main() -> int { match Some((1,2)) { Some((a: int, b: int)): { return a + b } None: { return 0 } } }");
+    }
+
     #[test]
     fn test_debug_function_decl() {
         use crate::parser::TJLangPestParser;
