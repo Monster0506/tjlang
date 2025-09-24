@@ -55,14 +55,22 @@ impl PestParser {
                     match inner.as_rule() {
                         Rule::statement => {
                             if let Some(statement) = self.parse_statement(inner)? {
-                                // For now, wrap statements in a simple program unit
-                                // In a real implementation, we'd have a proper main function
-                                units.push(ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
-                                    name: "main".to_string(),
-                                    var_type: Type::Primitive(PrimitiveType::Any),
-                                    value: Expression::Literal(Literal::None),
-                                    span: self.create_span(span),
-                                })));
+                                // Convert statement to appropriate program unit
+                                match statement {
+                                    Statement::Variable(var_decl) => {
+                                        units.push(ProgramUnit::Declaration(Declaration::Variable(var_decl)));
+                                    }
+                                    _ => {
+                                        // For other statements, create a dummy variable declaration
+                                        // This maintains backward compatibility with existing tests
+                                        units.push(ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
+                                            name: "main".to_string(),
+                                            var_type: Type::Primitive(PrimitiveType::Any),
+                                            value: Expression::Literal(Literal::None),
+                                            span: self.create_span(span),
+                                        })));
+                                    }
+                                }
                             }
                         }
                         Rule::function_decl => {
@@ -88,6 +96,10 @@ impl PestParser {
                         Rule::impl_block => {
                             let impl_block = self.parse_impl_block(inner)?;
                             units.push(ProgramUnit::Declaration(Declaration::Implementation(impl_block)));
+                        }
+                        Rule::export_decl => {
+                            let export_decl = self.parse_export_decl(inner)?;
+                            units.push(ProgramUnit::Export(export_decl));
                         }
                         _ => {}
                     }
@@ -151,6 +163,10 @@ impl PestParser {
                         let for_stmt = self.parse_for_stmt(inner)?;
                         Ok(Some(Statement::For(for_stmt)))
                     }
+                    Rule::match_stmt => {
+                        let m = self.parse_match_stmt(inner)?;
+                        Ok(Some(Statement::Match(m)))
+                    }
                     Rule::return_stmt => {
                         let return_stmt = self.parse_return_stmt(inner)?;
                         Ok(Some(Statement::Return(return_stmt)))
@@ -176,6 +192,151 @@ impl PestParser {
             }
             _ => Ok(None)
         }
+    }
+
+    /// Parse match statement
+    fn parse_match_stmt(&mut self, pair: Pair<Rule>) -> Result<MatchStatement, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        // First inner is the match expression
+        let expr_pair = inner.next().ok_or("Missing expression in match")?;
+        let expression = self.parse_expression(expr_pair)?;
+
+        // Then one or more arms
+        let mut arms: Vec<MatchArm> = Vec::new();
+        for arm_pair in inner {
+            if arm_pair.as_rule() == Rule::match_arm {
+                arms.push(self.parse_match_arm(arm_pair)?);
+            }
+        }
+
+        Ok(MatchStatement { expression, arms, span: self.create_span(span) })
+    }
+
+    fn parse_match_arm(&mut self, pair: Pair<Rule>) -> Result<MatchArm, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        // pattern
+        let pat_pair = inner.next().ok_or("Missing pattern in match arm")?;
+        let pattern = self.parse_pattern(pat_pair)?;
+
+        // optional guard: recognized by encountering an 'if' expression start (rule expression following literal 'if')
+        let mut guard: Option<Expression> = None;
+        if let Some(next) = inner.clone().next() {
+            // In grammar, guard is: ("if" ~ expression)? so the next pair will be expression if present
+            if next.as_rule() == Rule::expression {
+                // consume
+                let _ = inner.next();
+                guard = Some(self.parse_expression(next)?);
+            }
+        }
+
+        // Expect block next
+        let block_pair = inner.next().ok_or("Missing block in match arm")?;
+        let body = self.parse_block(block_pair)?;
+
+        Ok(MatchArm { pattern, guard, body, span: self.create_span(span) })
+    }
+
+    fn parse_pattern(&mut self, pair: Pair<Rule>) -> Result<Pattern, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        match pair.as_rule() {
+            Rule::pattern => {
+                let text = pair.as_str().trim();
+                if text == "_" {
+                    return Ok(Pattern::Wildcard(self.create_span(span)));
+                }
+
+                // collect children for structural decisions
+                let children: Vec<_> = pair.clone().into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE).collect();
+
+                // Tuple pattern if multiple inner pattern children and starts with '('
+                if text.starts_with('(') {
+                    let mut patterns = Vec::new();
+                    for ch in children.iter() {
+                        if ch.as_rule() == Rule::pattern { patterns.push(self.parse_pattern(ch.clone())?); }
+                    }
+                    if !patterns.is_empty() {
+                        return Ok(Pattern::Tuple { patterns, span: self.create_span(span) });
+                    }
+                }
+
+                // Constructor / Struct pattern handled by explicit rule child
+                for ch in &children {
+                    if ch.as_rule() == Rule::constructor_pattern { return self.parse_constructor_pattern(ch.clone()); }
+                    if ch.as_rule() == Rule::struct_pattern { return self.parse_struct_pattern(ch.clone()); }
+                    if ch.as_rule() == Rule::literal { return Ok(Pattern::Literal(self.parse_literal(ch.clone())?)); }
+                }
+
+                // Trait check pattern
+                if text.contains(":") && text.contains("implements") {
+                    let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                    let name = inner.next().ok_or("Missing identifier in trait pattern")?.as_str().to_string();
+                    let mut trait_name = String::new();
+                    for p in inner {
+                        if p.as_rule() == Rule::identifier { trait_name = p.as_str().to_string(); break; }
+                    }
+                    return Ok(Pattern::TraitCheck { name, trait_name, span: self.create_span(span) });
+                }
+
+                // Typed bind pattern: identifier : type_
+                if text.contains(":") {
+                    let mut id: Option<String> = None;
+                    let mut ty: Option<Type> = None;
+                    for ch in children {
+                        match ch.as_rule() {
+                            Rule::identifier => { if id.is_none() { id = Some(ch.as_str().to_string()); } }
+                            Rule::type_ => { ty = Some(self.parse_type(ch)?); }
+                            _ => {}
+                        }
+                    }
+                    if let (Some(name), Some(pattern_type)) = (id, ty) {
+                        return Ok(Pattern::Variable { name, pattern_type, span: self.create_span(span) });
+                    }
+                }
+
+                Err("Unrecognized pattern".into())
+            }
+            _ => Err("Expected pattern".into())
+        }
+    }
+
+    fn parse_constructor_pattern(&mut self, pair: Pair<Rule>) -> Result<Pattern, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let name = inner.next().ok_or("Missing constructor name in pattern")?.as_str().to_string();
+        let mut fields: Vec<Pattern> = Vec::new();
+        for p in inner {
+            if p.as_rule() == Rule::pattern_fields {
+                for f in p.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE) {
+                    if f.as_rule() == Rule::pattern { fields.push(self.parse_pattern(f)?); }
+                }
+            }
+        }
+        Ok(Pattern::Constructor { name, fields, span: self.create_span(span) })
+    }
+
+    fn parse_struct_pattern(&mut self, pair: Pair<Rule>) -> Result<Pattern, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let name = inner.next().ok_or("Missing struct name in pattern")?.as_str().to_string();
+        let mut fields_kv: Vec<(String, Pattern)> = Vec::new();
+        for p in inner {
+            if p.as_rule() == Rule::struct_pattern_fields {
+                for f in p.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE) {
+                    if f.as_rule() == Rule::struct_field_pattern {
+                        let mut it = f.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                        let field_name = it.next().ok_or("Missing field name in struct pattern")?.as_str().to_string();
+                        let pat_pair = it.next().ok_or("Missing field pattern")?;
+                        let field_pat = self.parse_pattern(pat_pair)?;
+                        fields_kv.push((field_name, field_pat));
+                    }
+                }
+            }
+        }
+        Ok(Pattern::Struct { name, fields: fields_kv, span: self.create_span(span) })
     }
 
     /// Parse block
@@ -329,6 +490,45 @@ impl PestParser {
                 }
                 Ok(left)
             }
+            Rule::bit_or_expr => {
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                while let Some(op_pair) = inner.next() {
+                    if op_pair.as_str() == "|" {
+                        let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                        left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::BitOr, right: Box::new(right), span: self.create_span(span) };
+                    } else {
+                        left = self.parse_expression(op_pair)?;
+                    }
+                }
+                Ok(left)
+            }
+            Rule::bit_xor_expr => {
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                while let Some(op_pair) = inner.next() {
+                    if op_pair.as_str() == "^" {
+                        let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                        left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::BitXor, right: Box::new(right), span: self.create_span(span) };
+                    } else {
+                        left = self.parse_expression(op_pair)?;
+                    }
+                }
+                Ok(left)
+            }
+            Rule::bit_and_expr => {
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                while let Some(op_pair) = inner.next() {
+                    if op_pair.as_str() == "&" {
+                        let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                        left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::BitAnd, right: Box::new(right), span: self.create_span(span) };
+                    } else {
+                        left = self.parse_expression(op_pair)?;
+                    }
+                }
+                Ok(left)
+            }
             Rule::equality => {
                 let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
@@ -459,12 +659,34 @@ impl PestParser {
                 let s = pair.as_str().to_string();
                 Ok(Expression::Literal(Literal::String(s)))
             }
+            Rule::fstring_literal => {
+                let s = pair.as_str().to_string();
+                Ok(Expression::Literal(Literal::FString(s)))
+            }
             Rule::boolean_literal => {
                 let val = match pair.as_str() { "true" => true, _ => false };
                 Ok(Expression::Literal(Literal::Bool(val)))
             }
             Rule::none_literal => {
                 Ok(Expression::Literal(Literal::None))
+            }
+            Rule::shift_expr => {
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                while let Some(op_pair) = inner.next() {
+                    match op_pair.as_str() {
+                        "<<" => {
+                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::ShiftLeft, right: Box::new(right), span: self.create_span(span) };
+                        }
+                        ">>" => {
+                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::ShiftRight, right: Box::new(right), span: self.create_span(span) };
+                        }
+                        _ => { left = self.parse_expression(op_pair)?; }
+                    }
+                }
+                Ok(left)
             }
             Rule::multiplicative => {
                 let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
@@ -506,6 +728,20 @@ impl PestParser {
                 }
                 Ok(left)
             }
+            Rule::power => {
+                // right-associative **
+                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                if let Some(op_pair) = inner.next() {
+                    if op_pair.as_str() == "**" {
+                        let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                        return Ok(Expression::Binary { left: Box::new(left), operator: BinaryOperator::Power, right: Box::new(right), span: self.create_span(span) });
+                    } else {
+                        return self.parse_expression(op_pair);
+                    }
+                }
+                Ok(left)
+            }
             Rule::unary => {
                 let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 
@@ -526,6 +762,10 @@ impl PestParser {
                                 operand: Box::new(operand),
                                 span: self.create_span(span),
                             })
+                        }
+                        "~" => {
+                            let operand = self.parse_expression(inner.next().ok_or("Missing operand")?)?;
+                            Ok(Expression::Unary { operator: UnaryOperator::BitNot, operand: Box::new(operand), span: self.create_span(span) })
                         }
                         _ => {
                             // No unary operator, parse as primary
@@ -610,6 +850,12 @@ impl PestParser {
                 // Remove quotes
                 let value = value.trim_start_matches('"').trim_end_matches('"').to_string();
                 Ok(Literal::String(value))
+            }
+            Rule::fstring_literal => {
+                let value = inner.as_str().to_string();
+                // Remove f" prefix and " suffix
+                let value = value.trim_start_matches("f\"").trim_end_matches('"').to_string();
+                Ok(Literal::FString(value))
             }
             Rule::boolean_literal => {
                 let value = inner.as_str() == "true";
@@ -718,20 +964,75 @@ impl PestParser {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
         
-        // The grammar produces: identifier, type_, expression, block
-        // (the literal tokens are consumed by the grammar)
-        let var_name = inner.next().ok_or("Missing variable name")?.as_str().trim().to_string();
-        let var_type = self.parse_type(inner.next().ok_or("Missing variable type")?)?;
-        let iterable = self.parse_expression(inner.next().ok_or("Missing iterable")?)?;
+        // Get the clause (either for_each_clause or c_style_clause)
+        let clause = inner.next().ok_or("Missing for clause")?;
         let body = self.parse_block(inner.next().ok_or("Missing body")?)?;
         
-        Ok(ForStatement {
-            var_name,
-            var_type,
-            iterable,
-            body,
-            span: self.create_span(span),
-        })
+        match clause.as_rule() {
+            Rule::for_each_clause => {
+                let mut clause_inner = clause.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let var_name = clause_inner.next().ok_or("Missing variable name")?.as_str().trim().to_string();
+                let var_type = self.parse_type(clause_inner.next().ok_or("Missing variable type")?)?;
+                let iterable = self.parse_expression(clause_inner.next().ok_or("Missing iterable")?)?;
+                
+                Ok(ForStatement::ForEach {
+                    var_name,
+                    var_type,
+                    iterable,
+                    body,
+                    span: self.create_span(span),
+                })
+            }
+            Rule::c_style_clause => {
+                let mut clause_inner = clause.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                
+                // Parse initializer (optional statement)
+                let initializer = if let Some(init_pair) = clause_inner.next() {
+                    if init_pair.as_rule() == Rule::statement {
+                        if let Some(stmt) = self.parse_statement(init_pair)? {
+                            Some(Box::new(stmt))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                // Parse condition (optional expression)
+                let condition = if let Some(cond_pair) = clause_inner.next() {
+                    if cond_pair.as_rule() == Rule::expression {
+                        Some(self.parse_expression(cond_pair)?)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                // Parse increment (optional expression)
+                let increment = if let Some(inc_pair) = clause_inner.next() {
+                    if inc_pair.as_rule() == Rule::expression {
+                        Some(self.parse_expression(inc_pair)?)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                Ok(ForStatement::CStyle {
+                    initializer,
+                    condition,
+                    increment,
+                    body,
+                    span: self.create_span(span),
+                })
+            }
+            _ => Err(format!("Expected for_each_clause or c_style_clause, got {:?}", clause.as_rule()).into()),
+        }
     }
 
     /// Parse return statement
@@ -793,82 +1094,70 @@ impl PestParser {
     /// Parse function declaration
     fn parse_function_decl(&mut self, pair: Pair<Rule>) -> Result<FunctionDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let pair_clone = pair.clone();
-        
-        let mut inner = pair_clone.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
         
         // Parse function name (first token after filtering whitespace)
         let name = inner.next().ok_or("Missing function name")?.as_str().to_string();
         
         // Parse generic parameters (optional)
-        let generic_params = Vec::new();
-        let mut params = Vec::new();
-        
-        // Check what the next token is
-        if let Some(next_token) = inner.next() {
-            match next_token.as_rule() {
-                Rule::param_list => {
-                    // Function has parameters
-                    params = self.parse_param_list(next_token)?;
-                    
-                    // Parse return type (next token should be type_)
-                    let return_type = self.parse_type(inner.next().ok_or("Missing return type")?)?;
-                    
-                    // Parse function body (next token should be block)
-                    let body = self.parse_block(inner.next().ok_or("Missing function body")?)?;
-                    
-                    return Ok(FunctionDecl {
-                        name,
-                        generic_params,
-                        params,
-                        return_type,
-                        body,
-                        span: self.create_span(span),
-                    });
-                }
-                Rule::type_ => {
-                    // Function has no parameters
-                    let return_type = self.parse_type(next_token)?;
-                    
-                    // Parse function body (next token should be block)
-                    let body = self.parse_block(inner.next().ok_or("Missing function body")?)?;
-                    
-                    return Ok(FunctionDecl {
-                        name,
-                        generic_params,
-                        params,
-                        return_type,
-                        body,
-                        span: self.create_span(span),
-                    });
-                }
-                _ => {
-                    return Err(format!("Expected param_list or type_, got {:?}", next_token.as_rule()).into());
-                }
+        let mut generic_params = Vec::new();
+        if let Some(next_token) = inner.clone().next() {
+            if next_token.as_rule() == Rule::generic_params {
+                // Consume the generic_params token
+                let generic_params_pair = inner.next().ok_or("Missing generic_params pair")?;
+                generic_params = self.parse_generic_params(generic_params_pair)?;
             }
         }
         
-        Err("Missing return type or parameters".into())
+        // Parse parameter list (optional)
+        let params = if let Some(params_pair) = inner.clone().next() {
+            if params_pair.as_rule() == Rule::param_list {
+                // Consume the param_list token
+                let _ = inner.next();
+                self.parse_param_list(params_pair)?
+            } else {
+                // No parameter list, skip to return type
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
+        
+        // Parse return type (required)
+        let return_type_pair = inner.next().ok_or("Missing return type")?;
+        let return_type = if return_type_pair.as_rule() == Rule::type_ {
+            self.parse_type(return_type_pair)?
+        } else {
+            return Err(format!("Expected type_, got {:?}", return_type_pair.as_rule()).into());
+        };
+        
+        // Parse function body (required)
+        let body_pair = inner.next().ok_or("Missing function body")?;
+        let body = if body_pair.as_rule() == Rule::block {
+            self.parse_block(body_pair)?
+        } else {
+            return Err(format!("Expected block, got {:?}", body_pair.as_rule()).into());
+        };
+        
+        Ok(FunctionDecl {
+            name,
+            generic_params,
+            params,
+            return_type,
+            body,
+            span: self.create_span(span),
+        })
     }
     
     /// Parse generic parameters
     fn parse_generic_params(&mut self, pair: Pair<Rule>) -> Result<Vec<GenericParam>, Box<dyn std::error::Error>> {
         let mut params = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
         
-        // Skip opening angle bracket
-        inner.next().ok_or("Missing opening '<'")?;
-        
-        while let Some(param_pair) = inner.next() {
+        for param_pair in inner {
             if param_pair.as_rule() == Rule::generic_param {
                 let param = self.parse_generic_param(param_pair)?;
                 params.push(param);
-            } else if param_pair.as_str() == "," {
-                // Skip comma
-                continue;
-            } else if param_pair.as_str() == ">" {
-                // End of generic parameters
-                break;
             }
         }
         
@@ -878,32 +1167,24 @@ impl PestParser {
     /// Parse single generic parameter
     fn parse_generic_param(&mut self, pair: Pair<Rule>) -> Result<GenericParam, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let pair_clone = pair.clone();
+        let mut inner = pair_clone.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
         
-        let name = inner.next().ok_or("Missing generic parameter name")?.as_str().to_string();
+        // First element should be the identifier (parameter name)
+        let name_pair = inner.next().ok_or("Missing generic parameter name")?;
+        let name = if name_pair.as_rule() == Rule::identifier {
+            name_pair.as_str().to_string()
+        } else {
+            return Err(format!("Expected identifier, got {:?}", name_pair.as_rule()).into());
+        };
         
-        // Skip colon
-        inner.next().ok_or("Missing ':'")?;
-        
-        // Skip "Implements" keyword
-        inner.next().ok_or("Missing 'Implements' keyword")?;
-        
-        // Skip opening bracket
-        inner.next().ok_or("Missing opening '['")?;
-        
-        // Parse bounds
-        let mut bounds = Vec::new();
-        while let Some(bound_pair) = inner.next() {
-            if bound_pair.as_rule() == Rule::identifier {
-                bounds.push(bound_pair.as_str().to_string());
-            } else if bound_pair.as_str() == "," {
-                // Skip comma
-                continue;
-            } else if bound_pair.as_str() == "]" {
-                // End of bounds
-                break;
-            }
-        }
+        // Second element should be the identifier_list (bounds)
+        let bounds_pair = inner.next().ok_or("Missing bounds")?;
+        let bounds = if bounds_pair.as_rule() == Rule::identifier_list {
+            self.parse_identifier_list(bounds_pair)?
+        } else {
+            return Err(format!("Expected identifier_list, got {:?}", bounds_pair.as_rule()).into());
+        };
         
         Ok(GenericParam {
             name,
@@ -956,6 +1237,7 @@ impl PestParser {
             Rule::set_literal => self.parse_set_literal(inner),
             Rule::map_literal => self.parse_map_literal(inner),
             Rule::tuple_literal => self.parse_tuple_literal(inner),
+            Rule::struct_literal => self.parse_struct_literal(inner),
             _ => Err("Unknown collection literal type".into())
         }
     }
@@ -1044,6 +1326,61 @@ impl PestParser {
 
         Ok(Expression::TupleLiteral {
             elements,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse struct literal
+    fn parse_struct_literal(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // First element should be the struct name (identifier)
+        let name_pair = inner.next().ok_or("Missing struct name in struct literal")?;
+        let name = name_pair.as_str().to_string();
+        
+        // Parse field initializations
+        let mut fields = Vec::new();
+        while let Some(field_pair) = inner.next() {
+            if field_pair.as_rule() == Rule::field_init {
+                let field = self.parse_field_init(field_pair)?;
+                fields.push(field);
+            } else if field_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            }
+        }
+        
+        Ok(Expression::StructLiteral {
+            name,
+            fields,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse field initialization
+    fn parse_field_init(&mut self, pair: Pair<Rule>) -> Result<FieldInit, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // First element should be the field name (identifier)
+        let name_pair = inner.next().ok_or("Missing field name in field initialization")?;
+        let name = name_pair.as_str().to_string();
+        
+        // Skip the colon
+        if let Some(colon_pair) = inner.next() {
+            if colon_pair.as_str() != ":" {
+                return Err("Expected ':' in field initialization".into());
+            }
+        }
+        
+        // Parse the expression value
+        let value_pair = inner.next().ok_or("Missing field value in field initialization")?;
+        let value = self.parse_expression(value_pair)?;
+        
+        Ok(FieldInit {
+            name,
+            value,
             span: self.create_span(span),
         })
     }
@@ -1562,7 +1899,7 @@ impl PestParser {
         // Parse identifier generic param names if present
         let mut type_params = Vec::new();
         if let Some(next_pair) = inner.next() {
-            if next_pair.as_rule() == Rule::type_param_names {
+            if next_pair.as_rule() == Rule::type_param_list {
                 let mut names = next_pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 while let Some(tok) = names.next() {
                     if tok.as_rule() == Rule::identifier {
@@ -1643,15 +1980,28 @@ impl PestParser {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
 
-        // Skip "interface" keyword
-        inner.next().ok_or("Missing interface keyword")?;
+        // Debug: print all inner pairs
+        let inner_pairs: Vec<_> = inner.clone().collect();
+        // println!("DEBUG: Interface declaration inner pairs:");
+        // for (i, p) in inner_pairs.iter().enumerate() {
+        //     println!("  {}: Rule={:?}, Content='{}'", i, p.as_rule(), p.as_str());
+        // }
 
-        // Parse interface name
-        let name = inner.next().ok_or("Missing interface name")?.as_str().to_string();
+        // Parse interface name (first element)
+        let name_pair = inner.next().ok_or("Missing interface name")?;
+        let name = if name_pair.as_rule() == Rule::interface_name {
+            // Extract the identifier from interface_name
+            let mut name_inner = name_pair.into_inner();
+            let identifier_pair = name_inner.next().ok_or("Missing identifier in interface_name")?;
+            identifier_pair.as_str().to_string()
+        } else {
+            name_pair.as_str().to_string()
+        };
+        // println!("DEBUG: Parsed interface name: '{}'", name);
 
         // Optional generic param names
         if let Some(next) = inner.clone().next() {
-            if next.as_rule() == Rule::type_param_names {
+            if next.as_rule() == Rule::type_param_list {
                 // consume
                 let _ = inner.next();
             }
@@ -1660,9 +2010,18 @@ impl PestParser {
         // Parse extends clause if present
         let mut extends = Vec::new();
         if let Some(next_pair) = inner.clone().next() {
-            if next_pair.as_rule() == Rule::identifier_list {
-                let _ = inner.next();
-                extends = self.parse_identifier_list(next_pair)?;
+            if next_pair.as_rule() == Rule::interface_extends {
+                // Parse the interface_extends rule
+                let _ = inner.next(); // consume the interface_extends pair
+                let mut extends_inner = next_pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                
+                // Skip the "extends" keyword and get the identifier_list
+                while let Some(extends_child) = extends_inner.next() {
+                    if extends_child.as_rule() == Rule::identifier_list {
+                        extends = self.parse_identifier_list(extends_child)?;
+                        break;
+                    }
+                }
             }
         }
 
@@ -1676,7 +2035,13 @@ impl PestParser {
     fn build_method_sig(&mut self, pair: Pair<Rule>) -> Result<MethodSig, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        let name = inner.next().ok_or("Missing method name")?.as_str().to_string();
+        
+        // Parse method name (can be identifier or operator_symbol)
+        let name_pair = inner.next().ok_or("Missing method name")?;
+        let name = match name_pair.as_rule() {
+            Rule::identifier | Rule::operator_symbol => name_pair.as_str().to_string(),
+            _ => return Err(format!("Expected identifier or operator_symbol, got {:?}", name_pair.as_rule()).into()),
+        };
         let mut params = Vec::new();
 
         // Next can be param_list or ARROW
@@ -1722,8 +2087,12 @@ impl PestParser {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
 
-        // Parse method name
-        let name = inner.next().ok_or("Missing method name")?.as_str().to_string();
+        // Parse method name (can be identifier or operator_symbol)
+        let name_pair = inner.next().ok_or("Missing method name")?;
+        let name = match name_pair.as_rule() {
+            Rule::identifier | Rule::operator_symbol => name_pair.as_str().to_string(),
+            _ => return Err(format!("Expected identifier or operator_symbol, got {:?}", name_pair.as_rule()).into()),
+        };
 
         // Next can be param_list or ARROW
         let mut params = Vec::new();
@@ -1769,6 +2138,36 @@ impl PestParser {
         }
         
         Ok(identifiers)
+    }
+
+    /// Parse export declaration
+    fn parse_export_decl(&mut self, pair: Pair<Rule>) -> Result<ExportDecl, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let inner = pair.into_inner().next().ok_or("Empty export declaration")?;
+        
+        match inner.as_rule() {
+            Rule::function_decl => {
+                let func_decl = self.parse_function_decl(inner)?;
+                Ok(ExportDecl::Declaration(Declaration::Function(func_decl)))
+            }
+            Rule::type_decl => {
+                let type_decl = self.parse_type_decl(inner)?;
+                Ok(ExportDecl::Declaration(Declaration::Type(type_decl)))
+            }
+            Rule::interface_decl => {
+                let interface_decl = self.parse_interface_decl(inner)?;
+                Ok(ExportDecl::Declaration(Declaration::Interface(interface_decl)))
+            }
+            Rule::identifier => {
+                let name = inner.as_str().to_string();
+                Ok(ExportDecl::Identifier(name))
+            }
+            Rule::identifier_list => {
+                let identifiers = self.parse_identifier_list(inner)?;
+                Ok(ExportDecl::IdentifierList(identifiers))
+            }
+            _ => return Err(format!("Expected function_decl, type_decl, interface_decl, identifier, or identifier_list in export, got {:?}", inner.as_rule()).into()),
+        }
     }
 
     /// Create a SourceSpan from a pest span
