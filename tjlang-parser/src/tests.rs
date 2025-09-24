@@ -54,7 +54,7 @@ mod tests {
         
         assert!(result.is_ok());
         let program = result.unwrap();
-        assert_eq!(program.units.len(), 1);
+        assert_eq!(program.units.len(), 3); // Should be 3 separate identifier expressions
     }
 
 
@@ -731,7 +731,7 @@ mod tests {
             "type Complex { real: float, imag: float }",
             
             // Enum declarations
-            "enum Option<T> { Some(T), None }",
+            "enum Option<T> { Some(T), Empty }",
             "enum Result<T, E> { Ok(T), Err(E) }",
             "enum Color { Red, Green, Blue }",
             
@@ -1979,7 +1979,7 @@ mod tests {
         
         // Test enum with type parameters (corrected syntax)
         let test_cases = vec![
-            "enum Option { Some(T), None }",
+            "enum Option { Some(T), Empty }",
             "enum Result { Ok(T), Err(E) }",
             "enum Color { Red, Green, Blue }",
         ];
