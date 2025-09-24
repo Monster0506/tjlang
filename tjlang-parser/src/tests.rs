@@ -2109,6 +2109,42 @@ mod tests {
     }
 
     #[test]
+    fn test_grammar_parse_bitwise_and_power_precedence() {
+        use crate::parser::{TJLangPestParser, Rule};
+        use pest::Parser;
+
+        let cases = vec![
+            "1 + 2 * 3 ** 2",
+            "~x & y | z ^ w",
+            "a << 2 + 1",
+            "(1 + 2) ** 3",
+        ];
+
+        for src in cases {
+            let res = TJLangPestParser::parse(Rule::expression, src);
+            assert!(res.is_ok(), "Failed to parse expression: {}", src);
+        }
+    }
+
+    #[test]
+    fn test_parse_bitwise_and_power_expressions() {
+        use crate::parser::PestParser;
+
+        let cases = vec![
+            ("def main() -> int { return 2 ** 3 * 2 }", 1usize),
+            ("def main() -> int { return ~1 & 3 }", 1usize),
+            ("def main() -> int { return (1 | 2) ^ 3 }", 1usize),
+            ("def main() -> int { return 1 << 2 >> 1 }", 1usize),
+        ];
+
+        for (src, expect_units) in cases {
+            let mut p = PestParser::new();
+            let program = p.parse(src).expect("parse failed");
+            assert_eq!(program.units.len(), expect_units, "Unexpected unit count for {}", src);
+        }
+    }
+
+    #[test]
     fn test_debug_function_decl() {
         use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
