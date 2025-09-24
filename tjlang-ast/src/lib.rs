@@ -4,8 +4,16 @@
 
 use std::fmt;
 
-// Re-export SourceSpan from diagnostics to avoid duplication
-pub use tjlang_diagnostics::SourceSpan;
+// Re-export SourceSpan from codespan to avoid duplication
+pub use codespan::FileId;
+use codespan::Span;
+
+/// A source span representing a location in source code
+#[derive(Debug, Clone, PartialEq)]
+pub struct SourceSpan {
+    pub file_id: FileId,
+    pub span: Span,
+}
 
 /// A complete TJLang program
 #[derive(Debug, Clone, PartialEq)]
