@@ -1669,6 +1669,63 @@ mod tests {
     }
 
     #[test]
+    fn test_grammar_parse_generic_params() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+        
+        // Test generic parameters with bounds
+        let test_cases = vec![
+            "def process<T: Implements [Comparable]> (item: T) -> int { 0 }",
+            "def sort<T: Implements [Comparable, Serializable]> (items: [T]) -> [T] { items }",
+            "def map<T: Implements [Clone], U: Implements [Default]> (f: (T) -> U, items: [T]) -> [U] { [] }",
+        ];
+        
+        for source in test_cases {
+            let result = TJLangPestParser::parse(Rule::function_decl, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Function with generic parameters parsed successfully: {}", source);
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    }
+                }
+                Err(e) => panic!("Failed to parse function with generic parameters '{}': {}", source, e),
+            }
+        }
+        
+        println!("✓ All generic parameters grammar tests passed");
+    }
+
+    #[test]
+    fn test_grammar_parse_operator_methods() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+        
+        // Test operator symbols in method signatures
+        let test_cases = vec![
+            "interface Math { + (other: int) -> int }",
+            "interface Comparable { == (other: int) -> bool }",
+            "interface Indexable { [] (index: int) -> int }",
+            "interface Logic { and (other: bool) -> bool }",
+        ];
+        
+        for source in test_cases {
+            let result = TJLangPestParser::parse(Rule::interface_decl, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Interface with operator method parsed successfully: {}", source);
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    }
+                }
+                Err(e) => panic!("Failed to parse interface with operator method '{}': {}", source, e),
+            }
+        }
+        
+        println!("✓ All operator method grammar tests passed");
+    }
+
+    #[test]
     fn test_grammar_parse_enum_type_parameters() {
         use pest::Parser;
         use crate::parser::{TJLangPestParser, Rule};
