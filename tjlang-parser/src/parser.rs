@@ -5,7 +5,7 @@ use pest::Parser;
 use pest::iterators::Pair;
 use pest_derive::Parser;
 use tjlang_ast::*;
-use tjlang_diagnostics::{DiagnosticCollection, SourceSpan};
+use tjlang_diagnostics::{DiagnosticCollection, SourceSpan as DiagnosticSourceSpan};
 use codespan::Files;
 
 // Import the generated parser
@@ -28,13 +28,81 @@ impl PestParser {
         }
     }
 
+    /// Add a parse error with context
+    fn add_parse_error(&mut self, code: tjlang_diagnostics::ErrorCode, message: String, span: pest::Span) {
+        let source_span = self.create_diagnostic_span(span);
+        self.diagnostics.add_error(code, message, source_span);
+    }
+
+    /// Add a parse warning with context
+    fn add_parse_warning(&mut self, code: tjlang_diagnostics::ErrorCode, message: String, span: pest::Span) {
+        let source_span = self.create_diagnostic_span(span);
+        self.diagnostics.add_warning(code, message, source_span);
+    }
+
+    /// Add an unexpected token error
+    fn add_unexpected_token_error(&mut self, expected: &str, found: &str, span: pest::Span) {
+        let message = format!("expected `{}`, found `{}`", expected, found);
+        self.add_parse_error(tjlang_diagnostics::ErrorCode::ParserUnexpectedToken, message, span);
+    }
+
+    /// Add a missing token error
+    fn add_missing_token_error(&mut self, expected: &str, span: pest::Span) {
+        let message = format!("expected `{}`", expected);
+        self.add_parse_error(tjlang_diagnostics::ErrorCode::ParserExpectedToken, message, span);
+    }
+
+    /// Add an invalid expression error with suggestion
+    fn add_invalid_expression_error(&mut self, context: &str, span: pest::Span) {
+        let message = format!("invalid expression in {}", context);
+        let mut diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+            tjlang_diagnostics::ErrorCode::ParserInvalidExpression,
+            codespan_reporting::diagnostic::Severity::Error,
+            message,
+            self.create_diagnostic_span(span),
+        );
+        
+        // Add helpful suggestions based on context
+        match context {
+            "if condition" => {
+                diagnostic = diagnostic.with_note("if conditions must be boolean expressions".to_string());
+            },
+            "while condition" => {
+                diagnostic = diagnostic.with_note("while conditions must be boolean expressions".to_string());
+            },
+            "function argument" => {
+                diagnostic = diagnostic.with_note("function arguments must be valid expressions".to_string());
+            },
+            _ => {}
+        }
+        
+        self.diagnostics.add(diagnostic);
+    }
+
 
 
     /// Parse TJLang source code
     pub fn parse(&mut self, source: &str) -> Result<Program, Box<dyn std::error::Error>> {
         // Parse using pest
         let pairs = TJLangPestParser::parse(Rule::program, source)
-            .map_err(|e| format!("Parse error: {}", e))?;
+            .map_err(|e| {
+                // Convert pest errors to our diagnostic format
+                match &e {
+                    pest::error::Error { location, .. } => {
+                        let pos = match location {
+                            pest::error::InputLocation::Pos(pos) => *pos,
+                            pest::error::InputLocation::Span((start, _)) => *start,
+                        };
+                        let span = pest::Span::new(source, pos, pos + 1).unwrap_or_else(|| pest::Span::new(source, 0, 1).unwrap());
+                        self.add_parse_error(
+                            tjlang_diagnostics::ErrorCode::ParserUnexpectedToken,
+                            format!("Parse error: {}", e),
+                            span,
+                        );
+                    }
+                }
+                format!("Parse error: {}", e)
+            })?;
 
         
         // Convert pest pairs to AST
@@ -44,64 +112,143 @@ impl PestParser {
 
     /// Parse program from pest pairs
     fn parse_program(&mut self, mut pairs: pest::iterators::Pairs<Rule>, _source: &str) -> Result<Program, Box<dyn std::error::Error>> {
-        let program_pair = pairs.next().ok_or("No program found")?;
+        let program_pair = pairs.next().ok_or_else(|| {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserUnexpectedEof,
+                "expected program content, found end of input".to_string(),
+                pest::Span::new("", 0, 0).unwrap(),
+            );
+            "No program found"
+        })?;
         let span = program_pair.as_span();
         
         let mut units = Vec::new();
+        let mut parse_errors = Vec::new();
+        
         for pair in program_pair.into_inner() {
             match pair.as_rule() {
                 Rule::program_unit => {
-                    let inner = pair.into_inner().next().ok_or("Empty program unit")?;
+                    let pair_span = pair.as_span();
+                    let inner = pair.into_inner().next().ok_or_else(|| {
+                        self.add_parse_error(
+                            tjlang_diagnostics::ErrorCode::ParserInvalidStatement,
+                            "empty program unit".to_string(),
+                            pair_span,
+                        );
+                        "Empty program unit"
+                    })?;
+                    
                     match inner.as_rule() {
                         Rule::statement => {
-                            if let Some(statement) = self.parse_statement(inner)? {
-                                // Convert statement to appropriate program unit
-                                match statement {
-                                    Statement::Variable(var_decl) => {
-                                        units.push(ProgramUnit::Declaration(Declaration::Variable(var_decl)));
+                            match self.parse_statement(inner) {
+                                Ok(Some(statement)) => {
+                                    // Convert statement to appropriate program unit
+                                    match statement {
+                                        Statement::Variable(var_decl) => {
+                                            units.push(ProgramUnit::Declaration(Declaration::Variable(var_decl)));
+                                        }
+                                        _ => {
+                                            // For other statements, create a dummy variable declaration
+                                            // This maintains backward compatibility with existing tests
+                                            units.push(ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
+                                                name: "main".to_string(),
+                                                var_type: Type::Primitive(PrimitiveType::Any),
+                                                value: Expression::Literal(Literal::None),
+                                                span: self.create_span(span),
+                                            })));
+                                        }
                                     }
-                                    _ => {
-                                        // For other statements, create a dummy variable declaration
-                                        // This maintains backward compatibility with existing tests
-                                units.push(ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
-                                    name: "main".to_string(),
-                                    var_type: Type::Primitive(PrimitiveType::Any),
-                                    value: Expression::Literal(Literal::None),
-                                    span: self.create_span(span),
-                                })));
-                                    }
+                                }
+                                Ok(None) => {
+                                    // Statement was parsed but is not a top-level statement
+                                    self.add_parse_warning(
+                                        tjlang_diagnostics::ErrorCode::ParserInvalidStatement,
+                                        "statement is not valid at top level".to_string(),
+                                        pair_span,
+                                    );
+                                }
+                                Err(e) => {
+                                    parse_errors.push(e);
                                 }
                             }
                         }
                         Rule::function_decl => {
-                            let func_decl = self.parse_function_decl(inner)?;
-                            units.push(ProgramUnit::Declaration(Declaration::Function(func_decl)));
+                            match self.parse_function_decl(inner) {
+                                Ok(func_decl) => {
+                                    units.push(ProgramUnit::Declaration(Declaration::Function(func_decl)));
+                                }
+                                Err(e) => {
+                                    parse_errors.push(e);
+                                }
+                            }
                         }
                         Rule::type_decl => {
-                            let type_decl = self.parse_type_decl(inner)?;
-                            units.push(ProgramUnit::Declaration(Declaration::Type(type_decl)));
+                            match self.parse_type_decl(inner) {
+                                Ok(type_decl) => {
+                                    units.push(ProgramUnit::Declaration(Declaration::Type(type_decl)));
+                                }
+                                Err(e) => {
+                                    parse_errors.push(e);
+                                }
+                            }
                         }
                         Rule::struct_decl => {
-                            let struct_decl = self.parse_struct_decl(inner)?;
-                            units.push(ProgramUnit::Declaration(Declaration::Struct(struct_decl)));
+                            match self.parse_struct_decl(inner) {
+                                Ok(struct_decl) => {
+                                    units.push(ProgramUnit::Declaration(Declaration::Struct(struct_decl)));
+                                }
+                                Err(e) => {
+                                    parse_errors.push(e);
+                                }
+                            }
                         }
                         Rule::enum_decl => {
-                            let enum_decl = self.parse_enum_decl(inner)?;
-                            units.push(ProgramUnit::Declaration(Declaration::Enum(enum_decl)));
+                            match self.parse_enum_decl(inner) {
+                                Ok(enum_decl) => {
+                                    units.push(ProgramUnit::Declaration(Declaration::Enum(enum_decl)));
+                                }
+                                Err(e) => {
+                                    parse_errors.push(e);
+                                }
+                            }
                         }
                         Rule::interface_decl => {
-                            let interface_decl = self.parse_interface_decl(inner)?;
-                            units.push(ProgramUnit::Declaration(Declaration::Interface(interface_decl)));
+                            match self.parse_interface_decl(inner) {
+                                Ok(interface_decl) => {
+                                    units.push(ProgramUnit::Declaration(Declaration::Interface(interface_decl)));
+                                }
+                                Err(e) => {
+                                    parse_errors.push(e);
+                                }
+                            }
                         }
                         Rule::impl_block => {
-                            let impl_block = self.parse_impl_block(inner)?;
-                            units.push(ProgramUnit::Declaration(Declaration::Implementation(impl_block)));
+                            match self.parse_impl_block(inner) {
+                                Ok(impl_block) => {
+                                    units.push(ProgramUnit::Declaration(Declaration::Implementation(impl_block)));
+                                }
+                                Err(e) => {
+                                    parse_errors.push(e);
+                                }
+                            }
                         }
                         Rule::export_decl => {
-                            let export_decl = self.parse_export_decl(inner)?;
-                            units.push(ProgramUnit::Export(export_decl));
+                            match self.parse_export_decl(inner) {
+                                Ok(export_decl) => {
+                                    units.push(ProgramUnit::Export(export_decl));
+                                }
+                                Err(e) => {
+                                    parse_errors.push(e);
+                                }
+                            }
                         }
-                        _ => {}
+                        _ => {
+                            self.add_parse_error(
+                                tjlang_diagnostics::ErrorCode::ParserInvalidStatement,
+                                format!("unexpected construct: {:?}", inner.as_rule()),
+                                inner.as_span(),
+                            );
+                        }
                     }
                 }
                 Rule::EOI => break, // End of input
@@ -109,8 +256,18 @@ impl PestParser {
             }
         }
 
+        // If we had parse errors, return the first one
+        if let Some(first_error) = parse_errors.into_iter().next() {
+            return Err(first_error);
+        }
+
         // If no units were parsed, create a dummy one for empty programs
         if units.is_empty() {
+            self.add_parse_warning(
+                tjlang_diagnostics::ErrorCode::ParserInvalidStatement,
+                "empty program - no declarations found".to_string(),
+                span,
+            );
             units.push(ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
                 name: "main".to_string(),
                 var_type: Type::Primitive(PrimitiveType::Any),
@@ -361,18 +518,70 @@ impl PestParser {
             let span = pair.as_span();
             let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
             
-            let name_pair = inner.next().ok_or("Missing variable name")?;
+            let name_pair = inner.next().ok_or_else(|| {
+                self.add_parse_error(
+                    tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                    "expected variable name".to_string(),
+                    span,
+                );
+                "Missing variable name"
+            })?;
             let name = name_pair.as_str().to_string();
+            
+            // Validate variable name
+            if name.is_empty() {
+                self.add_parse_error(
+                    tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                    "variable name cannot be empty".to_string(),
+                    name_pair.as_span(),
+                );
+            }
             
             // Note: colon ":" is a literal in the grammar and not included in the parse tree
             
-            let type_pair = inner.next().ok_or("Missing type")?;
+            let type_pair = inner.next().ok_or_else(|| {
+                self.add_parse_error(
+                    tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                    format!("expected type annotation for variable `{}`", name),
+                    span,
+                );
+                "Missing type"
+            })?;
             let type_ = self.parse_type(type_pair)?;
             
             // Note: equals "=" is a literal in the grammar and not included in the parse tree
             
-            let expr_pair = inner.next().ok_or("Missing expression")?;
+            let expr_pair = inner.next().ok_or_else(|| {
+                self.add_parse_error(
+                    tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                    format!("expected initializer expression for variable `{}`", name),
+                    span,
+                );
+                "Missing expression"
+            })?;
+            let expr_span = expr_pair.as_span();
             let expression = self.parse_expression(expr_pair)?;
+            
+            // Add type checking warning if types don't match (basic check)
+            if let Expression::Literal(lit) = &expression {
+                match (&type_, lit) {
+                    (Type::Primitive(PrimitiveType::Int), Literal::String(_)) => {
+                        self.add_parse_warning(
+                            tjlang_diagnostics::ErrorCode::AnalyzerTypeMismatch,
+                            format!("variable `{}` declared as `int` but initialized with string literal", name),
+                            expr_span,
+                        );
+                    }
+                    (Type::Primitive(PrimitiveType::Str), Literal::Int(_)) => {
+                        self.add_parse_warning(
+                            tjlang_diagnostics::ErrorCode::AnalyzerTypeMismatch,
+                            format!("variable `{}` declared as `str` but initialized with integer literal", name),
+                            expr_span,
+                        );
+                    }
+                    _ => {} // Other combinations are fine or will be checked later
+                }
+            }
             
             Ok(VariableDecl {
                 name,
@@ -876,10 +1085,34 @@ impl PestParser {
         let mut inner = pair.into_inner();
         
         // The "if" keyword is consumed by the grammar, so the first inner pair is the expression
-        let condition_pair = inner.next().ok_or("Missing condition")?;
+        let condition_pair = inner.next().ok_or_else(|| {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                "expected condition expression after `if`".to_string(),
+                span,
+            );
+            "Missing condition"
+        })?;
+        let condition_span = condition_pair.as_span();
         let condition = self.parse_expression(condition_pair)?;
         
-        let block_pair = inner.next().ok_or("Missing then block")?;
+        // Add warning if condition is not a boolean expression (basic check)
+        if let Expression::Literal(Literal::Int(_)) = &condition {
+            self.add_parse_warning(
+                tjlang_diagnostics::ErrorCode::AnalyzerTypeMismatch,
+                "if condition is an integer - consider using a boolean expression".to_string(),
+                condition_span,
+            );
+        }
+        
+        let block_pair = inner.next().ok_or_else(|| {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                "expected block after if condition".to_string(),
+                span,
+            );
+            "Missing then block"
+        })?;
         let then_block = self.parse_block(block_pair)?;
         
         // Parse elif branches
@@ -890,8 +1123,35 @@ impl PestParser {
                 let mut branch_inner = branch_pair.into_inner();
                 
                 // The "elif" keyword is consumed by the grammar, so the first inner pair is the condition
-                let branch_condition = self.parse_expression(branch_inner.next().ok_or("Missing elif condition")?)?;
-                let branch_block = self.parse_block(branch_inner.next().ok_or("Missing elif block")?)?;
+                let elif_condition_pair = branch_inner.next().ok_or_else(|| {
+                    self.add_parse_error(
+                        tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                        "expected condition expression after `elif`".to_string(),
+                        branch_span,
+                    );
+                    "Missing elif condition"
+                })?;
+                let elif_condition_span = elif_condition_pair.as_span();
+                let branch_condition = self.parse_expression(elif_condition_pair)?;
+                
+                // Add warning if elif condition is not a boolean expression
+                if let Expression::Literal(Literal::Int(_)) = &branch_condition {
+                    self.add_parse_warning(
+                        tjlang_diagnostics::ErrorCode::AnalyzerTypeMismatch,
+                        "elif condition is an integer - consider using a boolean expression".to_string(),
+                        elif_condition_span,
+                    );
+                }
+                
+                let elif_block_pair = branch_inner.next().ok_or_else(|| {
+                    self.add_parse_error(
+                        tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                        "expected block after elif condition".to_string(),
+                        branch_span,
+                    );
+                    "Missing elif block"
+                })?;
+                let branch_block = self.parse_block(elif_block_pair)?;
                 
                 elif_branches.push(ElifBranch {
                     condition: branch_condition,
@@ -907,16 +1167,34 @@ impl PestParser {
         // Parse else branch if present
         let else_block = if let Some(else_pair) = inner.next() {
             if else_pair.as_rule() == Rule::else_branch {
+                let else_span = else_pair.as_span();
                 let mut else_inner = else_pair.into_inner();
                 
                 // The "else" keyword is consumed by the grammar, so the first inner pair is the block
-                Some(self.parse_block(else_inner.next().ok_or("Missing else block")?)?)
+                let else_block_pair = else_inner.next().ok_or_else(|| {
+                    self.add_parse_error(
+                        tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                        "expected block after `else`".to_string(),
+                        else_span,
+                    );
+                    "Missing else block"
+                })?;
+                Some(self.parse_block(else_block_pair)?)
             } else {
                 None
             }
         } else {
             None
         };
+        
+        // Add helpful warning if if statement has no else branch
+        if else_block.is_none() && elif_branches.is_empty() {
+            self.add_parse_warning(
+                tjlang_diagnostics::ErrorCode::ParserInvalidStatement,
+                "if statement without else branch - consider adding an else clause for completeness".to_string(),
+                span,
+            );
+        }
         
         Ok(IfStatement {
             condition,
@@ -1095,14 +1373,38 @@ impl PestParser {
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
         
         // Parse function name (first token after filtering whitespace)
-        let name = inner.next().ok_or("Missing function name")?.as_str().to_string();
+        let name_pair = inner.next().ok_or_else(|| {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                "expected function name".to_string(),
+                span,
+            );
+            "Missing function name"
+        })?;
+        let name = name_pair.as_str().to_string();
+        
+        // Validate function name
+        if name.is_empty() {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                "function name cannot be empty".to_string(),
+                name_pair.as_span(),
+            );
+        }
         
         // Parse generic parameters (optional)
         let mut generic_params = Vec::new();
         if let Some(next_token) = inner.clone().next() {
             if next_token.as_rule() == Rule::generic_params {
                 // Consume the generic_params token
-                let generic_params_pair = inner.next().ok_or("Missing generic_params pair")?;
+                let generic_params_pair = inner.next().ok_or_else(|| {
+                    self.add_parse_error(
+                        tjlang_diagnostics::ErrorCode::ParserInvalidFunction,
+                        "malformed generic parameters".to_string(),
+                        next_token.as_span(),
+                    );
+                    "Missing generic_params pair"
+                })?;
                 generic_params = self.parse_generic_params(generic_params_pair)?;
             }
         }
@@ -1122,20 +1424,53 @@ impl PestParser {
         };
         
         // Parse return type (required)
-        let return_type_pair = inner.next().ok_or("Missing return type")?;
+        let return_type_pair = inner.next().ok_or_else(|| {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                format!("expected return type for function `{}`", name),
+                span,
+            );
+            "Missing return type"
+        })?;
         let return_type = if return_type_pair.as_rule() == Rule::type_ {
             self.parse_type(return_type_pair)?
         } else {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserInvalidType,
+                format!("expected type, found {:?}", return_type_pair.as_rule()),
+                return_type_pair.as_span(),
+            );
             return Err(format!("Expected type_, got {:?}", return_type_pair.as_rule()).into());
         };
         
         // Parse function body (required)
-        let body_pair = inner.next().ok_or("Missing function body")?;
+        let body_pair = inner.next().ok_or_else(|| {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                format!("expected function body for function `{}`", name),
+                span,
+            );
+            "Missing function body"
+        })?;
         let body = if body_pair.as_rule() == Rule::block {
             self.parse_block(body_pair)?
         } else {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserInvalidFunction,
+                format!("expected block, found {:?}", body_pair.as_rule()),
+                body_pair.as_span(),
+            );
             return Err(format!("Expected block, got {:?}", body_pair.as_rule()).into());
         };
+        
+        // Add helpful warnings
+        if params.is_empty() {
+            self.add_parse_warning(
+                tjlang_diagnostics::ErrorCode::ParserInvalidFunction,
+                format!("function `{}` has no parameters - consider adding `()` for clarity", name),
+                span,
+            );
+        }
         
         Ok(FunctionDecl {
                         name,
@@ -2173,6 +2508,19 @@ impl PestParser {
         let mut files = Files::new();
         let file_id = files.add("input.tj", "");
         tjlang_ast::SourceSpan {
+            file_id,
+            span: codespan::Span::new(
+                codespan::ByteIndex(span.start() as u32),
+                codespan::ByteIndex(span.end() as u32),
+            ),
+        }
+    }
+
+    /// Create a DiagnosticSourceSpan from a pest span
+    fn create_diagnostic_span(&self, span: pest::Span) -> DiagnosticSourceSpan {
+        let mut files = Files::new();
+        let file_id = files.add("input.tj", "");
+        DiagnosticSourceSpan {
             file_id,
             span: codespan::Span::new(
                 codespan::ByteIndex(span.start() as u32),
