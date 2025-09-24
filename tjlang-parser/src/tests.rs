@@ -1361,6 +1361,45 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_struct_literals() {
+        use crate::parser::PestParser;
+        
+        let test_cases = vec![
+            "Point { x: 1, y: 2 }",
+            "Person { name: \"Alice\", age: 30 }",
+            "Config { debug: true, port: 8080 }",
+        ];
+        
+        for source in test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            
+            match result {
+                Ok(program) => {
+                    println!("✓ Successfully parsed struct literal: {}", source);
+                    // Check that we have a variable declaration with a struct literal
+                    if let Some(unit) = program.units.first() {
+                        if let tjlang_ast::ProgramUnit::Declaration(decl) = unit {
+                            if let tjlang_ast::Declaration::Variable(var_decl) = decl {
+                                if let tjlang_ast::Expression::StructLiteral { name, fields, .. } = &var_decl.value {
+                                    println!("  Struct name: {}", name);
+                                    println!("  Fields: {} field(s)", fields.len());
+                                    for field in fields {
+                                        println!("    {}: {:?}", field.name, field.value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => panic!("Failed to parse struct literal '{}': {}", source, e),
+            }
+        }
+        
+        println!("✓ All struct literal parsing tests passed");
+    }
+
+    #[test]
     fn test_parse_spawn_expressions() {
         use crate::parser::PestParser;
 

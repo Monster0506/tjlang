@@ -974,6 +974,7 @@ impl PestParser {
             Rule::set_literal => self.parse_set_literal(inner),
             Rule::map_literal => self.parse_map_literal(inner),
             Rule::tuple_literal => self.parse_tuple_literal(inner),
+            Rule::struct_literal => self.parse_struct_literal(inner),
             _ => Err("Unknown collection literal type".into())
         }
     }
@@ -1062,6 +1063,61 @@ impl PestParser {
 
         Ok(Expression::TupleLiteral {
             elements,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse struct literal
+    fn parse_struct_literal(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // First element should be the struct name (identifier)
+        let name_pair = inner.next().ok_or("Missing struct name in struct literal")?;
+        let name = name_pair.as_str().to_string();
+        
+        // Parse field initializations
+        let mut fields = Vec::new();
+        while let Some(field_pair) = inner.next() {
+            if field_pair.as_rule() == Rule::field_init {
+                let field = self.parse_field_init(field_pair)?;
+                fields.push(field);
+            } else if field_pair.as_str() == "," {
+                // Skip comma
+                continue;
+            }
+        }
+        
+        Ok(Expression::StructLiteral {
+            name,
+            fields,
+            span: self.create_span(span),
+        })
+    }
+
+    /// Parse field initialization
+    fn parse_field_init(&mut self, pair: Pair<Rule>) -> Result<FieldInit, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        
+        // First element should be the field name (identifier)
+        let name_pair = inner.next().ok_or("Missing field name in field initialization")?;
+        let name = name_pair.as_str().to_string();
+        
+        // Skip the colon
+        if let Some(colon_pair) = inner.next() {
+            if colon_pair.as_str() != ":" {
+                return Err("Expected ':' in field initialization".into());
+            }
+        }
+        
+        // Parse the expression value
+        let value_pair = inner.next().ok_or("Missing field value in field initialization")?;
+        let value = self.parse_expression(value_pair)?;
+        
+        Ok(FieldInit {
+            name,
+            value,
             span: self.create_span(span),
         })
     }
