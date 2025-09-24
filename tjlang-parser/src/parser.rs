@@ -1717,11 +1717,24 @@ impl PestParser {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
 
-        // Skip "interface" keyword
-        inner.next().ok_or("Missing interface keyword")?;
+        // Debug: print all inner pairs
+        let inner_pairs: Vec<_> = inner.clone().collect();
+        // println!("DEBUG: Interface declaration inner pairs:");
+        // for (i, p) in inner_pairs.iter().enumerate() {
+        //     println!("  {}: Rule={:?}, Content='{}'", i, p.as_rule(), p.as_str());
+        // }
 
-        // Parse interface name
-        let name = inner.next().ok_or("Missing interface name")?.as_str().to_string();
+        // Parse interface name (first element)
+        let name_pair = inner.next().ok_or("Missing interface name")?;
+        let name = if name_pair.as_rule() == Rule::interface_name {
+            // Extract the identifier from interface_name
+            let mut name_inner = name_pair.into_inner();
+            let identifier_pair = name_inner.next().ok_or("Missing identifier in interface_name")?;
+            identifier_pair.as_str().to_string()
+        } else {
+            name_pair.as_str().to_string()
+        };
+        // println!("DEBUG: Parsed interface name: '{}'", name);
 
         // Optional generic param names
         if let Some(next) = inner.clone().next() {
@@ -1734,9 +1747,18 @@ impl PestParser {
         // Parse extends clause if present
         let mut extends = Vec::new();
         if let Some(next_pair) = inner.clone().next() {
-            if next_pair.as_rule() == Rule::identifier_list {
-                let _ = inner.next();
-                extends = self.parse_identifier_list(next_pair)?;
+            if next_pair.as_rule() == Rule::interface_extends {
+                // Parse the interface_extends rule
+                let _ = inner.next(); // consume the interface_extends pair
+                let mut extends_inner = next_pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                
+                // Skip the "extends" keyword and get the identifier_list
+                while let Some(extends_child) = extends_inner.next() {
+                    if extends_child.as_rule() == Rule::identifier_list {
+                        extends = self.parse_identifier_list(extends_child)?;
+                        break;
+                    }
+                }
             }
         }
 

@@ -95,7 +95,9 @@ type_param_list = { "<" ~ identifier ~ ("," ~ identifier)* ~ ">" }
 
 ARROW = { "->" }
 
-interface_decl = { "interface" ~ identifier ~ (type_param_list)? ~ ("extends" ~ identifier_list)? ~ "{" ~ method_sig+ ~ "}" }
+interface_decl = { "interface" ~ interface_name ~ (interface_extends)? ~ "{" ~ method_sig+ ~ "}" }
+interface_name = { identifier }
+interface_extends = { "extends" ~ identifier_list }
 
 method_sig = { (identifier | operator_symbol) ~ "(" ~ param_list? ~ ")" ~ ARROW ~ type_ }
 
@@ -192,7 +194,7 @@ field_init_list = { field_init ~ ("," ~ field_init)* }
 impl_kw = { "impl" }
 for_kw = { "for" }
 keyword = { impl_kw | for_kw | "module" | "import" | "from" | "export" | "as" | "do" | "spawn" | "def" | "type" | "enum" | "interface" | "if" | "elif" | "else" | "while" | "match" | "return" | "break" | "continue" | "pass" | "raise" | "implements" | "extends" }
-identifier = { !keyword ~ (ASCII_ALPHA | "_") ~ ASCII_ALPHANUMERIC* }
+identifier = @{ !keyword ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHA | ASCII_DIGIT | "_")* }
 
 // Qualified names (for modules/imports)
 qualified_name = { identifier ~ ("." ~ identifier)* }

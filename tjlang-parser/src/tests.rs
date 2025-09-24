@@ -1361,6 +1361,214 @@ mod tests {
     }
 
     #[test]
+    fn test_grammar_parse_interface_debug() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+        
+        // Test identifier parsing first
+        let identifier_tests = vec![
+            "Drawable",
+            "extends",
+            "Printable",
+        ];
+        
+        for source in identifier_tests {
+            println!("Testing identifier: {}", source);
+            let result = TJLangPestParser::parse(Rule::identifier, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Identifier parsed successfully");
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    }
+                }
+                Err(e) => println!("Failed to parse identifier '{}': {}", source, e),
+            }
+            println!();
+        }
+        
+        // Test interface declaration grammar directly
+        let test_cases = vec![
+            "interface Drawable { draw() -> int }",
+            "interface Drawable extends Printable { draw() -> int }",
+        ];
+        
+        for source in test_cases {
+            println!("Testing: {}", source);
+            let result = TJLangPestParser::parse(Rule::interface_decl, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Interface declaration parsed successfully");
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                        println!("  Parse tree depth analysis:");
+                        for (i, inner) in pair.into_inner().enumerate() {
+                            println!("    [{}] Rule={:?}, Content='{}'", i, inner.as_rule(), inner.as_str());
+                            println!("         Span: {:?}", inner.as_span());
+                            // Check if this inner has more children
+                            let inner_children: Vec<_> = inner.clone().into_inner().collect();
+                            if !inner_children.is_empty() {
+                                println!("         Has {} children:", inner_children.len());
+                                for (j, child) in inner_children.iter().enumerate() {
+                                    println!("           [{}] Rule={:?}, Content='{}'", j, child.as_rule(), child.as_str());
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => panic!("Failed to parse interface declaration '{}': {}", source, e),
+            }
+            println!();
+        }
+        
+        // Test the specific problematic part
+        println!("=== Testing specific parts ===");
+        let problematic_parts = vec![
+            "Drawable extends",
+            "Drawable extends Printable",
+            "Drawable ",
+            "Drawable\t",
+            "Drawable\n",
+        ];
+        
+        for part in problematic_parts {
+            println!("Testing part: '{}'", part);
+            let result = TJLangPestParser::parse(Rule::identifier, part);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Parsed as identifier");
+                    for pair in pairs {
+                        println!("  Content: '{}'", pair.as_str());
+                        println!("  Length: {}", pair.as_str().len());
+                        println!("  Bytes: {:?}", pair.as_str().as_bytes());
+                    }
+                }
+                Err(e) => println!("✗ Failed to parse: {}", e),
+            }
+            println!();
+        }
+        
+        // Test character sets
+        println!("=== Testing character sets ===");
+        let char_tests = vec![
+            "a", "A", "1", "_", " ", "\t", "\n", "extends",
+        ];
+        
+        for ch in char_tests {
+            println!("Testing character: '{}' (bytes: {:?})", ch, ch.as_bytes());
+            let result = TJLangPestParser::parse(Rule::identifier, ch);
+            match result {
+                Ok(pairs) => println!("✓ Parsed as identifier"),
+                Err(e) => println!("✗ Failed: {}", e),
+            }
+        }
+        
+        // Test what ASCII_ALPHANUMERIC includes
+        println!("=== Testing ASCII_ALPHANUMERIC behavior ===");
+        let ascii_tests = vec![
+            "a1", "a_", "a ", "a\t", "a\n", "ab", "a1b", "a_b", "a b",
+        ];
+        
+        for test in ascii_tests {
+            println!("Testing ASCII pattern: '{}' (bytes: {:?})", test, test.as_bytes());
+            let result = TJLangPestParser::parse(Rule::identifier, test);
+            match result {
+                Ok(pairs) => {
+                    for pair in pairs {
+                        println!("✓ Parsed as identifier: '{}'", pair.as_str());
+                    }
+                }
+                Err(e) => println!("✗ Failed: {}", e),
+            }
+        }
+        
+        // Test the exact problematic string
+        println!("=== Testing exact problematic string ===");
+        let exact_test = "Drawable extends Printable";
+        println!("Testing exact string: '{}'", exact_test);
+        let result = TJLangPestParser::parse(Rule::identifier, exact_test);
+        match result {
+            Ok(pairs) => {
+                for pair in pairs {
+                    println!("✓ Parsed as identifier: '{}'", pair.as_str());
+                    println!("  Length: {}", pair.as_str().len());
+                    println!("  Bytes: {:?}", pair.as_str().as_bytes());
+                }
+            }
+            Err(e) => println!("✗ Failed: {}", e),
+        }
+        
+        // Test if the issue is with the grammar rule structure
+        println!("=== Testing grammar rule structure ===");
+        let grammar_test = "interface Drawable extends Printable { draw() -> int }";
+        println!("Testing full grammar: '{}'", grammar_test);
+        let result = TJLangPestParser::parse(Rule::interface_decl, grammar_test);
+        match result {
+            Ok(pairs) => {
+                for pair in pairs {
+                    println!("✓ Parsed as interface_decl");
+                    for (i, inner) in pair.into_inner().enumerate() {
+                        println!("  [{}] Rule={:?}, Content='{}'", i, inner.as_rule(), inner.as_str());
+                        println!("       Span: {:?}", inner.as_span());
+                    }
+                }
+            }
+            Err(e) => println!("✗ Failed: {}", e),
+        }
+        
+        // Minimal test to understand the issue
+        println!("=== Minimal test ===");
+        let minimal_test = "a b";
+        println!("Testing minimal: '{}'", minimal_test);
+        let result = TJLangPestParser::parse(Rule::identifier, minimal_test);
+        match result {
+            Ok(pairs) => {
+                for pair in pairs {
+                    println!("✓ Parsed as identifier: '{}'", pair.as_str());
+                    println!("  Length: {}", pair.as_str().len());
+                    println!("  Bytes: {:?}", pair.as_str().as_bytes());
+                }
+            }
+            Err(e) => println!("✗ Failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_parse_interface_extends() {
+        use crate::parser::PestParser;
+        
+        let test_cases = vec![
+            "interface Drawable { draw() -> int }",
+            "interface Drawable extends Printable { draw() -> int }",
+            "interface Drawable extends Printable, Serializable { draw() -> int }",
+        ];
+        
+        for source in test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            
+            match result {
+                Ok(program) => {
+                    println!("✓ Successfully parsed interface: {}", source);
+                    // Check that we have an interface declaration
+                    if let Some(unit) = program.units.first() {
+                        if let tjlang_ast::ProgramUnit::Declaration(decl) = unit {
+                            if let tjlang_ast::Declaration::Interface(interface_decl) = decl {
+                                println!("  Interface name: {}", interface_decl.name);
+                                println!("  Extends: {:?}", interface_decl.extends);
+                                println!("  Methods: {} method(s)", interface_decl.methods.len());
+                            }
+                        }
+                    }
+                }
+                Err(e) => panic!("Failed to parse interface '{}': {}", source, e),
+            }
+        }
+        
+        println!("✓ All interface extension parsing tests passed");
+    }
+
+    #[test]
     fn test_parse_struct_literals() {
         use crate::parser::PestParser;
         
