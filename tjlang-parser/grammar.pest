@@ -69,7 +69,7 @@ function_decl = { "def" ~ identifier ~ (generic_params ~ "(" ~ param_list ~ ")" 
 
 generic_params = { "<" ~ generic_param ~ ("," ~ generic_param)* ~ ">" }
 
-generic_param = { identifier ~ ":" ~ "Implements" ~ "[" ~ identifier_list ~ "]" }
+generic_param = { identifier ~ ":" ~ "implements" ~ "[" ~ identifier_list ~ "]" }
 
 param_list = { param ~ ("," ~ param)* }
 

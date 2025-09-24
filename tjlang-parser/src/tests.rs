@@ -1922,9 +1922,9 @@ mod tests {
         
         // Test generic parameters with bounds
         let test_cases = vec![
-            "def process<T: Implements [Comparable]> (item: T) -> int { 0 }",
-            "def sort<T: Implements [Comparable, Serializable]> (items: [T]) -> [T] { items }",
-            "def map<T: Implements [Clone], U: Implements [Default]> (f: (T) -> U, items: [T]) -> [U] { [] }",
+            "def process<T: implements [Comparable]> (item: T) -> int { 0 }",
+            "def sort<T: implements [Comparable, Serializable]> (items: [T]) -> [T] { items }",
+            "def map<T: implements [Clone], U: implements [Default]> (f: (T) -> U, items: [T]) -> [U] { [] }",
         ];
         
         for source in test_cases {
@@ -1941,6 +1941,104 @@ mod tests {
         }
         
         println!("✓ All generic parameters grammar tests passed");
+    }
+
+    #[test]
+    fn test_parse_generic_params() {
+        use crate::parser::PestParser;
+        
+        let test_cases = vec![
+            "def identity<T: implements [Comparable]>(x: T) -> T { return x }",
+            "def compare<T: implements [Comparable, Serializable]>(a: T, b: T) -> int { return a.compare(b) }",
+            "def process<T: implements [Comparable], U: implements [Clone]>(item: T, backup: U) -> T { return item }",
+        ];
+        
+        for source in test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            
+            match result {
+                Ok(program) => {
+                    println!("✓ Successfully parsed function with generic parameters: {}", source);
+                    if let Some(unit) = program.units.first() {
+                        if let tjlang_ast::ProgramUnit::Declaration(decl) = unit {
+                            if let tjlang_ast::Declaration::Function(func_decl) = decl {
+                                println!("  Function name: {}", func_decl.name);
+                                println!("  Generic parameters: {} parameter(s)", func_decl.generic_params.len());
+                                for (i, param) in func_decl.generic_params.iter().enumerate() {
+                                    println!("    [{}] {}: Implements {:?}", i, param.name, param.bounds);
+                                }
+                                println!("  Parameters: {} parameter(s)", func_decl.params.len());
+                                println!("  Return type: {:?}", func_decl.return_type);
+                            }
+                        }
+                    }
+                }
+                Err(e) => panic!("Failed to parse function with generic parameters '{}': {}", source, e),
+            }
+        }
+        
+        println!("✓ All generic parameters parsing tests passed");
+    }
+
+    #[test]
+    fn test_debug_generic_params() {
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+        use pest::Parser;
+        
+        let test_cases = vec![
+            "<T: implements [Comparable]>",
+            "<T: implements [Comparable, Serializable]>",
+        ];
+        
+        for source in test_cases {
+            println!("Testing generic_params: {}", source);
+            let result = TJLangPestParser::parse(Rule::generic_params, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Generic params parsed successfully");
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                        for inner in pair.into_inner() {
+                            println!("    Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        }
+                    }
+                }
+                Err(e) => panic!("Failed to parse generic_params '{}': {}", source, e),
+            }
+            println!();
+        }
+    }
+
+    #[test]
+    fn test_debug_generic_param() {
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+        use pest::Parser;
+        
+        let test_cases = vec![
+            "T: implements [Comparable]",
+            "T: implements [Comparable, Serializable]",
+        ];
+        
+        for source in test_cases {
+            println!("Testing generic_param: {}", source);
+            let result = TJLangPestParser::parse(Rule::generic_param, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Generic param parsed successfully");
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                        for inner in pair.into_inner() {
+                            println!("    Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        }
+                    }
+                }
+                Err(e) => panic!("Failed to parse generic_param '{}': {}", source, e),
+            }
+            println!();
+        }
     }
 
     #[test]
@@ -1970,6 +2068,74 @@ mod tests {
         }
         
         println!("✓ All operator method grammar tests passed");
+    }
+
+    #[test]
+    fn test_parse_operator_methods() {
+        use crate::parser::PestParser;
+        
+        let test_cases = vec![
+            "interface Math { + (other: int) -> int }",
+            "interface Comparable { == (other: int) -> bool }",
+            "interface Indexable { [] (index: int) -> int }",
+            "interface Logic { and (other: bool) -> bool }",
+        ];
+        
+        for source in test_cases {
+            let mut parser = PestParser::new();
+            let result = parser.parse(source);
+            
+            match result {
+                Ok(program) => {
+                    println!("✓ Successfully parsed interface with operator method: {}", source);
+                    if let Some(unit) = program.units.first() {
+                        if let tjlang_ast::ProgramUnit::Declaration(decl) = unit {
+                            if let tjlang_ast::Declaration::Interface(interface_decl) = decl {
+                                println!("  Interface name: {}", interface_decl.name);
+                                println!("  Methods: {} method(s)", interface_decl.methods.len());
+                                for (i, method) in interface_decl.methods.iter().enumerate() {
+                                    println!("    [{}] {}: {} parameter(s) -> {:?}", 
+                                        i, method.name, method.params.len(), method.return_type);
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => panic!("Failed to parse interface with operator method '{}': {}", source, e),
+            }
+        }
+        
+        println!("✓ All operator method parsing tests passed");
+    }
+
+    #[test]
+    fn test_debug_function_decl() {
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+        use pest::Parser;
+        
+        let test_cases = vec![
+            "def main() -> int { return 42 }",
+            "def add(x: int, y: int) -> int { return x + y }",
+        ];
+        
+        for source in test_cases {
+            println!("Testing function_decl: {}", source);
+            let result = TJLangPestParser::parse(Rule::function_decl, source);
+            match result {
+                Ok(pairs) => {
+                    println!("✓ Function declaration parsed successfully");
+                    for pair in pairs {
+                        println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                        for inner in pair.into_inner() {
+                            println!("    Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        }
+                    }
+                }
+                Err(e) => panic!("Failed to parse function_decl '{}': {}", source, e),
+            }
+            println!();
+        }
     }
 
     #[test]

@@ -811,82 +811,70 @@ impl PestParser {
     /// Parse function declaration
     fn parse_function_decl(&mut self, pair: Pair<Rule>) -> Result<FunctionDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let pair_clone = pair.clone();
-        
-        let mut inner = pair_clone.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
         
         // Parse function name (first token after filtering whitespace)
         let name = inner.next().ok_or("Missing function name")?.as_str().to_string();
         
         // Parse generic parameters (optional)
-        let generic_params = Vec::new();
-        let mut params = Vec::new();
-        
-        // Check what the next token is
-        if let Some(next_token) = inner.next() {
-            match next_token.as_rule() {
-                Rule::param_list => {
-                    // Function has parameters
-                    params = self.parse_param_list(next_token)?;
-                    
-                    // Parse return type (next token should be type_)
-                    let return_type = self.parse_type(inner.next().ok_or("Missing return type")?)?;
-                    
-                    // Parse function body (next token should be block)
-                    let body = self.parse_block(inner.next().ok_or("Missing function body")?)?;
-                    
-                    return Ok(FunctionDecl {
-                        name,
-                        generic_params,
-                        params,
-                        return_type,
-                        body,
-                        span: self.create_span(span),
-                    });
-                }
-                Rule::type_ => {
-                    // Function has no parameters
-                    let return_type = self.parse_type(next_token)?;
-                    
-                    // Parse function body (next token should be block)
-                    let body = self.parse_block(inner.next().ok_or("Missing function body")?)?;
-                    
-                    return Ok(FunctionDecl {
-                        name,
-                        generic_params,
-                        params,
-                        return_type,
-                        body,
-                        span: self.create_span(span),
-                    });
-                }
-                _ => {
-                    return Err(format!("Expected param_list or type_, got {:?}", next_token.as_rule()).into());
-                }
+        let mut generic_params = Vec::new();
+        if let Some(next_token) = inner.clone().next() {
+            if next_token.as_rule() == Rule::generic_params {
+                // Consume the generic_params token
+                let generic_params_pair = inner.next().ok_or("Missing generic_params pair")?;
+                generic_params = self.parse_generic_params(generic_params_pair)?;
             }
         }
         
-        Err("Missing return type or parameters".into())
+        // Parse parameter list (optional)
+        let params = if let Some(params_pair) = inner.clone().next() {
+            if params_pair.as_rule() == Rule::param_list {
+                // Consume the param_list token
+                let _ = inner.next();
+                self.parse_param_list(params_pair)?
+            } else {
+                // No parameter list, skip to return type
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
+        
+        // Parse return type (required)
+        let return_type_pair = inner.next().ok_or("Missing return type")?;
+        let return_type = if return_type_pair.as_rule() == Rule::type_ {
+            self.parse_type(return_type_pair)?
+        } else {
+            return Err(format!("Expected type_, got {:?}", return_type_pair.as_rule()).into());
+        };
+        
+        // Parse function body (required)
+        let body_pair = inner.next().ok_or("Missing function body")?;
+        let body = if body_pair.as_rule() == Rule::block {
+            self.parse_block(body_pair)?
+        } else {
+            return Err(format!("Expected block, got {:?}", body_pair.as_rule()).into());
+        };
+        
+        Ok(FunctionDecl {
+            name,
+            generic_params,
+            params,
+            return_type,
+            body,
+            span: self.create_span(span),
+        })
     }
     
     /// Parse generic parameters
     fn parse_generic_params(&mut self, pair: Pair<Rule>) -> Result<Vec<GenericParam>, Box<dyn std::error::Error>> {
         let mut params = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
         
-        // Skip opening angle bracket
-        inner.next().ok_or("Missing opening '<'")?;
-        
-        while let Some(param_pair) = inner.next() {
+        for param_pair in inner {
             if param_pair.as_rule() == Rule::generic_param {
                 let param = self.parse_generic_param(param_pair)?;
                 params.push(param);
-            } else if param_pair.as_str() == "," {
-                // Skip comma
-                continue;
-            } else if param_pair.as_str() == ">" {
-                // End of generic parameters
-                break;
             }
         }
         
@@ -896,32 +884,24 @@ impl PestParser {
     /// Parse single generic parameter
     fn parse_generic_param(&mut self, pair: Pair<Rule>) -> Result<GenericParam, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let pair_clone = pair.clone();
+        let mut inner = pair_clone.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
         
-        let name = inner.next().ok_or("Missing generic parameter name")?.as_str().to_string();
+        // First element should be the identifier (parameter name)
+        let name_pair = inner.next().ok_or("Missing generic parameter name")?;
+        let name = if name_pair.as_rule() == Rule::identifier {
+            name_pair.as_str().to_string()
+        } else {
+            return Err(format!("Expected identifier, got {:?}", name_pair.as_rule()).into());
+        };
         
-        // Skip colon
-        inner.next().ok_or("Missing ':'")?;
-        
-        // Skip "Implements" keyword
-        inner.next().ok_or("Missing 'Implements' keyword")?;
-        
-        // Skip opening bracket
-        inner.next().ok_or("Missing opening '['")?;
-        
-        // Parse bounds
-        let mut bounds = Vec::new();
-        while let Some(bound_pair) = inner.next() {
-            if bound_pair.as_rule() == Rule::identifier {
-                bounds.push(bound_pair.as_str().to_string());
-            } else if bound_pair.as_str() == "," {
-                // Skip comma
-                continue;
-            } else if bound_pair.as_str() == "]" {
-                // End of bounds
-                break;
-            }
-        }
+        // Second element should be the identifier_list (bounds)
+        let bounds_pair = inner.next().ok_or("Missing bounds")?;
+        let bounds = if bounds_pair.as_rule() == Rule::identifier_list {
+            self.parse_identifier_list(bounds_pair)?
+        } else {
+            return Err(format!("Expected identifier_list, got {:?}", bounds_pair.as_rule()).into());
+        };
         
         Ok(GenericParam {
             name,
@@ -1772,7 +1752,13 @@ impl PestParser {
     fn build_method_sig(&mut self, pair: Pair<Rule>) -> Result<MethodSig, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        let name = inner.next().ok_or("Missing method name")?.as_str().to_string();
+        
+        // Parse method name (can be identifier or operator_symbol)
+        let name_pair = inner.next().ok_or("Missing method name")?;
+        let name = match name_pair.as_rule() {
+            Rule::identifier | Rule::operator_symbol => name_pair.as_str().to_string(),
+            _ => return Err(format!("Expected identifier or operator_symbol, got {:?}", name_pair.as_rule()).into()),
+        };
         let mut params = Vec::new();
 
         // Next can be param_list or ARROW
@@ -1818,8 +1804,12 @@ impl PestParser {
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
 
-        // Parse method name
-        let name = inner.next().ok_or("Missing method name")?.as_str().to_string();
+        // Parse method name (can be identifier or operator_symbol)
+        let name_pair = inner.next().ok_or("Missing method name")?;
+        let name = match name_pair.as_rule() {
+            Rule::identifier | Rule::operator_symbol => name_pair.as_str().to_string(),
+            _ => return Err(format!("Expected identifier or operator_symbol, got {:?}", name_pair.as_rule()).into()),
+        };
 
         // Next can be param_list or ARROW
         let mut params = Vec::new();
