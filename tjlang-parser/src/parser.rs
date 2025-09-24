@@ -97,6 +97,10 @@ impl PestParser {
                             let impl_block = self.parse_impl_block(inner)?;
                             units.push(ProgramUnit::Declaration(Declaration::Implementation(impl_block)));
                         }
+                        Rule::export_decl => {
+                            let export_decl = self.parse_export_decl(inner)?;
+                            units.push(ProgramUnit::Export(export_decl));
+                        }
                         _ => {}
                     }
                 }
@@ -2079,6 +2083,33 @@ impl PestParser {
         }
         
         Ok(identifiers)
+    }
+
+    /// Parse export declaration
+    fn parse_export_decl(&mut self, pair: Pair<Rule>) -> Result<ExportDecl, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let inner = pair.into_inner().next().ok_or("Empty export declaration")?;
+        
+        let item = match inner.as_rule() {
+            Rule::function_decl => {
+                let func_decl = self.parse_function_decl(inner)?;
+                Declaration::Function(func_decl)
+            }
+            Rule::type_decl => {
+                let type_decl = self.parse_type_decl(inner)?;
+                Declaration::Type(type_decl)
+            }
+            Rule::interface_decl => {
+                let interface_decl = self.parse_interface_decl(inner)?;
+                Declaration::Interface(interface_decl)
+            }
+            _ => return Err(format!("Expected function_decl, type_decl, or interface_decl in export, got {:?}", inner.as_rule()).into()),
+        };
+        
+        Ok(ExportDecl {
+            item,
+            span: self.create_span(span),
+        })
     }
 
     /// Create a SourceSpan from a pest span

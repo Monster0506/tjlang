@@ -221,4 +221,4 @@ import_decl = { "import" ~ (
     qualified_name ~ ("as" ~ identifier)?
 ) }
 
-export_decl = { "export" ~ ( identifier | "{" ~ identifier_list ~ "}" ) }
+export_decl = { "export" ~ ( function_decl | type_decl | interface_decl ) }

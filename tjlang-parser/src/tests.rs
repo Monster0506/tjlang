@@ -2294,6 +2294,139 @@ mod tests {
         }
     }
 
+    // Export declarations
+    #[test]
+    fn test_grammar_parse_export_function() {
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+        use pest::Parser;
+        
+        let source = "export def my_func() -> int { return 42 }";
+        let result = TJLangPestParser::parse(Rule::export_decl, source);
+        match result {
+            Ok(pairs) => {
+                println!("✓ Export function parsed successfully");
+                assert!(pairs.len() > 0);
+            }
+            Err(e) => {
+                panic!("Failed to parse export function: {}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_grammar_parse_export_interface() {
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+        use pest::Parser;
+        
+        let source = "export interface Drawable { draw() -> int }";
+        let result = TJLangPestParser::parse(Rule::export_decl, source);
+        match result {
+            Ok(pairs) => {
+                println!("✓ Export interface parsed successfully");
+                assert!(pairs.len() > 0);
+            }
+            Err(e) => {
+                panic!("Failed to parse export interface: {}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_grammar_parse_export_type() {
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+        use pest::Parser;
+        
+        let source = "export type MyType = int";
+        let result = TJLangPestParser::parse(Rule::export_decl, source);
+        match result {
+            Ok(pairs) => {
+                println!("✓ Export type parsed successfully");
+                assert!(pairs.len() > 0);
+            }
+            Err(e) => {
+                panic!("Failed to parse export type: {}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_export_function() {
+        use crate::parser::PestParser;
+        use tjlang_ast::{ProgramUnit, Declaration};
+        let mut p = PestParser::new();
+        let result = p.parse("export def my_func() -> int { return 42 }");
+        match result {
+            Ok(program) => {
+                assert_eq!(program.units.len(), 1);
+                match &program.units[0] {
+                    ProgramUnit::Export(export_decl) => {
+                        match &export_decl.item {
+                            Declaration::Function(func_decl) => {
+                                assert_eq!(func_decl.name, "my_func");
+                            }
+                            _ => panic!("Expected Function declaration in export"),
+                        }
+                    }
+                    _ => panic!("Expected Export, got {:?}", program.units[0]),
+                }
+            }
+            Err(e) => panic!("Failed to parse export function: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_parse_export_interface() {
+        use crate::parser::PestParser;
+        use tjlang_ast::{ProgramUnit, Declaration};
+        let mut p = PestParser::new();
+        let result = p.parse("export interface Drawable { draw() -> int }");
+        match result {
+            Ok(program) => {
+                assert_eq!(program.units.len(), 1);
+                match &program.units[0] {
+                    ProgramUnit::Export(export_decl) => {
+                        match &export_decl.item {
+                            Declaration::Interface(interface_decl) => {
+                                assert_eq!(interface_decl.name, "Drawable");
+                            }
+                            _ => panic!("Expected Interface declaration in export"),
+                        }
+                    }
+                    _ => panic!("Expected Export, got {:?}", program.units[0]),
+                }
+            }
+            Err(e) => panic!("Failed to parse export interface: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_parse_export_type() {
+        use crate::parser::PestParser;
+        use tjlang_ast::{ProgramUnit, Declaration};
+        let mut p = PestParser::new();
+        let result = p.parse("export type MyType = int");
+        match result {
+            Ok(program) => {
+                assert_eq!(program.units.len(), 1);
+                match &program.units[0] {
+                    ProgramUnit::Export(export_decl) => {
+                        match &export_decl.item {
+                            Declaration::Type(type_decl) => {
+                                assert_eq!(type_decl.name, "MyType");
+                            }
+                            _ => panic!("Expected Type declaration in export"),
+                        }
+                    }
+                    _ => panic!("Expected Export, got {:?}", program.units[0]),
+                }
+            }
+            Err(e) => panic!("Failed to parse export type: {}", e),
+        }
+    }
+
     #[test]
     fn test_debug_function_decl() {
         use crate::parser::TJLangPestParser;
