@@ -109,7 +109,7 @@ method_sig = { (identifier | operator_symbol) ~ "(" ~ param_list? ~ ")" ~ ARROW 
 
 operator_symbol = { "**" | "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "&" | "^" | "|" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "[]" | "or" | "and" | "!" | "~" }
 
-impl_block = { "impl" ~ impl_trait_name ~ ":" ~ impl_type_name ~ "{" ~ method_decl ~ "}" }
+impl_block = { "impl" ~ impl_trait_name ~ ":" ~ impl_type_name ~ "{" ~ method_decl+ ~ "}" }
 impl_trait_name = { !keyword ~ (ASCII_ALPHA | "_") ~ ASCII_ALPHANUMERIC* }
 impl_type_name = { !keyword ~ (ASCII_ALPHA | "_") ~ ASCII_ALPHANUMERIC* }
 

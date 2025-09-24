@@ -2250,6 +2250,50 @@ mod tests {
         parse_ok_program_helper("def main() -> int { match Some((1,2)) { Some((a: int, b: int)): { return a + b } None: { return 0 } } }");
     }
 
+    // Multiple methods in impl blocks
+    #[test]
+    fn test_grammar_parse_impl_multiple_methods() {
+        use crate::parser::TJLangPestParser;
+        use crate::parser::Rule;
+        use pest::Parser;
+        
+        let source = "impl Drawable: Point { draw() -> int { return 1 } clear() -> int { return 0 } }";
+        let result = TJLangPestParser::parse(Rule::impl_block, source);
+        match result {
+            Ok(pairs) => {
+                println!("✓ Multiple methods impl block parsed successfully");
+                assert!(pairs.len() > 0);
+            }
+            Err(e) => {
+                panic!("Failed to parse impl block with multiple methods: {}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_impl_multiple_methods() {
+        use crate::parser::PestParser;
+        use tjlang_ast::{ProgramUnit, Declaration};
+        let mut p = PestParser::new();
+        let result = p.parse("impl Drawable: Point { draw() -> int { return 1 } clear() -> int { return 0 } }");
+        match result {
+            Ok(program) => {
+                assert_eq!(program.units.len(), 1);
+                match &program.units[0] {
+                    ProgramUnit::Declaration(Declaration::Implementation(impl_block)) => {
+                        assert_eq!(impl_block.trait_name, "Drawable");
+                        assert_eq!(impl_block.type_name, "Point");
+                        assert_eq!(impl_block.methods.len(), 2);
+                        assert_eq!(impl_block.methods[0].name, "draw");
+                        assert_eq!(impl_block.methods[1].name, "clear");
+                    }
+                    _ => panic!("Expected Implementation, got {:?}", program.units[0]),
+                }
+            }
+            Err(e) => panic!("Failed to parse impl block with multiple methods: {}", e),
+        }
+    }
+
     #[test]
     fn test_debug_function_decl() {
         use crate::parser::TJLangPestParser;
