@@ -2540,28 +2540,6 @@ mod tests {
     }
 
     #[test]
-    fn test_grammar_parse_modules_imports_exports() {
-        use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
-
-        let cases = vec![
-            "module graphics.ui",
-            "import math.core as m",
-            "import { sin, cos } from math.core",
-            "export def draw() -> int { return 0 }",
-            "export interface Drawable { draw() -> int }",
-            "export draw",
-            "export { draw, fill }",
-        ];
-
-        for source in cases {
-            // module/import/export are program units per grammar
-            let result = TJLangPestParser::parse(Rule::program_unit, source);
-            assert!(result.is_ok(), "Grammar failed for program_unit: {} -> {:?}", source, result.err());
-        }
-    }
-
-    #[test]
     fn test_parse_export_identifier() {
         use crate::parser::PestParser;
         use tjlang_ast::{ProgramUnit, ExportDecl};

@@ -2171,9 +2171,15 @@ impl PestParser {
     }
 
     /// Create a SourceSpan from a pest span
-    fn create_span(&self, span: pest::Span) -> SourceSpan {
+    fn create_span(&self, span: pest::Span) -> tjlang_ast::SourceSpan {
         let mut files = Files::new();
         let file_id = files.add("input.tj", "");
-        SourceSpan::new(file_id, codespan::Span::new(span.start() as u32, span.end() as u32))
+        tjlang_ast::SourceSpan {
+            file_id,
+            span: codespan::Span::new(
+                codespan::ByteIndex(span.start() as u32),
+                codespan::ByteIndex(span.end() as u32),
+            ),
+        }
     }
 }

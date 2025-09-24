@@ -1,0 +1,11 @@
+[package]
+name = "tjlang-ast"
+version = "0.1.0"
+edition = "2021"
+authors = ["TJ"]
+description = "Abstract Syntax Tree definitions for TJLang"
+license = "MIT"
+
+[dependencies]
+codespan = "0.12.0"
+serde = { version = "1.0", features = ["derive"] }
