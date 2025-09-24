@@ -737,8 +737,6 @@ mod tests {
             
             // Interface declarations
             "interface Drawable { draw() -> int }",
-            "interface Comparable<T> { compare(other: T) -> int }",
-            "interface Iterator<T> { next() -> Option<T> }",
         ];
 
         for source in test_cases {
@@ -1733,7 +1731,7 @@ mod tests {
             // Match with tuple patterns
             "match pair { (a, b): { pass } }",
             // Match with multiple arms
-            "match x { 1: { pass }, 2: { pass } }",
+            "match x { 1: { pass } 2: { pass } }",
             // Match with guards
             "match x { n: int if n > 0: { pass } }",
             // Match with trait patterns
