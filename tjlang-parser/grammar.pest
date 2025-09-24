@@ -167,7 +167,10 @@ literal = {
 integer_literal = { "-"? ~ ASCII_DIGIT+ }
 float_literal = { "-"? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 string_literal = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
-fstring_literal = { "f\"" ~ (!"\"" ~ ANY)* ~ "\""}
+fstring_literal = { "f\"" ~ fstring_content* ~ "\"" }
+fstring_content = { fstring_text | fstring_expression }
+fstring_text = { (!"{" ~ !"\"" ~ ANY)+ }
+fstring_expression = { "{" ~ expression ~ "}" }
 boolean_literal = { "true" | "false" }
 none_literal = { "None" }
 

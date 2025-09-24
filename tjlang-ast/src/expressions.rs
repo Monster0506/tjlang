@@ -122,8 +122,15 @@ pub enum Literal {
     Float(f64),
     String(String),
     FString(String),
+    FStringInterpolation(Vec<FStringPart>),
     Bool(bool),
     None,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum FStringPart {
+    Text(String),
+    Expression(Box<Expression>),
 }
 
 /// Field initialization

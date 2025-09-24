@@ -63,12 +63,12 @@ impl PestParser {
                                     _ => {
                                         // For other statements, create a dummy variable declaration
                                         // This maintains backward compatibility with existing tests
-                                        units.push(ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
-                                            name: "main".to_string(),
-                                            var_type: Type::Primitive(PrimitiveType::Any),
-                                            value: Expression::Literal(Literal::None),
-                                            span: self.create_span(span),
-                                        })));
+                                units.push(ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
+                                    name: "main".to_string(),
+                                    var_type: Type::Primitive(PrimitiveType::Any),
+                                    value: Expression::Literal(Literal::None),
+                                    span: self.create_span(span),
+                                })));
                                     }
                                 }
                             }
@@ -660,8 +660,8 @@ impl PestParser {
                 Ok(Expression::Literal(Literal::String(s)))
             }
             Rule::fstring_literal => {
-                let s = pair.as_str().to_string();
-                Ok(Expression::Literal(Literal::FString(s)))
+                let parts = self.parse_fstring_parts(pair)?;
+                Ok(Expression::Literal(Literal::FStringInterpolation(parts)))
             }
             Rule::boolean_literal => {
                 let val = match pair.as_str() { "true" => true, _ => false };
@@ -852,10 +852,8 @@ impl PestParser {
                 Ok(Literal::String(value))
             }
             Rule::fstring_literal => {
-                let value = inner.as_str().to_string();
-                // Remove f" prefix and " suffix
-                let value = value.trim_start_matches("f\"").trim_end_matches('"').to_string();
-                Ok(Literal::FString(value))
+                let parts = self.parse_fstring_parts(inner)?;
+                Ok(Literal::FStringInterpolation(parts))
             }
             Rule::boolean_literal => {
                 let value = inner.as_str() == "true";
@@ -976,12 +974,12 @@ impl PestParser {
                 let iterable = self.parse_expression(clause_inner.next().ok_or("Missing iterable")?)?;
                 
                 Ok(ForStatement::ForEach {
-                    var_name,
-                    var_type,
-                    iterable,
-                    body,
-                    span: self.create_span(span),
-                })
+            var_name,
+            var_type,
+            iterable,
+            body,
+            span: self.create_span(span),
+        })
             }
             Rule::c_style_clause => {
                 let mut clause_inner = clause.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
@@ -1140,12 +1138,12 @@ impl PestParser {
         };
         
         Ok(FunctionDecl {
-            name,
-            generic_params,
-            params,
-            return_type,
-            body,
-            span: self.create_span(span),
+                        name,
+                        generic_params,
+                        params,
+                        return_type,
+                        body,
+                        span: self.create_span(span),
         })
     }
     
@@ -2181,5 +2179,36 @@ impl PestParser {
                 codespan::ByteIndex(span.end() as u32),
             ),
         }
+    }
+
+    fn parse_fstring_parts(&mut self, pair: Pair<Rule>) -> Result<Vec<tjlang_ast::FStringPart>, Box<dyn std::error::Error>> {
+        let mut parts = Vec::new();
+        
+        for inner in pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE) {
+            match inner.as_rule() {
+                Rule::fstring_content => {
+                    // fstring_content contains either fstring_text or fstring_expression
+                    let content_inner = inner.into_inner().next().ok_or("Empty fstring_content")?;
+                    match content_inner.as_rule() {
+                        Rule::fstring_text => {
+                            let text = content_inner.as_str().to_string();
+                            if !text.is_empty() {
+                                parts.push(tjlang_ast::FStringPart::Text(text));
+                            }
+                        }
+                        Rule::fstring_expression => {
+                            // fstring_expression contains an expression rule
+                            let expr_inner = content_inner.into_inner().next().ok_or("Empty fstring_expression")?;
+                            let expr = self.parse_expression(expr_inner)?;
+                            parts.push(tjlang_ast::FStringPart::Expression(Box::new(expr)));
+                        }
+                        _ => return Err(format!("Unexpected rule in fstring_content: {:?}", content_inner.as_rule()).into()),
+                    }
+                }
+                _ => return Err(format!("Unexpected rule in f-string: {:?}", inner.as_rule()).into()),
+            }
+        }
+        
+        Ok(parts)
     }
 }
