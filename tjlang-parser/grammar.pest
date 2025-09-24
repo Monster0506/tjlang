@@ -49,6 +49,7 @@ pattern = {
     literal |
     identifier ~ ":" ~ type_ |
     identifier ~ ":" ~ "implements" ~ "[" ~ identifier ~ "]" |
+    struct_pattern |
     constructor_pattern |
     "(" ~ pattern ~ ("," ~ pattern)* ~ ")" |
     "_"
@@ -56,6 +57,11 @@ pattern = {
 
 constructor_pattern = { identifier ~ ("(" ~ pattern_fields? ~ ")")? }
 pattern_fields = { pattern ~ ("," ~ pattern)* }
+
+// Struct destructuring patterns
+struct_pattern = { identifier ~ "{" ~ struct_pattern_fields? ~ "}" }
+struct_pattern_fields = { struct_field_pattern ~ ("," ~ struct_field_pattern)* }
+struct_field_pattern = { identifier ~ ":" ~ pattern }
 
 // Simple statements
 return_stmt = { "return" ~ expression? }

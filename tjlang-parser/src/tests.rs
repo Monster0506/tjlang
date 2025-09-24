@@ -2220,6 +2220,16 @@ mod tests {
     }
 
     #[test]
+    fn test_grammar_match_struct_destructuring() {
+        parse_match_stmt_ok("match p { Point{ x: 0, y: y: int }: { pass } Point{ x: x: int, y: y: int }: { pass } }");
+    }
+
+    #[test]
+    fn test_parse_match_struct_destructuring() {
+        parse_ok_program_helper("def main() -> int { p: Point = Point{ x: 1, y: 2 } match p { Point{ x: 0, y: y: int }: { return y } Point{ x: x: int, y: y: int }: { return x + y } } }");
+    }
+
+    #[test]
     fn test_debug_function_decl() {
         use crate::parser::TJLangPestParser;
         use crate::parser::Rule;

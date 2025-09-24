@@ -259,9 +259,10 @@ impl PestParser {
                     }
                 }
 
-                // Constructor pattern handled by explicit rule child
+                // Constructor / Struct pattern handled by explicit rule child
                 for ch in &children {
                     if ch.as_rule() == Rule::constructor_pattern { return self.parse_constructor_pattern(ch.clone()); }
+                    if ch.as_rule() == Rule::struct_pattern { return self.parse_struct_pattern(ch.clone()); }
                     if ch.as_rule() == Rule::literal { return Ok(Pattern::Literal(self.parse_literal(ch.clone())?)); }
                 }
 
@@ -311,6 +312,27 @@ impl PestParser {
             }
         }
         Ok(Pattern::Constructor { name, fields, span: self.create_span(span) })
+    }
+
+    fn parse_struct_pattern(&mut self, pair: Pair<Rule>) -> Result<Pattern, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let name = inner.next().ok_or("Missing struct name in pattern")?.as_str().to_string();
+        let mut fields_kv: Vec<(String, Pattern)> = Vec::new();
+        for p in inner {
+            if p.as_rule() == Rule::struct_pattern_fields {
+                for f in p.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE) {
+                    if f.as_rule() == Rule::struct_field_pattern {
+                        let mut it = f.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                        let field_name = it.next().ok_or("Missing field name in struct pattern")?.as_str().to_string();
+                        let pat_pair = it.next().ok_or("Missing field pattern")?;
+                        let field_pat = self.parse_pattern(pat_pair)?;
+                        fields_kv.push((field_name, field_pat));
+                    }
+                }
+            }
+        }
+        Ok(Pattern::Struct { name, fields: fields_kv, span: self.create_span(span) })
     }
 
     /// Parse block
