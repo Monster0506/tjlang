@@ -2144,6 +2144,81 @@ mod tests {
         }
     }
 
+    // Match statement coverage: literals, type binds, enums/constructors, option, traits, guards, tuples, structs, nested
+    fn parse_match_stmt_ok(src: &str) {
+        use crate::parser::{TJLangPestParser, Rule};
+        use pest::Parser;
+        let res = TJLangPestParser::parse(Rule::match_stmt, src);
+        assert!(res.is_ok(), "Failed to parse match statement: {}", src);
+    }
+
+    #[test]
+    fn test_grammar_match_literals_and_wildcard() {
+        parse_match_stmt_ok("match x { 0: { pass } 1: { pass } _: { pass } }");
+    }
+
+    #[test]
+    fn test_grammar_match_type_binds() {
+        parse_match_stmt_ok("match val { n: int: { pass } s: str: { pass } }");
+    }
+
+    #[test]
+    fn test_grammar_match_constructors() {
+        parse_match_stmt_ok("match res { Ok(v: int): { pass } Err(e: str): { pass } }");
+    }
+
+    #[test]
+    fn test_grammar_match_option_patterns() {
+        parse_match_stmt_ok("match x { Some(v: int): { pass } None: { pass } }");
+    }
+
+    #[test]
+    fn test_grammar_match_with_guard() {
+        parse_match_stmt_ok("match n { v: int if v > 0: { pass } v: int: { pass } }");
+    }
+
+    #[test]
+    fn test_grammar_match_tuple_patterns() {
+        parse_match_stmt_ok("match pair { (0, y: int): { pass } (x: int, 0): { pass } (a: int, b: int): { pass } }");
+    }
+
+    fn parse_ok_program_helper(src: &str) {
+        use crate::parser::PestParser;
+        let mut p = PestParser::new();
+        let result = p.parse(src);
+        assert!(result.is_ok(), "Failed to parse program with match: {}", src);
+    }
+
+    #[test]
+    fn test_parse_match_literals_and_wildcard() {
+        parse_ok_program_helper("def main() -> int { match 5 { 0: { pass } 5: { return 1 } _: { return 0 } } }");
+    }
+
+    #[test]
+    fn test_parse_match_type_binds() {
+        parse_ok_program_helper("def main() -> int { match 1 { n: int: { return n } s: str: { return 0 } } }");
+    }
+
+    #[test]
+    fn test_parse_match_constructors() {
+        parse_ok_program_helper("def main() -> int { match Ok(42) { Ok(v: int): { return v } Err(e: str): { return 0 } } }");
+    }
+
+    #[test]
+    fn test_parse_match_option_patterns() {
+        parse_ok_program_helper("def main() -> int { match None { Some(v: int): { return v } None: { return 0 } } }");
+    }
+
+    #[test]
+    fn test_parse_match_with_guard() {
+        parse_ok_program_helper("def main() -> int { match 10 { v: int if v % 2 == 0: { return 1 } v: int: { return 0 } } }");
+    }
+
+    #[test]
+    fn test_parse_match_tuple_patterns() {
+        parse_ok_program_helper("def main() -> int { match (1,2) { (0, y: int): { return y } (x: int, 0): { return x } (a: int, b: int): { return a + b } } }");
+    }
+
     #[test]
     fn test_debug_function_decl() {
         use crate::parser::TJLangPestParser;

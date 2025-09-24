@@ -159,6 +159,10 @@ impl PestParser {
                         let for_stmt = self.parse_for_stmt(inner)?;
                         Ok(Some(Statement::For(for_stmt)))
                     }
+                    Rule::match_stmt => {
+                        let m = self.parse_match_stmt(inner)?;
+                        Ok(Some(Statement::Match(m)))
+                    }
                     Rule::return_stmt => {
                         let return_stmt = self.parse_return_stmt(inner)?;
                         Ok(Some(Statement::Return(return_stmt)))
@@ -184,6 +188,129 @@ impl PestParser {
             }
             _ => Ok(None)
         }
+    }
+
+    /// Parse match statement
+    fn parse_match_stmt(&mut self, pair: Pair<Rule>) -> Result<MatchStatement, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        // First inner is the match expression
+        let expr_pair = inner.next().ok_or("Missing expression in match")?;
+        let expression = self.parse_expression(expr_pair)?;
+
+        // Then one or more arms
+        let mut arms: Vec<MatchArm> = Vec::new();
+        for arm_pair in inner {
+            if arm_pair.as_rule() == Rule::match_arm {
+                arms.push(self.parse_match_arm(arm_pair)?);
+            }
+        }
+
+        Ok(MatchStatement { expression, arms, span: self.create_span(span) })
+    }
+
+    fn parse_match_arm(&mut self, pair: Pair<Rule>) -> Result<MatchArm, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        // pattern
+        let pat_pair = inner.next().ok_or("Missing pattern in match arm")?;
+        let pattern = self.parse_pattern(pat_pair)?;
+
+        // optional guard: recognized by encountering an 'if' expression start (rule expression following literal 'if')
+        let mut guard: Option<Expression> = None;
+        if let Some(next) = inner.clone().next() {
+            // In grammar, guard is: ("if" ~ expression)? so the next pair will be expression if present
+            if next.as_rule() == Rule::expression {
+                // consume
+                let _ = inner.next();
+                guard = Some(self.parse_expression(next)?);
+            }
+        }
+
+        // Expect block next
+        let block_pair = inner.next().ok_or("Missing block in match arm")?;
+        let body = self.parse_block(block_pair)?;
+
+        Ok(MatchArm { pattern, guard, body, span: self.create_span(span) })
+    }
+
+    fn parse_pattern(&mut self, pair: Pair<Rule>) -> Result<Pattern, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        match pair.as_rule() {
+            Rule::pattern => {
+                let text = pair.as_str().trim();
+                if text == "_" {
+                    return Ok(Pattern::Wildcard(self.create_span(span)));
+                }
+
+                // collect children for structural decisions
+                let children: Vec<_> = pair.clone().into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE).collect();
+
+                // Tuple pattern if multiple inner pattern children and starts with '('
+                if text.starts_with('(') {
+                    let mut patterns = Vec::new();
+                    for ch in children.iter() {
+                        if ch.as_rule() == Rule::pattern { patterns.push(self.parse_pattern(ch.clone())?); }
+                    }
+                    if !patterns.is_empty() {
+                        return Ok(Pattern::Tuple { patterns, span: self.create_span(span) });
+                    }
+                }
+
+                // Constructor pattern handled by explicit rule child
+                for ch in &children {
+                    if ch.as_rule() == Rule::constructor_pattern { return self.parse_constructor_pattern(ch.clone()); }
+                    if ch.as_rule() == Rule::literal { return Ok(Pattern::Literal(self.parse_literal(ch.clone())?)); }
+                }
+
+                // Trait check pattern
+                if text.contains(":") && text.contains("implements") {
+                    let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                    let name = inner.next().ok_or("Missing identifier in trait pattern")?.as_str().to_string();
+                    let mut trait_name = String::new();
+                    for p in inner {
+                        if p.as_rule() == Rule::identifier { trait_name = p.as_str().to_string(); break; }
+                    }
+                    return Ok(Pattern::TraitCheck { name, trait_name, span: self.create_span(span) });
+                }
+
+                // Typed bind pattern: identifier : type_
+                if text.contains(":") {
+                    let mut id: Option<String> = None;
+                    let mut ty: Option<Type> = None;
+                    for ch in children {
+                        match ch.as_rule() {
+                            Rule::identifier => { if id.is_none() { id = Some(ch.as_str().to_string()); } }
+                            Rule::type_ => { ty = Some(self.parse_type(ch)?); }
+                            _ => {}
+                        }
+                    }
+                    if let (Some(name), Some(pattern_type)) = (id, ty) {
+                        return Ok(Pattern::Variable { name, pattern_type, span: self.create_span(span) });
+                    }
+                }
+
+                Err("Unrecognized pattern".into())
+            }
+            _ => Err("Expected pattern".into())
+        }
+    }
+
+    fn parse_constructor_pattern(&mut self, pair: Pair<Rule>) -> Result<Pattern, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let name = inner.next().ok_or("Missing constructor name in pattern")?.as_str().to_string();
+        let mut fields: Vec<Pattern> = Vec::new();
+        for p in inner {
+            if p.as_rule() == Rule::pattern_fields {
+                for f in p.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE) {
+                    if f.as_rule() == Rule::pattern { fields.push(self.parse_pattern(f)?); }
+                }
+            }
+        }
+        Ok(Pattern::Constructor { name, fields, span: self.create_span(span) })
     }
 
     /// Parse block
