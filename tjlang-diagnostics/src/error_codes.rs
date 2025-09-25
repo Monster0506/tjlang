@@ -44,6 +44,66 @@ pub enum ErrorCode {
     AnalyzerInvalidImport,
     AnalyzerInvalidExport,
     
+    // Code Quality Rules (A2100-A2199)
+    AnalyzerNamingConvention,
+    AnalyzerFunctionComplexity,
+    AnalyzerMagicNumber,
+    AnalyzerParameterCount,
+    AnalyzerFunctionLength,
+    AnalyzerNestingDepth,
+    AnalyzerEmptyFunction,
+    AnalyzerCommentCoverage,
+    AnalyzerCommentStyle,
+    AnalyzerImportOrder,
+    
+    // Dead Code & Usage Rules (A2200-A2299)
+    AnalyzerUnusedVariable,
+    AnalyzerUnusedParameter,
+    AnalyzerDeadCode,
+    AnalyzerUnreachableCode,
+    AnalyzerRecursionDepth,
+    AnalyzerResourceLeak,
+    
+    // Performance Rules (A2300-A2399)
+    AnalyzerInefficientLoop,
+    AnalyzerMemoryAllocation,
+    AnalyzerStringConcatenation,
+    AnalyzerCacheEfficiency,
+    AnalyzerBranchPrediction,
+    AnalyzerVectorization,
+    
+    // Architecture Rules (A2400-A2499)
+    AnalyzerLargeFile,
+    AnalyzerTooManyImports,
+    AnalyzerGlobalVariable,
+    AnalyzerCoupling,
+    AnalyzerCohesion,
+    
+    // Style & Formatting Rules (A2500-A2599)
+    AnalyzerFormattingConvention,
+    AnalyzerIndentation,
+    AnalyzerTrailingWhitespace,
+    AnalyzerLineLength,
+    AnalyzerSemicolon,
+    AnalyzerBracketMatching,
+    
+    // Security & Safety Rules (A2600-A2699)
+    AnalyzerNullPointer,
+    AnalyzerBufferOverflow,
+    AnalyzerUnsafeOperation,
+    AnalyzerInputValidation,
+    AnalyzerHardcodedCredentials,
+    AnalyzerSQLInjection,
+    AnalyzerConcurrency,
+    AnalyzerMemoryLeak,
+    AnalyzerRaceCondition,
+    
+    // Language-Specific Rules (A2700-A2799)
+    AnalyzerAsyncAwait,
+    AnalyzerErrorHandling,
+    AnalyzerPatternMatching,
+    AnalyzerGenericConstraint,
+    
     // Codegen errors (C3000-C3999)
     CodegenInvalidType,
     CodegenInvalidExpression,
@@ -107,6 +167,66 @@ impl ErrorCode {
             ErrorCode::AnalyzerInvalidImport => "A2013",
             ErrorCode::AnalyzerInvalidExport => "A2014",
             
+            // Code Quality Rules (A2100-A2199)
+            ErrorCode::AnalyzerNamingConvention => "A2100",
+            ErrorCode::AnalyzerFunctionComplexity => "A2101",
+            ErrorCode::AnalyzerMagicNumber => "A2102",
+            ErrorCode::AnalyzerParameterCount => "A2103",
+            ErrorCode::AnalyzerFunctionLength => "A2104",
+            ErrorCode::AnalyzerNestingDepth => "A2105",
+            ErrorCode::AnalyzerEmptyFunction => "A2106",
+            ErrorCode::AnalyzerCommentCoverage => "A2107",
+            ErrorCode::AnalyzerCommentStyle => "A2108",
+            ErrorCode::AnalyzerImportOrder => "A2109",
+            
+            // Dead Code & Usage Rules (A2200-A2299)
+            ErrorCode::AnalyzerUnusedVariable => "A2200",
+            ErrorCode::AnalyzerUnusedParameter => "A2201",
+            ErrorCode::AnalyzerDeadCode => "A2202",
+            ErrorCode::AnalyzerUnreachableCode => "A2203",
+            ErrorCode::AnalyzerRecursionDepth => "A2204",
+            ErrorCode::AnalyzerResourceLeak => "A2205",
+            
+            // Performance Rules (A2300-A2399)
+            ErrorCode::AnalyzerInefficientLoop => "A2300",
+            ErrorCode::AnalyzerMemoryAllocation => "A2301",
+            ErrorCode::AnalyzerStringConcatenation => "A2302",
+            ErrorCode::AnalyzerCacheEfficiency => "A2303",
+            ErrorCode::AnalyzerBranchPrediction => "A2304",
+            ErrorCode::AnalyzerVectorization => "A2305",
+            
+            // Architecture Rules (A2400-A2499)
+            ErrorCode::AnalyzerLargeFile => "A2400",
+            ErrorCode::AnalyzerTooManyImports => "A2401",
+            ErrorCode::AnalyzerGlobalVariable => "A2402",
+            ErrorCode::AnalyzerCoupling => "A2403",
+            ErrorCode::AnalyzerCohesion => "A2404",
+            
+            // Style & Formatting Rules (A2500-A2599)
+            ErrorCode::AnalyzerFormattingConvention => "A2500",
+            ErrorCode::AnalyzerIndentation => "A2501",
+            ErrorCode::AnalyzerTrailingWhitespace => "A2502",
+            ErrorCode::AnalyzerLineLength => "A2503",
+            ErrorCode::AnalyzerSemicolon => "A2504",
+            ErrorCode::AnalyzerBracketMatching => "A2505",
+            
+            // Security & Safety Rules (A2600-A2699)
+            ErrorCode::AnalyzerNullPointer => "A2600",
+            ErrorCode::AnalyzerBufferOverflow => "A2601",
+            ErrorCode::AnalyzerUnsafeOperation => "A2602",
+            ErrorCode::AnalyzerInputValidation => "A2603",
+            ErrorCode::AnalyzerHardcodedCredentials => "A2604",
+            ErrorCode::AnalyzerSQLInjection => "A2605",
+            ErrorCode::AnalyzerConcurrency => "A2606",
+            ErrorCode::AnalyzerMemoryLeak => "A2607",
+            ErrorCode::AnalyzerRaceCondition => "A2608",
+            
+            // Language-Specific Rules (A2700-A2799)
+            ErrorCode::AnalyzerAsyncAwait => "A2700",
+            ErrorCode::AnalyzerErrorHandling => "A2701",
+            ErrorCode::AnalyzerPatternMatching => "A2702",
+            ErrorCode::AnalyzerGenericConstraint => "A2703",
+            
             // Codegen errors
             ErrorCode::CodegenInvalidType => "C3000",
             ErrorCode::CodegenInvalidExpression => "C3001",
@@ -165,7 +285,53 @@ impl ErrorCode {
             | ErrorCode::AnalyzerInvalidImplementation
             | ErrorCode::AnalyzerInvalidModule
             | ErrorCode::AnalyzerInvalidImport
-            | ErrorCode::AnalyzerInvalidExport => "Analyzer",
+            | ErrorCode::AnalyzerInvalidExport
+            | ErrorCode::AnalyzerNamingConvention
+            | ErrorCode::AnalyzerFunctionComplexity
+            | ErrorCode::AnalyzerMagicNumber
+            | ErrorCode::AnalyzerParameterCount
+            | ErrorCode::AnalyzerFunctionLength
+            | ErrorCode::AnalyzerNestingDepth
+            | ErrorCode::AnalyzerEmptyFunction
+            | ErrorCode::AnalyzerCommentCoverage
+            | ErrorCode::AnalyzerCommentStyle
+            | ErrorCode::AnalyzerImportOrder
+            | ErrorCode::AnalyzerUnusedVariable
+            | ErrorCode::AnalyzerUnusedParameter
+            | ErrorCode::AnalyzerDeadCode
+            | ErrorCode::AnalyzerUnreachableCode
+            | ErrorCode::AnalyzerRecursionDepth
+            | ErrorCode::AnalyzerResourceLeak
+            | ErrorCode::AnalyzerInefficientLoop
+            | ErrorCode::AnalyzerMemoryAllocation
+            | ErrorCode::AnalyzerStringConcatenation
+            | ErrorCode::AnalyzerCacheEfficiency
+            | ErrorCode::AnalyzerBranchPrediction
+            | ErrorCode::AnalyzerVectorization
+            | ErrorCode::AnalyzerLargeFile
+            | ErrorCode::AnalyzerTooManyImports
+            | ErrorCode::AnalyzerGlobalVariable
+            | ErrorCode::AnalyzerCoupling
+            | ErrorCode::AnalyzerCohesion
+            | ErrorCode::AnalyzerFormattingConvention
+            | ErrorCode::AnalyzerIndentation
+            | ErrorCode::AnalyzerTrailingWhitespace
+            | ErrorCode::AnalyzerLineLength
+            | ErrorCode::AnalyzerSemicolon
+            | ErrorCode::AnalyzerBracketMatching
+            | ErrorCode::AnalyzerNullPointer
+            | ErrorCode::AnalyzerBufferOverflow
+            | ErrorCode::AnalyzerUnsafeOperation
+            | ErrorCode::AnalyzerInputValidation
+            | ErrorCode::AnalyzerHardcodedCredentials
+            | ErrorCode::AnalyzerSQLInjection
+            | ErrorCode::AnalyzerConcurrency
+            | ErrorCode::AnalyzerMemoryLeak
+            | ErrorCode::AnalyzerRaceCondition
+            | ErrorCode::AnalyzerAsyncAwait
+            | ErrorCode::AnalyzerErrorHandling
+            | ErrorCode::AnalyzerPatternMatching
+            | ErrorCode::AnalyzerGenericConstraint => "Analyzer",
             
             ErrorCode::CodegenInvalidType
             | ErrorCode::CodegenInvalidExpression

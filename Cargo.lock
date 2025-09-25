@@ -601,10 +601,16 @@ name = "tjlang-analyzer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "codespan",
+ "codespan-reporting",
  "indexmap",
+ "serde",
+ "serde_json",
  "thiserror 2.0.16",
  "tjlang-ast",
  "tjlang-diagnostics",
+ "tjlang-lexer",
+ "tjlang-parser",
  "tjlang-tir",
 ]
 
@@ -614,8 +620,6 @@ version = "0.1.0"
 dependencies = [
  "codespan",
  "serde",
- "thiserror 2.0.16",
- "tjlang-diagnostics",
 ]
 
 [[package]]
@@ -661,6 +665,7 @@ version = "0.1.0"
 dependencies = [
  "codespan",
  "codespan-reporting",
+ "tjlang-analyzer",
  "tjlang-ast",
  "tjlang-diagnostics",
  "tjlang-lexer",
@@ -684,6 +689,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "codespan",
+ "codespan-reporting",
  "pest",
  "pest_derive",
  "thiserror 2.0.16",

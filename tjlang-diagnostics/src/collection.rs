@@ -88,6 +88,23 @@ impl DiagnosticCollection {
     pub fn clear(&mut self) {
         self.diagnostics.clear();
     }
+    
+    /// Merge another diagnostic collection into this one
+    pub fn merge(&mut self, other: DiagnosticCollection) {
+        self.diagnostics.extend(other.diagnostics);
+    }
+    
+    /// Get the count of diagnostics
+    pub fn count(&self) -> usize {
+        self.diagnostics.len()
+    }
+    
+    /// Get diagnostics by severity
+    pub fn get_diagnostics_by_severity(&self, severity: Severity) -> Vec<&TJLangDiagnostic> {
+        self.diagnostics.iter()
+            .filter(|d| d.severity == severity)
+            .collect()
+    }
 }
 
 impl IntoIterator for DiagnosticCollection {
