@@ -200,8 +200,6 @@ impl AnalysisPipeline {
         let mut diagnostics = DiagnosticCollection::new();
         let mut rule_results = Vec::new();
         
-        println!("DEBUG: run_pre_ast_analysis called with {} pre-AST rules", self.pre_ast_rules.len());
-        
         // Get tokens from lexer
         let tokens = self.lex_tokens(&context.source);
         let mut context = context.clone();
@@ -209,7 +207,6 @@ impl AnalysisPipeline {
         
         // Run pre-AST rules
         for rule in &self.pre_ast_rules {
-            println!("DEBUG: Running pre-AST rule: {}", rule.name());
             if rule.is_enabled(&self.config) {
                 let rule_start = Instant::now();
                 let rule_diagnostics = rule.analyze(&context);
@@ -383,8 +380,8 @@ impl AnalysisPipeline {
     
     /// Run a single rule
     fn run_single_rule(&self, _rule: &dyn AnalysisRule, _context: &AnalysisContext) -> DiagnosticCollection {
-        // This is a simplified implementation. In practice, you'd need to
-        // handle the different rule types properly with trait objects.
+        // This method is not used since we call rules directly from their specific collections
+        // (pre_ast_rules, ast_rules, post_ast_rules)
         DiagnosticCollection::new()
     }
     

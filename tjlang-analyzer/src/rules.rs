@@ -34,6 +34,7 @@ pub trait AnalysisRule {
             .map(|s| s.severity)
             .unwrap_or(RuleSeverity::Warning)
     }
+    
 }
 
 /// Trait for rules that analyze tokens (pre-AST)
@@ -638,7 +639,6 @@ impl AnalysisRule for LineLengthRule {
 
 impl PreASTRule for LineLengthRule {
     fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
-        println!("DEBUG: LineLengthRule::analyze called with source length: {}", context.source.len());
         let mut diagnostics = DiagnosticCollection::new();
         
         // Default line length threshold (configurable)
@@ -646,14 +646,11 @@ impl PreASTRule for LineLengthRule {
         
         // Split source into lines and check each line
         let lines: Vec<&str> = context.source.lines().collect();
-        println!("DEBUG: Found {} lines", lines.len());
         
         for (line_number, line) in lines.iter().enumerate() {
             let line_length = line.len();
-            println!("DEBUG: Line {}: length = {} (limit: {})", line_number + 1, line_length, max_line_length);
             
             if line_length > max_line_length {
-                println!("DEBUG: Line {} exceeds limit! Creating diagnostic...", line_number + 1);
                 // Create diagnostic for this line
                 let start_byte = lines[..line_number].iter()
                     .map(|l| l.len() + 1) // +1 for newline

@@ -14,9 +14,59 @@ mod tests {
         files.add("test.tj", source)
     }
 
-    /// Helper function to run analysis on source code
+    /// Helper function to create a configuration with all rules enabled
+    fn create_all_rules_enabled_config() -> crate::config::RuleConfig {
+        use std::collections::HashMap;
+        use crate::config::{RuleConfig, RuleSettings, RuleSeverity, GlobalSettings};
+        
+        let mut enabled_rules = HashMap::new();
+        let mut rule_settings = HashMap::new();
+        
+        // List of all available rules
+        let all_rules = vec![
+            "TypeSafetyRule", "NullPointerRule", "BufferOverflowRule", "UnsafeOperationRule",
+            "UnusedVariableRule", "DeadCodeRule", "UnusedParameterRule", "DuplicateNameRule",
+            "UndefinedVariableRule", "CircularDependencyRule", "NamingConventionRule",
+            "FunctionComplexityRule", "MagicNumberRule", "ParameterCountRule",
+            "InefficientLoopRule", "MemoryAllocationRule", "StringConcatenationRule",
+            "LargeFileRule", "TooManyImportsRule", "GlobalVariableRule",
+            "FormattingConventionRule", "IndentationRule", "TrailingWhitespaceRule",
+            "LineLengthRule", "CommentCoverageRule", "FunctionLengthRule",
+            "NestingDepthRule", "EmptyFunctionRule", "UnreachableCodeRule",
+            "RecursionDepthRule", "ResourceLeakRule", "AsyncAwaitRule",
+            "ErrorHandlingRule", "PatternMatchingRule", "GenericConstraintRule",
+            "CommentStyleRule", "SemicolonRule", "BracketMatchingRule",
+            "ImportOrderRule", "CacheEfficiencyRule", "BranchPredictionRule",
+            "VectorizationRule", "ConcurrencyRule", "MemoryLeakRule",
+            "RaceConditionRule", "InputValidationRule", "HardcodedCredentialsRule",
+            "SQLInjectionRule", "CouplingRule", "CohesionRule",
+        ];
+        
+        // Enable all rules
+        for rule in all_rules {
+            enabled_rules.insert(rule.to_string(), true);
+            rule_settings.insert(rule.to_string(), RuleSettings {
+                severity: RuleSeverity::Warning,
+                config: HashMap::new(),
+            });
+        }
+        
+        RuleConfig {
+            enabled_rules,
+            rule_settings,
+            global_settings: GlobalSettings {
+                max_diagnostics: None,
+                stop_on_error: false,
+                parallel_execution: false,
+                timeout_seconds: Some(30),
+            },
+        }
+    }
+
+    /// Helper function to run analysis on source code with all rules enabled
     fn analyze_source(source: &str) -> AnalysisResult {
-        let pipeline = AnalysisPipeline::new();
+        let config = create_all_rules_enabled_config();
+        let pipeline = AnalysisPipeline::with_config(config);
         let file_id = create_test_file_id(source);
         pipeline.analyze(source, file_id)
     }

@@ -130,6 +130,7 @@ impl Default for RuleConfig {
             "DeadCodeRule",
             "NamingConventionRule",
             "FormattingConventionRule",
+            "LineLengthRule",
         ];
         
         for rule in critical_rules {
