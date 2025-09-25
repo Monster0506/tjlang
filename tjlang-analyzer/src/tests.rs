@@ -753,7 +753,7 @@ e: float = 2.71828  # Mathematical constant
         let result = analyze_source(source);
         
         // Should handle edge cases appropriately
-        assert!(result.diagnostics_count >= 0);
+        assert!(result.diagnostics_count == 0);
     }
 
     #[test]
