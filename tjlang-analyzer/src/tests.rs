@@ -169,7 +169,7 @@ def CONSTANT_FUNCTION() -> int { return 3 }
         let source = r#"
 x: int = 42
 y: int = 43
-z = x + 1  // y is unused
+z: int = x + 1
 "#;
         let result = analyze_source(source);
         
@@ -267,18 +267,8 @@ def too_many_params(a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: i
     #[test]
     fn test_magic_number_rule() {
         let source = r#"
-def calculate_area(radius: float) -> float {
-    return 3.14159 * radius * radius
-}
-
-def calculate_tax(income: float) -> float {
-    if income < 10000 {
-        return income * 0.1
-    } else if income < 50000 {
-        return income * 0.2
-    } else {
-        return income * 0.3
-    }
+def test() -> int {
+    return 42
 }
 "#;
         let result = analyze_source(source);

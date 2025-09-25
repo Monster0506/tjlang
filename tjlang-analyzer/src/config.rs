@@ -131,6 +131,7 @@ impl Default for RuleConfig {
             "NamingConventionRule",
             "FormattingConventionRule",
             "LineLengthRule",
+            "MagicNumberRule",
         ];
         
         for rule in critical_rules {

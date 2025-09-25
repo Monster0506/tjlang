@@ -438,9 +438,16 @@ impl AnalysisPipeline {
     }
     
     /// Parse AST from source code
-    fn parse_ast(&self, _source: &str, _file_id: codespan::FileId) -> Option<Program> {
-        // TODO: Integrate with actual parser
-        None
+    fn parse_ast(&self, source: &str, file_id: codespan::FileId) -> Option<Program> {
+        // Use the TJLang parser to parse the source code
+        match tjlang_parser::parse(source, file_id) {
+            Ok((ast, _diagnostics)) => Some(ast),
+            Err(_) => {
+                // If parsing fails, we still want to run some analysis rules
+                // that don't require an AST (like PreASTRule)
+                None
+            }
+        }
     }
 }
 

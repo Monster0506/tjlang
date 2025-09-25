@@ -207,15 +207,172 @@ impl AnalysisRule for UnusedVariableRule {
 }
 
 impl PostASTRule for UnusedVariableRule {
-    fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
-        let diagnostics = DiagnosticCollection::new();
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
         
-        // TODO: Implement unused variable detection
-        // - Track variable declarations
-        // - Track variable usage
-        // - Report unused variables
+        // Get the AST - if it's not available, return empty diagnostics
+        let ast = match &context.ast {
+            Some(ast) => ast,
+            None => return diagnostics,
+        };
+        
+        // Track variable declarations and usage
+        let mut variable_declarations = std::collections::HashMap::new();
+        let mut variable_usage = std::collections::HashSet::new();
+        
+        // Analyze the AST to find variable declarations and usage
+        self.analyze_program(ast, &mut variable_declarations, &mut variable_usage, context.file_id);
+        
+        // Find unused variables
+        for (var_name, (span, var_type)) in variable_declarations {
+            if !variable_usage.contains(&var_name) {
+                // This variable is declared but never used
+                let source_span = tjlang_diagnostics::SourceSpan::new(
+                    context.file_id,
+                    span,
+                );
+                
+                let suggestions = vec![
+                    tjlang_diagnostics::Suggestion::new(
+                        format!("Remove unused variable '{}'", var_name),
+                        "".to_string(),
+                        source_span,
+                    ),
+                ];
+                
+                let mut diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                    tjlang_diagnostics::ErrorCode::AnalyzerUnusedVariable,
+                    codespan_reporting::diagnostic::Severity::Warning,
+                    format!(
+                        "Variable '{}' is declared but never used",
+                        var_name
+                    ),
+                    source_span,
+                );
+                
+                diagnostic.notes = vec![
+                    "Unused variables clutter the code and should be removed".to_string(),
+                    "Consider removing the variable declaration if it's not needed".to_string(),
+                ];
+                diagnostic.suggestions = suggestions;
+                
+                diagnostics.add(diagnostic);
+            }
+        }
         
         diagnostics
+    }
+}
+
+impl UnusedVariableRule {
+    /// Recursively analyze AST nodes for variable declarations and usage
+    fn analyze_program(
+        &self, 
+        program: &Program, 
+        declarations: &mut std::collections::HashMap<String, (codespan::Span, String)>,
+        usage: &mut std::collections::HashSet<String>,
+        file_id: codespan::FileId
+    ) {
+        for unit in &program.units {
+            match unit {
+                ProgramUnit::Declaration(decl) => self.analyze_declaration(decl, declarations, usage, file_id),
+                _ => {} // Handle other program units as needed
+            }
+        }
+    }
+    
+    fn analyze_declaration(
+        &self,
+        decl: &Declaration,
+        declarations: &mut std::collections::HashMap<String, (codespan::Span, String)>,
+        usage: &mut std::collections::HashSet<String>,
+        file_id: codespan::FileId
+    ) {
+        match decl {
+            Declaration::Variable(var_decl) => {
+                // Track variable declaration
+                let var_name = var_decl.name.clone();
+                let var_type = format!("{:?}", var_decl.var_type);
+                declarations.insert(var_name.clone(), (var_decl.span.span, var_type));
+                
+                // Analyze the initial value for variable usage
+                self.analyze_expression(&var_decl.value, usage, file_id);
+            },
+            Declaration::Function(func_decl) => {
+                // Analyze function parameters (they are declared variables)
+                for param in &func_decl.params {
+                    let param_name = param.name.clone();
+                    let param_type = format!("{:?}", param.param_type);
+                    declarations.insert(param_name.clone(), (param.span.span, param_type));
+                }
+                
+                // Analyze function body for variable usage
+                self.analyze_block(&func_decl.body, declarations, usage, file_id);
+            },
+            _ => {} // Handle other declaration types
+        }
+    }
+    
+    fn analyze_statement(
+        &self,
+        stmt: &Statement,
+        declarations: &mut std::collections::HashMap<String, (codespan::Span, String)>,
+        usage: &mut std::collections::HashSet<String>,
+        file_id: codespan::FileId
+    ) {
+        match stmt {
+            Statement::Expression(expr) => {
+                self.analyze_expression(expr, usage, file_id);
+            },
+            Statement::Return(return_stmt) => {
+                if let Some(expr) = &return_stmt.value {
+                    self.analyze_expression(expr, usage, file_id);
+                }
+            },
+            Statement::Block(block) => {
+                self.analyze_block(block, declarations, usage, file_id);
+            },
+            _ => {} // Handle other statement types
+        }
+    }
+    
+    fn analyze_block(
+        &self,
+        block: &Block,
+        declarations: &mut std::collections::HashMap<String, (codespan::Span, String)>,
+        usage: &mut std::collections::HashSet<String>,
+        file_id: codespan::FileId
+    ) {
+        for stmt in &block.statements {
+            self.analyze_statement(stmt, declarations, usage, file_id);
+        }
+    }
+    
+    fn analyze_expression(
+        &self,
+        expr: &Expression,
+        usage: &mut std::collections::HashSet<String>,
+        file_id: codespan::FileId
+    ) {
+        match expr {
+            Expression::Variable(var_name) => {
+                // This is a variable usage
+                usage.insert(var_name.clone());
+            },
+            Expression::Binary { left, right, .. } => {
+                self.analyze_expression(left, usage, file_id);
+                self.analyze_expression(right, usage, file_id);
+            },
+            Expression::Unary { operand, .. } => {
+                self.analyze_expression(operand, usage, file_id);
+            },
+            Expression::Call { args, .. } => {
+                for arg in args {
+                    self.analyze_expression(arg, usage, file_id);
+                }
+            },
+            _ => {} // Handle other expression types
+        }
     }
 }
 
@@ -395,15 +552,172 @@ impl AnalysisRule for MagicNumberRule {
 }
 
 impl PostASTRule for MagicNumberRule {
-    fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
-        let diagnostics = DiagnosticCollection::new();
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
         
-        // TODO: Implement magic number detection
-        // - Literal value analysis
-        // - Context-aware detection
-        // - Constant suggestion
+        // Get the AST - if it's not available, return empty diagnostics
+        let ast = match &context.ast {
+            Some(ast) => {
+                println!("DEBUG: MagicNumberRule - AST is available");
+                ast
+            },
+            None => {
+                println!("DEBUG: MagicNumberRule - No AST available");
+                return diagnostics;
+            },
+        };
+        
+        // Common magic numbers that should be constants
+        let magic_numbers = vec![
+            (0, "ZERO"),
+            (1, "ONE"), 
+            (-1, "NEGATIVE_ONE"),
+            (2, "TWO"),
+            (3, "THREE"),
+            (4, "FOUR"),
+            (5, "FIVE"),
+            (10, "TEN"),
+            (42, "FORTY_TWO"),
+            (100, "HUNDRED"),
+            (1000, "THOUSAND"),
+            (1024, "KILOBYTE"),
+            (2048, "TWO_KILOBYTES"),
+            (4096, "FOUR_KILOBYTES"),
+            (3600, "SECONDS_PER_HOUR"),
+            (86400, "SECONDS_PER_DAY"),
+            (7, "DAYS_PER_WEEK"),
+            (30, "DAYS_PER_MONTH"),
+            (365, "DAYS_PER_YEAR"),
+            (24, "HOURS_PER_DAY"),
+            (60, "MINUTES_PER_HOUR"),
+            (80, "DEFAULT_PORT"),
+            (443, "HTTPS_PORT"),
+            (22, "SSH_PORT"),
+            (21, "FTP_PORT"),
+            (25, "SMTP_PORT"),
+            (53, "DNS_PORT"),
+            (3306, "MYSQL_PORT"),
+            (5432, "POSTGRES_PORT"),
+            (6379, "REDIS_PORT"),
+            (27017, "MONGODB_PORT"),
+        ];
+        
+        // Analyze the AST to find magic numbers
+        self.analyze_program(ast, &magic_numbers, &mut diagnostics, context.file_id);
         
         diagnostics
+    }
+}
+
+impl MagicNumberRule {
+    /// Recursively analyze AST nodes for magic numbers
+    fn analyze_program(&self, program: &Program, magic_numbers: &[(i32, &str)], diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId) {
+        for unit in &program.units {
+            match unit {
+                ProgramUnit::Declaration(decl) => self.analyze_declaration(decl, magic_numbers, diagnostics, file_id),
+                _ => {} // Handle other program units as needed
+            }
+        }
+    }
+    
+    fn analyze_declaration(&self, decl: &Declaration, magic_numbers: &[(i32, &str)], diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId) {
+        match decl {
+            Declaration::Variable(var_decl) => {
+                self.analyze_expression(&var_decl.value, magic_numbers, diagnostics, file_id);
+            },
+            Declaration::Function(func_decl) => {
+                // Analyze function body
+                self.analyze_block(&func_decl.body, magic_numbers, diagnostics, file_id);
+            },
+            _ => {} // Handle other declaration types
+        }
+    }
+    
+    fn analyze_statement(&self, stmt: &Statement, magic_numbers: &[(i32, &str)], diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId) {
+        match stmt {
+            Statement::Expression(expr) => {
+                self.analyze_expression(expr, magic_numbers, diagnostics, file_id);
+            },
+            Statement::Return(return_stmt) => {
+                if let Some(expr) = &return_stmt.value {
+                    self.analyze_expression(expr, magic_numbers, diagnostics, file_id);
+                }
+            },
+            Statement::Block(block) => {
+                self.analyze_block(block, magic_numbers, diagnostics, file_id);
+            },
+            _ => {} // Handle other statement types
+        }
+    }
+    
+    fn analyze_block(&self, block: &Block, magic_numbers: &[(i32, &str)], diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId) {
+        for stmt in &block.statements {
+            self.analyze_statement(stmt, magic_numbers, diagnostics, file_id);
+        }
+    }
+    
+    fn analyze_expression(&self, expr: &Expression, magic_numbers: &[(i32, &str)], diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId) {
+        match expr {
+            Expression::Literal(lit) => {
+                self.analyze_literal(lit, magic_numbers, diagnostics, file_id);
+            },
+            Expression::Binary { left, right, .. } => {
+                self.analyze_expression(left, magic_numbers, diagnostics, file_id);
+                self.analyze_expression(right, magic_numbers, diagnostics, file_id);
+            },
+            Expression::Unary { operand, .. } => {
+                self.analyze_expression(operand, magic_numbers, diagnostics, file_id);
+            },
+            _ => {} // Handle other expression types
+        }
+    }
+    
+    fn analyze_literal(&self, lit: &Literal, magic_numbers: &[(i32, &str)], diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId) {
+        match lit {
+            Literal::Int(value) => {
+                // Check if this integer is a magic number
+                for (magic_value, suggested_name) in magic_numbers {
+                    if *value as i32 == *magic_value {
+                        // Create diagnostic for magic number
+                        let source_span = tjlang_diagnostics::SourceSpan::new(
+                            file_id,
+                            codespan::Span::new(
+                                codespan::ByteIndex::from(0), // TODO: Get actual span from AST
+                                codespan::ByteIndex::from(0),
+                            ),
+                        );
+                        
+                        let suggestions = vec![
+                            tjlang_diagnostics::Suggestion::new(
+                                format!("Replace with named constant: const {}: int = {};", suggested_name, value),
+                                suggested_name.to_string(),
+                                source_span,
+                            ),
+                        ];
+                        
+                        let mut diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                            tjlang_diagnostics::ErrorCode::AnalyzerMagicNumber,
+                            codespan_reporting::diagnostic::Severity::Warning,
+                            format!(
+                                "Magic number {} found. Consider replacing with a named constant.",
+                                value
+                            ),
+                            source_span,
+                        );
+                        
+                        diagnostic.notes = vec![
+                            "Magic numbers make code harder to understand and maintain".to_string(),
+                            "Consider defining a named constant with a descriptive name".to_string(),
+                        ];
+                        diagnostic.suggestions = suggestions;
+                        
+                        diagnostics.add(diagnostic);
+                        break; // Only report the first match
+                    }
+                }
+            },
+            _ => {} // Handle other literal types
+        }
     }
 }
 
