@@ -16,10 +16,12 @@ pub fn parse(source: &str, file_id: codespan::FileId) -> Result<(tjlang_ast::Pro
     
     match parser.parse(source) {
         Ok(program) => {
-            if parser.diagnostics.is_empty() {
-                Ok((program, parser.diagnostics))
-            } else {
+            // Only return error if there are actual errors, not warnings
+            let has_errors = parser.diagnostics.iter().any(|d| d.severity == codespan_reporting::diagnostic::Severity::Error);
+            if has_errors {
                 Err(parser.diagnostics)
+            } else {
+                Ok((program, parser.diagnostics))
             }
         },
         Err(e) => {

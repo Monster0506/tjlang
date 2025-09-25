@@ -387,15 +387,276 @@ impl AnalysisRule for DeadCodeRule {
 }
 
 impl PostASTRule for DeadCodeRule {
-    fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
-        let diagnostics = DiagnosticCollection::new();
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
         
-        // TODO: Implement dead code detection
-        // - Control flow analysis
-        // - Unreachable code detection
-        // - Dead function detection
+        // Get the AST - if it's not available, return empty diagnostics
+        let ast = match &context.ast {
+            Some(ast) => ast,
+            None => return diagnostics,
+        };
+        
+        // Analyze the AST for dead code
+        self.analyze_program(ast, &mut diagnostics, context.file_id);
         
         diagnostics
+    }
+}
+
+impl DeadCodeRule {
+    /// Recursively analyze AST nodes for dead code
+    fn analyze_program(&self, program: &Program, diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId) {
+        for unit in &program.units {
+            match unit {
+                ProgramUnit::Declaration(decl) => self.analyze_declaration(decl, diagnostics, file_id),
+                _ => {} // Handle other program units as needed
+            }
+        }
+    }
+    
+    fn analyze_declaration(&self, decl: &Declaration, diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId) {
+        match decl {
+            Declaration::Function(func_decl) => {
+                // Analyze function body for dead code
+                self.analyze_block(&func_decl.body, diagnostics, file_id, false);
+            },
+            _ => {} // Handle other declaration types
+        }
+    }
+    
+    fn analyze_statement(&self, stmt: &Statement, diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId, is_unreachable: bool) {
+        match stmt {
+            Statement::Return(return_stmt) => {
+                // Return statements make subsequent code unreachable
+                if is_unreachable {
+                    // This return statement itself is unreachable
+                    let source_span = tjlang_diagnostics::SourceSpan::new(
+                        file_id,
+                        return_stmt.span.span,
+                    );
+                    
+                    let mut diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                        tjlang_diagnostics::ErrorCode::AnalyzerDeadCode,
+                        codespan_reporting::diagnostic::Severity::Warning,
+                        "Unreachable return statement".to_string(),
+                        source_span,
+                    );
+                    
+                    diagnostic.notes = vec![
+                        "This return statement is unreachable due to previous control flow".to_string(),
+                        "Consider removing this statement or restructuring the code".to_string(),
+                    ];
+                    
+                    diagnostics.add(diagnostic);
+                }
+            },
+            Statement::Break(break_stmt) => {
+                // Break statements terminate execution
+                if is_unreachable {
+                    let source_span = tjlang_diagnostics::SourceSpan::new(
+                        file_id,
+                        break_stmt.span.span,
+                    );
+                    
+                    let mut diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                        tjlang_diagnostics::ErrorCode::AnalyzerDeadCode,
+                        codespan_reporting::diagnostic::Severity::Warning,
+                        "Unreachable break statement".to_string(),
+                        source_span,
+                    );
+                    
+                    diagnostic.notes = vec![
+                        "This break statement is unreachable due to previous control flow".to_string(),
+                        "Consider removing this statement or restructuring the code".to_string(),
+                    ];
+                    
+                    diagnostics.add(diagnostic);
+                }
+            },
+            Statement::Continue(continue_stmt) => {
+                // Continue statements terminate execution
+                if is_unreachable {
+                    let source_span = tjlang_diagnostics::SourceSpan::new(
+                        file_id,
+                        continue_stmt.span.span,
+                    );
+                    
+                    let mut diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                        tjlang_diagnostics::ErrorCode::AnalyzerDeadCode,
+                        codespan_reporting::diagnostic::Severity::Warning,
+                        "Unreachable continue statement".to_string(),
+                        source_span,
+                    );
+                    
+                    diagnostic.notes = vec![
+                        "This continue statement is unreachable due to previous control flow".to_string(),
+                        "Consider removing this statement or restructuring the code".to_string(),
+                    ];
+                    
+                    diagnostics.add(diagnostic);
+                }
+            },
+            Statement::Raise(raise_stmt) => {
+                // Raise statements terminate execution
+                if is_unreachable {
+                    let source_span = tjlang_diagnostics::SourceSpan::new(
+                        file_id,
+                        raise_stmt.span.span,
+                    );
+                    
+                    let mut diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                        tjlang_diagnostics::ErrorCode::AnalyzerDeadCode,
+                        codespan_reporting::diagnostic::Severity::Warning,
+                        "Unreachable raise statement".to_string(),
+                        source_span,
+                    );
+                    
+                    diagnostic.notes = vec![
+                        "This raise statement is unreachable due to previous control flow".to_string(),
+                        "Consider removing this statement or restructuring the code".to_string(),
+                    ];
+                    
+                    diagnostics.add(diagnostic);
+                }
+            },
+            Statement::Block(block) => {
+                self.analyze_block(block, diagnostics, file_id, is_unreachable);
+            },
+            Statement::If(if_stmt) => {
+                // Analyze if statement
+                self.analyze_expression(&if_stmt.condition, diagnostics, file_id);
+                self.analyze_block(&if_stmt.then_block, diagnostics, file_id, is_unreachable);
+                
+                // Analyze elif branches
+                for elif in &if_stmt.elif_branches {
+                    self.analyze_expression(&elif.condition, diagnostics, file_id);
+                    self.analyze_block(&elif.block, diagnostics, file_id, is_unreachable);
+                }
+                
+                // Analyze else branch
+                if let Some(else_block) = &if_stmt.else_block {
+                    self.analyze_block(else_block, diagnostics, file_id, is_unreachable);
+                }
+            },
+            Statement::While(while_stmt) => {
+                self.analyze_expression(&while_stmt.condition, diagnostics, file_id);
+                self.analyze_block(&while_stmt.body, diagnostics, file_id, is_unreachable);
+            },
+            Statement::For(for_stmt) => {
+                match for_stmt {
+                    ForStatement::ForEach { body, .. } => {
+                        self.analyze_block(body, diagnostics, file_id, is_unreachable);
+                    },
+                    ForStatement::CStyle { body, .. } => {
+                        self.analyze_block(body, diagnostics, file_id, is_unreachable);
+                    },
+                }
+            },
+            Statement::Match(match_stmt) => {
+                self.analyze_expression(&match_stmt.expression, diagnostics, file_id);
+                for arm in &match_stmt.arms {
+                    if let Some(guard) = &arm.guard {
+                        self.analyze_expression(guard, diagnostics, file_id);
+                    }
+                    self.analyze_block(&arm.body, diagnostics, file_id, is_unreachable);
+                }
+            },
+            _ => {
+                // For other statements, check if they're unreachable
+                if is_unreachable {
+                    // Get span from the statement - we need to handle different statement types
+                    let span = match stmt {
+                        Statement::Variable(var_decl) => var_decl.span.span,
+                        Statement::Expression(expr) => {
+                            match expr {
+                                Expression::Binary { span, .. } => span.span,
+                                Expression::Unary { span, .. } => span.span,
+                                Expression::Call { span, .. } => span.span,
+                                Expression::Index { span, .. } => span.span,
+                                Expression::Member { span, .. } => span.span,
+                                Expression::Lambda { span, .. } => span.span,
+                                Expression::Range { span, .. } => span.span,
+                                Expression::Spawn { span, .. } => span.span,
+                                Expression::Literal(_lit) => {
+                                    // Literals don't have spans in this AST structure
+                                    codespan::Span::new(0, 0)
+                                },
+                                _ => codespan::Span::new(0, 0), // Fallback for expressions without span
+                            }
+                        },
+                        Statement::If(if_stmt) => if_stmt.span.span,
+                        Statement::While(while_stmt) => while_stmt.span.span,
+                        Statement::For(for_stmt) => {
+                            match for_stmt {
+                                ForStatement::ForEach { span, .. } => span.span,
+                                ForStatement::CStyle { span, .. } => span.span,
+                            }
+                        },
+                        Statement::Match(match_stmt) => match_stmt.span.span,
+                        Statement::Block(block) => block.span.span,
+                        _ => codespan::Span::new(0, 0), // Fallback
+                    };
+                    
+                    let source_span = tjlang_diagnostics::SourceSpan::new(
+                        file_id,
+                        span,
+                    );
+                    
+                    let mut diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                        tjlang_diagnostics::ErrorCode::AnalyzerDeadCode,
+                        codespan_reporting::diagnostic::Severity::Warning,
+                        "Unreachable code detected".to_string(),
+                        source_span,
+                    );
+                    
+                    diagnostic.notes = vec![
+                        "This code is unreachable due to previous control flow".to_string(),
+                        "Consider removing this code or restructuring the logic".to_string(),
+                    ];
+                    
+                    diagnostics.add(diagnostic);
+                }
+            }
+        }
+    }
+    
+    fn analyze_block(&self, block: &Block, diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId, is_unreachable: bool) {
+        let mut current_unreachable = is_unreachable;
+        
+        for (i, stmt) in block.statements.iter().enumerate() {
+            // Check if this statement is unreachable
+            if current_unreachable {
+                self.analyze_statement(stmt, diagnostics, file_id, true);
+            } else {
+                self.analyze_statement(stmt, diagnostics, file_id, false);
+                
+                // Check if this statement makes subsequent statements unreachable
+                match stmt {
+                    Statement::Return(_) | Statement::Break(_) | Statement::Continue(_) | Statement::Raise(_) => {
+                        current_unreachable = true;
+                    },
+                    _ => {}
+                }
+            }
+        }
+    }
+    
+    fn analyze_expression(&self, expr: &Expression, diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId) {
+        match expr {
+            Expression::Binary { left, right, .. } => {
+                self.analyze_expression(left, diagnostics, file_id);
+                self.analyze_expression(right, diagnostics, file_id);
+            },
+            Expression::Unary { operand, .. } => {
+                self.analyze_expression(operand, diagnostics, file_id);
+            },
+            Expression::Call { args, .. } => {
+                for arg in args {
+                    self.analyze_expression(arg, diagnostics, file_id);
+                }
+            },
+            _ => {} // Handle other expression types
+        }
     }
 }
 

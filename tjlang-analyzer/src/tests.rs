@@ -110,7 +110,7 @@ z: bool = "not a boolean"
     fn test_type_safety_rule_undefined_variable() {
         let source = r#"
 x: int = 42
-y = x + z  // z is undefined
+y = x + z  # z is undefined
 "#;
         let result = analyze_source(source);
         
@@ -195,7 +195,7 @@ def func(x: int, unused_param: int) -> int {
         let source = r#"
 def func() -> int {
     return 42
-    x: int = 100  // This is unreachable
+    x: int = 100  # This is unreachable
 }
 "#;
         let result = analyze_source(source);
@@ -208,7 +208,7 @@ def func() -> int {
     fn test_empty_function_rule() {
         let source = r#"
 def empty_func() -> void {
-    // This function is empty
+    # This function is empty
 }
 "#;
         let result = analyze_source(source);
@@ -308,8 +308,8 @@ y: str = "test"
     fn test_indentation_rule() {
         let source = r#"
 def func() -> int {
-  x: int = 42  // Inconsistent indentation
-    y: int = 43  // Different indentation
+  x: int = 42  # Inconsistent indentation
+    y: int = 43  # Different indentation
   return x
 }
 "#;
@@ -349,7 +349,7 @@ def inefficient_search(items: [int], target: int) -> bool {
 def build_string(parts: [str]) -> str {
     result: str = ""
     for (i: int | 0..5) {
-        result = result + parts[i]  // Inefficient string concatenation
+        result = result + parts[i]  # Inefficient string concatenation
     }
     return result
 }
@@ -422,7 +422,7 @@ def increment_counter() -> void {
     fn test_null_pointer_rule() {
         let source = r#"
 def process_user(user: User?) -> str {
-    return user.name  // Potential null dereference
+    return user.name  # Potential null dereference
 }
 "#;
         let result = analyze_source(source);
@@ -436,7 +436,7 @@ def process_user(user: User?) -> str {
         let source = r#"
 def copy_string(source: str, dest: str) -> void {
     for (i: int | 0..10) {
-        dest[i] = source[i]  // No bounds checking
+        dest[i] = source[i]  # No bounds checking
     }
 }
 "#;
@@ -483,7 +483,7 @@ def get_user_by_id(id: str) -> User {
     fn test_error_handling_rule() {
         let source = r#"
 def process_input(input: str) -> str {
-    return input.to_upper()  // No error handling
+    return input.to_upper()  # No error handling
 }
 "#;
         let result = analyze_source(source);
@@ -498,7 +498,7 @@ def process_input(input: str) -> str {
 def process_value(value: int) -> str {
     match value {
         x: int: { return "integer" }
-        // Missing case for other values
+        # Missing case for other values
     }
 }
 "#;
@@ -515,8 +515,8 @@ def process_value(value: int) -> str {
     #[test]
     fn test_pipeline_phase_analysis() {
         let source = r#"
-x: int = "hello"  // Type mismatch
-unused_var: int = 42  // Unused variable
+x: int = "hello"  # Type mismatch
+unused_var: int = 42  # Unused variable
 "#;
         let pipeline = AnalysisPipeline::new();
         let file_id = create_test_file_id(source);
@@ -537,8 +537,8 @@ unused_var: int = 42  // Unused variable
     #[test]
     fn test_pipeline_category_analysis() {
         let source = r#"
-x: int = "hello"  // Type safety issue
-unused_var: int = 42  // Dead code issue
+x: int = "hello"  # Type safety issue
+unused_var: int = 42  # Dead code issue
 "#;
         let pipeline = AnalysisPipeline::new();
         let file_id = create_test_file_id(source);
@@ -555,7 +555,7 @@ unused_var: int = 42  // Dead code issue
     #[test]
     fn test_rule_configuration() {
         let source = r#"
-x: int = "hello"  // Type mismatch
+x: int = "hello"  # Type mismatch
 "#;
         let mut pipeline = AnalysisPipeline::new();
         let file_id = create_test_file_id(source);
@@ -575,7 +575,7 @@ x: int = "hello"  // Type mismatch
     #[test]
     fn test_rule_severity_configuration() {
         let source = r#"
-x: int = "hello"  // Type mismatch
+x: int = "hello"  # Type mismatch
 "#;
         let mut pipeline = AnalysisPipeline::new();
         let file_id = create_test_file_id(source);
@@ -596,29 +596,29 @@ x: int = "hello"  // Type mismatch
     #[test]
     fn test_comprehensive_analysis() {
         let source = r#"
-// Type safety issues
+# Type safety issues
 x: int = "hello"
 y: str = 42
 
-// Naming convention issues
+# Naming convention issues
 badVariableName: int = 42
 GoodVariableName: int = 43
 
-// Dead code issues
+# Dead code issues
 unused_var: int = 100
 def func(unused_param: int) -> int {
     return 42
 }
 
-// Magic numbers
+# Magic numbers
 def calculate_area(radius: float) -> float {
     return 3.14159 * radius * radius
 }
 
-// Long line
+# Long line
 this_is_a_very_long_line_that_exceeds_the_recommended_line_length_limit_and_should_trigger_a_warning_about_line_length
 
-// Inefficient loop
+# Inefficient loop
 def inefficient_search(items: [int], target: int) -> bool {
     for (i: int | 0..10) {
         for (j: int | 0..10) {
@@ -661,8 +661,8 @@ z: bool = true
     #[test]
     fn test_analysis_summary() {
         let source = r#"
-x: int = "hello"  // Error
-unused_var: int = 42  // Warning
+x: int = "hello"  # Error
+unused_var: int = 42  # Warning
 "#;
         let result = analyze_source(source);
         let summary = result.get_summary();
@@ -715,10 +715,10 @@ unused_var: int = 42  // Warning
     #[test]
     fn test_naming_convention_edge_cases() {
         let source = r#"
-// Edge cases for naming conventions
-_: int = 42  // Single underscore
-__: int = 43  // Double underscore
-a: int = 44  // Single letter
+# Edge cases for naming conventions
+_: int = 42  # Single underscore
+__: int = 43  # Double underscore
+a: int = 44  # Single letter
 very_long_variable_name_that_might_exceed_recommended_length: int = 45
 "#;
         let result = analyze_source(source);
@@ -730,12 +730,12 @@ very_long_variable_name_that_might_exceed_recommended_length: int = 45
     #[test]
     fn test_magic_number_edge_cases() {
         let source = r#"
-// Edge cases for magic numbers
-x: int = 0  // Zero might be acceptable
-y: int = 1  // One might be acceptable
-z: int = -1  // Negative one might be acceptable
-pi: float = 3.14159  // Mathematical constant
-e: float = 2.71828  // Mathematical constant
+# Edge cases for magic numbers
+x: int = 0  # Zero might be acceptable
+y: int = 1  # One might be acceptable
+z: int = -1  # Negative one might be acceptable
+pi: float = 3.14159  # Mathematical constant
+e: float = 2.71828  # Mathematical constant
 "#;
         let result = analyze_source(source);
         
@@ -746,7 +746,7 @@ e: float = 2.71828  // Mathematical constant
     #[test]
     fn test_complexity_edge_cases() {
         let source = r#"
-// Edge cases for complexity analysis
+# Edge cases for complexity analysis
 def simple_function() -> int {
     return 42
 }
