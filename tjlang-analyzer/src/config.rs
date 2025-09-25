@@ -67,6 +67,7 @@ pub struct NamingConfig {
 pub enum CaseStyle {
     SnakeCase,
     CamelCase,
+    ScreamingCamelCase,
     PascalCase,
     ScreamingSnakeCase,
     KebabCase,

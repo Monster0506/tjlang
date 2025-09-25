@@ -767,15 +767,141 @@ impl AnalysisRule for NamingConventionRule {
 }
 
 impl PostASTRule for NamingConventionRule {
-    fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
-        let diagnostics = DiagnosticCollection::new();
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
         
-        // TODO: Implement naming convention checking
-        // - Case style validation
-        // - Length requirements
-        // - Reserved word checking
+        // Get the AST - if it's not available, return empty diagnostics
+        let ast = match &context.ast {
+            Some(ast) => ast,
+            None => return diagnostics,
+        };
+        
+        // Maximum reasonable length for identifiers
+        const MAX_IDENTIFIER_LENGTH: usize = 50;
+        
+        // Analyze the AST for long identifiers
+        self.analyze_program(ast, &mut diagnostics, context.file_id, MAX_IDENTIFIER_LENGTH);
         
         diagnostics
+    }
+}
+
+impl NamingConventionRule {
+    /// Recursively analyze AST nodes for long identifiers
+    fn analyze_program(&self, program: &Program, diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId, max_length: usize) {
+        for unit in &program.units {
+            match unit {
+                ProgramUnit::Declaration(decl) => self.analyze_declaration(decl, diagnostics, file_id, max_length),
+                _ => {} // Handle other program units as needed
+            }
+        }
+    }
+    
+    fn analyze_declaration(&self, decl: &Declaration, diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId, max_length: usize) {
+        match decl {
+            Declaration::Variable(var_decl) => {
+                // Check variable name length
+                self.check_identifier_length(&var_decl.name, diagnostics, file_id, max_length, "variable");
+            },
+            Declaration::Function(func_decl) => {
+                // Check function name length
+                self.check_identifier_length(&func_decl.name, diagnostics, file_id, max_length, "function");
+                
+                // Check parameter names
+                for param in &func_decl.params {
+                    self.check_identifier_length(&param.name, diagnostics, file_id, max_length, "parameter");
+                }
+                
+                // Analyze function body for variable declarations
+                self.analyze_block(&func_decl.body, diagnostics, file_id, max_length);
+            },
+            Declaration::Type(type_decl) => {
+                // Check type name length
+                self.check_identifier_length(&type_decl.name, diagnostics, file_id, max_length, "type");
+            },
+            Declaration::Struct(struct_decl) => {
+                // Check struct name length
+                self.check_identifier_length(&struct_decl.name, diagnostics, file_id, max_length, "struct");
+                
+                // Check field names
+                for field in &struct_decl.fields {
+                    self.check_identifier_length(&field.name, diagnostics, file_id, max_length, "field");
+                }
+            },
+            Declaration::Enum(enum_decl) => {
+                // Check enum name length
+                self.check_identifier_length(&enum_decl.name, diagnostics, file_id, max_length, "enum");
+                
+                // Check variant names
+                for variant in &enum_decl.variants {
+                    self.check_identifier_length(&variant.name, diagnostics, file_id, max_length, "enum variant");
+                }
+            },
+            Declaration::Interface(interface_decl) => {
+                // Check interface name length
+                self.check_identifier_length(&interface_decl.name, diagnostics, file_id, max_length, "interface");
+                
+                // Check method names
+                for method in &interface_decl.methods {
+                    self.check_identifier_length(&method.name, diagnostics, file_id, max_length, "method");
+                }
+            },
+            _ => {} // Handle other declaration types
+        }
+    }
+    
+    fn analyze_statement(&self, stmt: &Statement, diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId, max_length: usize) {
+        match stmt {
+            Statement::Variable(var_decl) => {
+                self.check_identifier_length(&var_decl.name, diagnostics, file_id, max_length, "variable");
+            },
+            Statement::Block(block) => {
+                self.analyze_block(block, diagnostics, file_id, max_length);
+            },
+            _ => {} // Handle other statement types
+        }
+    }
+    
+    fn analyze_block(&self, block: &Block, diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId, max_length: usize) {
+        for stmt in &block.statements {
+            self.analyze_statement(stmt, diagnostics, file_id, max_length);
+        }
+    }
+    
+    fn check_identifier_length(&self, name: &str, diagnostics: &mut DiagnosticCollection, file_id: codespan::FileId, max_length: usize, identifier_type: &str) {
+        if name.len() > max_length {
+            // Create a span for the identifier (we'll use a fallback since we don't have exact position)
+            let source_span = tjlang_diagnostics::SourceSpan::new(
+                file_id,
+                codespan::Span::new(0, name.len() as u32),
+            );
+            
+            let suggestions = vec![
+                tjlang_diagnostics::Suggestion::new(
+                    format!("Consider shortening '{}' to a more concise name", name),
+                    format!("{}_short", &name[..max_length.min(name.len())]),
+                    source_span,
+                ),
+            ];
+            
+            let mut diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                tjlang_diagnostics::ErrorCode::AnalyzerNamingConvention,
+                codespan_reporting::diagnostic::Severity::Warning,
+                format!(
+                    "{} name '{}' is too long ({} characters, max recommended: {})",
+                    identifier_type, name, name.len(), max_length
+                ),
+                source_span,
+            );
+            
+            diagnostic.notes = vec![
+                "Long identifiers can make code harder to read and maintain".to_string(),
+                "Consider using a shorter, more descriptive name".to_string(),
+            ];
+            diagnostic.suggestions = suggestions;
+            
+            diagnostics.add(diagnostic);
+        }
     }
 }
 

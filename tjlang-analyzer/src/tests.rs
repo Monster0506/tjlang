@@ -137,8 +137,8 @@ def func1() -> str { return "duplicate" }
     #[test]
     fn test_naming_convention_rule_bad_variable_names() {
         let source = r#"
-badVariableName: int = 42
-GoodVariableName: int = 43
+very_long_variable_name_that_exceeds_reasonable_length_and_should_trigger_warning: int = 42
+normalVariable: int = 43
 CONSTANT_VALUE: int = 44
 "#;
         let result = analyze_source(source);
@@ -150,8 +150,8 @@ CONSTANT_VALUE: int = 44
     #[test]
     fn test_naming_convention_rule_function_names() {
         let source = r#"
-def badFunctionName() -> int { return 1 }
-def GoodFunctionName() -> int { return 2 }
+def very_long_function_name_that_exceeds_reasonable_length_and_should_trigger_warning() -> int { return 1 }
+def normalFunction() -> int { return 2 }
 def CONSTANT_FUNCTION() -> int { return 3 }
 "#;
         let result = analyze_source(source);
@@ -723,8 +723,21 @@ very_long_variable_name_that_might_exceed_recommended_length: int = 45
 "#;
         let result = analyze_source(source);
         
-        // Should handle edge cases gracefully
-        assert!(result.diagnostics_count >= 0);
+        // Should detect the long identifier (58 characters > 50 limit)
+        assert!(has_warning_code(&result, ErrorCode::AnalyzerNamingConvention));
+        
+        // Should have exactly 1 naming convention warning
+        let naming_warnings: Vec<_> = result.diagnostics.iter()
+            .filter(|d| d.code == ErrorCode::AnalyzerNamingConvention)
+            .collect();
+        assert_eq!(naming_warnings.len(), 1);
+        
+        // Verify the warning message mentions the long identifier
+        let warning = &naming_warnings[0];
+        assert!(warning.message.contains("very_long_variable_name_that_might_exceed_recommended_length"));
+        assert!(warning.message.contains("too long"));
+        assert!(warning.message.contains("60 characters"));
+        assert!(warning.message.contains("max recommended: 50"));
     }
 
     #[test]
