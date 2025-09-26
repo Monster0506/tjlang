@@ -135,7 +135,7 @@ type_list = { type_ ~ ("," ~ type_)* }
 primitive_type = { "int" | "float" | "bool" | "str" | "any" }
 
 // Expressions (with proper precedence - right associative to avoid left recursion)
-expression = { assignment }
+expression = { or_expr | assignment }
 assignment = { or_expr ~ ("=" ~ expression)? }
 or_expr = { and_expr ~ ("or" ~ and_expr)* }
 and_expr = { bit_or_expr ~ ("and" ~ bit_or_expr)* }

@@ -78,15 +78,15 @@ impl Interpreter {
         println!("🔧 Stdlib registry created successfully");
         
         println!("📦 Registering stdlib functions...");
-        // Temporarily disable stdlib registration to isolate the issue
-        // interpreter.register_stdlib_functions();
-        println!("✅ Interpreter created successfully (stdlib disabled)");
-        
-        Self {
+        let mut interpreter = Self {
             environment,
             functions,
             stdlib,
-        }
+        };
+        interpreter.register_stdlib_functions();
+        println!("✅ Interpreter created successfully (stdlib enabled)");
+        
+        interpreter
     }
     
     /// Register all stdlib functions in the environment
@@ -94,17 +94,33 @@ impl Interpreter {
         let function_names = self.stdlib.get_function_names();
         println!("📋 Found {} stdlib functions to register", function_names.len());
         
-        for (i, function_name) in function_names.iter().enumerate() {
-            println!("  📝 Registering function {}: {}", i, function_name);
-            let func_value = Value::Function {
-                name: function_name.clone(),
-                params: vec![], // Native functions handle their own parameter validation
-                body: Expression::Literal(Literal::None), // Native functions don't have TJLang bodies
-                closure: HashMap::new(),
-            };
-            self.environment.define(function_name.clone(), func_value);
-            println!("  ✅ Function {} registered successfully", function_name);
+        // First, collect all module names
+        let mut modules: HashMap<String, HashMap<String, Value>> = HashMap::new();
+        
+        for function_name in &function_names {
+            if let Some((module, func)) = function_name.split_once("::") {
+                let func_value = Value::Function {
+                    name: function_name.clone(),
+                    params: vec![], // Native functions handle their own parameter validation
+                    body: Expression::Literal(Literal::None), // Native functions don't have TJLang bodies
+                    closure: HashMap::new(),
+                };
+                modules.entry(module.to_string()).or_insert_with(HashMap::new)
+                    .insert(func.to_string(), func_value);
+            }
         }
+        
+        // Register modules as structs
+        for (module_name, functions) in modules {
+            println!("  📝 Registering module: {}", module_name);
+            let module_value = Value::Struct {
+                name: module_name.clone(),
+                fields: functions,
+            };
+            self.environment.define(module_name.clone(), module_value);
+            println!("  ✅ Module {} registered successfully", module_name);
+        }
+        
         println!("🎉 All stdlib functions registered successfully");
     }
     
@@ -135,9 +151,13 @@ impl Interpreter {
                     result = self.interpret_declaration(decl)?;
                     println!("    ✅ Declaration result: {:?}", result);
                 },
+                ProgramUnit::Expression(expr) => {
+                    println!("    🎯 Interpreting expression: {:?}", std::mem::discriminant(expr));
+                    result = self.interpret_expression(expr)?;
+                    println!("    ✅ Expression result: {:?}", result);
+                },
                 _ => {
-                    println!("    ⏭️ Skipping non-declaration unit");
-                    // Handle other program units as needed
+                    println!("    ⏭️ Skipping unknown unit type");
                 }
             }
         }
@@ -195,9 +215,15 @@ impl Interpreter {
             },
             Expression::Binary { left, operator, right, .. } => {
                 println!("          ➕ Binary operation: {:?}", operator);
+                println!("          📝 Left operand: {:?}", left);
+                println!("          📝 Right operand: {:?}", right);
                 let left_val = self.interpret_expression(left)?;
+                println!("          📝 Left value: {:?}", left_val);
                 let right_val = self.interpret_expression(right)?;
-                self.interpret_binary_operation(&left_val, operator, &right_val)
+                println!("          📝 Right value: {:?}", right_val);
+                let result = self.interpret_binary_operation(&left_val, operator, &right_val);
+                println!("          📝 Binary result: {:?}", result);
+                result
             },
             Expression::Unary { operator, operand, .. } => {
                 println!("          🔢 Unary operation: {:?}", operator);
@@ -350,8 +376,8 @@ impl Interpreter {
                     let func_decl = func_decl.clone();
                     
                     println!("              🔧 Creating new environment with {} params", func_decl.params.len());
-                    // Create new environment with parameters
-                    let mut new_env = Environment::new();
+                    // Create new environment with parameters that has access to global scope
+                    let mut new_env = Environment::with_parent(self.environment.clone());
                     for (param, arg) in func_decl.params.iter().zip(args.iter()) {
                         println!("                📝 Binding param {} = {:?}", param.name, arg);
                         new_env.define(param.name.clone(), arg.clone());
@@ -647,3 +673,4 @@ pub struct Closure {
     pub body: Expression,
     pub environment: Environment,
 }
+

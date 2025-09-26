@@ -18,10 +18,11 @@ pub type NativeFunction = fn(&mut Interpreter, &[Value]) -> Result<Value, String
 impl StdlibRegistry {
     pub fn new() -> Self {
         println!("🔧 Creating stdlib registry...");
-        let registry = Self {
+        let mut registry = Self {
             functions: HashMap::new(),
         };
-        println!("🔧 Stdlib registry created (functions disabled)");
+        registry.register_stdlib_functions();
+        println!("🔧 Stdlib registry created (functions enabled)");
         registry
     }
     
@@ -503,3 +504,4 @@ impl Default for StdlibRegistry {
         Self::new()
     }
 }
+

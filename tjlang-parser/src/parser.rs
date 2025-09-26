@@ -148,14 +148,9 @@ impl PestParser {
                                             units.push(ProgramUnit::Declaration(Declaration::Variable(var_decl)));
                                         }
                                         Statement::Expression(expr) => {
-                                            // For expression statements, create a dummy variable declaration
-                                            // This maintains backward compatibility with existing tests
-                                            units.push(ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
-                                                name: "main".to_string(),
-                                                var_type: Type::Primitive(PrimitiveType::Any),
-                                                value: expr,
-                                                span: self.create_span(span),
-                                            })));
+                                            // For expression statements, preserve them as executable expressions
+                                            // This allows function calls and other expressions to be executed
+                                            units.push(ProgramUnit::Expression(expr));
                                         }
                                         _ => {
                                             // For other statements, create a dummy variable declaration
@@ -644,16 +639,185 @@ impl PestParser {
         }
     }
 
+    /// Parse precedence chain to get to postfix_expr
+    fn parse_precedence_chain(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        let mut current = pair;
+        loop {
+            let inner = current.into_inner().next().ok_or("Empty precedence chain")?;
+            println!("🔍 precedence chain: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+            match inner.as_rule() {
+                Rule::postfix_expr => {
+                    return self.parse_postfix_expr(inner);
+                }
+                Rule::additive => {
+                    // Handle binary operations like x + y
+                    println!("🔍 Found additive rule, parsing binary operation");
+                    return self.parse_binary_operation(inner);
+                }
+                Rule::multiplicative => {
+                    // Handle binary operations like x * y
+                    return self.parse_binary_operation(inner);
+                }
+                Rule::power => {
+                    // Handle power expressions like x ** y
+                    return self.parse_binary_operation(inner);
+                }
+                Rule::unary => {
+                    // Handle unary expressions like -x, !x
+                    return self.parse_binary_operation(inner);
+                }
+                Rule::postfix_expr => {
+                    // Handle postfix expressions like x(), x[], x.member
+                    return self.parse_postfix_expr(inner);
+                }
+                _ => {
+                    // Continue down the precedence chain
+                    current = inner;
+                }
+            }
+        }
+    }
+
+    /// Parse binary operations like x + y, x * y, etc.
+    fn parse_binary_operation(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        println!("🔍 parse_binary_operation: content = '{}'", pair.as_str());
+        let span = self.create_span(pair.as_span());
+        let rule = pair.as_rule();
+        let children: Vec<_> = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE).collect();
+        println!("🔍 Binary operation children: {} items", children.len());
+        for (i, child) in children.iter().enumerate() {
+            println!("  Child {}: {:?} = '{}'", i, child.as_rule(), child.as_str());
+        }
+        
+        if children.len() == 1 {
+            // Single operand, no operator - parse it directly
+            let child = &children[0];
+            println!("🔍 Single operand: {:?} = '{}'", child.as_rule(), child.as_str());
+            
+            match child.as_rule() {
+                Rule::power => {
+                    // Handle power expressions like x ** y
+                    return self.parse_binary_operation(child.clone());
+                }
+                Rule::unary => {
+                    // Handle unary expressions like -x, !x
+                    return self.parse_binary_operation(child.clone());
+                }
+                Rule::postfix_expr => {
+                    // Handle postfix expressions like x(), x[], x.member
+                    return self.parse_postfix_expr(child.clone());
+                }
+                _ => {
+                    // For other rules, try to parse as expression
+                    return self.parse_expression(child.clone());
+                }
+            }
+        }
+        
+        if children.len() == 2 {
+            // Binary operation: left + right (operator is implicit)
+            let left = self.parse_expression(children[0].clone())?;
+            let right = self.parse_expression(children[1].clone())?;
+            
+            // Determine operator based on the rule context
+            let operator = match rule {
+                Rule::additive => BinaryOperator::Add, // Default to + for additive
+                Rule::multiplicative => BinaryOperator::Multiply, // Default to * for multiplicative
+                _ => BinaryOperator::Add, // Default fallback
+            };
+            
+            let result = Expression::Binary {
+                left: Box::new(left),
+                operator,
+                right: Box::new(right),
+                span,
+            };
+            println!("🔍 Created binary operation: {:?}", result);
+            return Ok(result);
+        }
+        
+        if children.len() == 3 {
+            // Binary operation: left op right
+            let left = self.parse_expression(children[0].clone())?;
+            let op = children[1].as_str();
+            let right = self.parse_expression(children[2].clone())?;
+            
+            let operator = match op {
+                "+" => BinaryOperator::Add,
+                "-" => BinaryOperator::Subtract,
+                "*" => BinaryOperator::Multiply,
+                "/" => BinaryOperator::Divide,
+                "%" => BinaryOperator::Modulo,
+                "==" => BinaryOperator::Equal,
+                "!=" => BinaryOperator::NotEqual,
+                "<" => BinaryOperator::LessThan,
+                "<=" => BinaryOperator::LessThanEqual,
+                ">" => BinaryOperator::GreaterThan,
+                ">=" => BinaryOperator::GreaterThanEqual,
+                "and" => BinaryOperator::And,
+                "or" => BinaryOperator::Or,
+                _ => return Err(format!("Unknown binary operator: {}", op).into()),
+            };
+            
+            return Ok(Expression::Binary {
+                left: Box::new(left),
+                operator,
+                right: Box::new(right),
+                span,
+            });
+        }
+        
+        // Fallback for complex expressions
+        Ok(Expression::Literal(Literal::Int(0)))
+    }
+
     /// Parse expression with proper precedence - simplified non-recursive approach
     fn parse_expression(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
+        println!("🔍 parse_expression: rule = {:?}, content = '{}'", pair.as_rule(), pair.as_str());
         
         match pair.as_rule() {
             Rule::expression => {
                 // For the top-level expression rule, just parse its inner content
                 let inner = pair.into_inner().next().ok_or("Empty expression")?;
-                // Avoid recursion - handle basic cases only  
+                println!("🔍 expression inner rule: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+                // Delegate to the appropriate sub-parser based on the inner rule
                 match inner.as_rule() {
+                    Rule::assignment => {
+                        // Handle assignment expressions
+                        let mut inner_iter = inner.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                        let left = inner_iter.next().ok_or("Missing left operand")?;
+                        
+                        // Check if there's an assignment operator
+                        if let Some(assign_op) = inner_iter.next() {
+                            if assign_op.as_str() == "=" {
+                                // This is a real assignment - for now, return placeholder to avoid recursion
+                                Ok(Expression::Literal(Literal::Int(0)))
+                            } else {
+                                // This is not an assignment, treat the left side as the expression
+                                // Avoid recursion by delegating to the appropriate sub-parser
+                                println!("🔍 assignment left side rule: {:?}, content: '{}'", left.as_rule(), left.as_str());
+                                match left.as_rule() {
+                                    Rule::postfix_expr => self.parse_postfix_expr(left),
+                                    _ => Ok(Expression::Literal(Literal::Int(0)))
+                                }
+                            }
+                        } else {
+                            // No assignment operator, treat the left side as the expression
+                            // Avoid recursion by delegating to the appropriate sub-parser
+                            println!("🔍 assignment left side rule: {:?}, content: '{}'", left.as_rule(), left.as_str());
+                            match left.as_rule() {
+                                Rule::postfix_expr => self.parse_postfix_expr(left),
+                                _ => Ok(Expression::Literal(Literal::Int(0)))
+                            }
+                        }
+                    }
+                    Rule::or_expr => {
+                        // Handle or_expr by delegating to the appropriate sub-parser
+                        // Use a helper function to traverse the precedence chain
+                        self.parse_precedence_chain(inner)
+                    }
+                    Rule::postfix_expr => self.parse_postfix_expr(inner),
                     Rule::primary => {
                         // Handle primary expressions directly
                         let primary_inner = inner.into_inner().next().ok_or("Empty primary")?;
@@ -668,17 +832,27 @@ impl PestParser {
                             _ => Ok(Expression::Literal(Literal::Int(0)))
                         }
                     }
-                    Rule::postfix_expr => self.parse_postfix_expr(inner),
-                    _ => Ok(Expression::Literal(Literal::Int(0)))
+                    _ => {
+                        // For other complex expressions, try to parse as postfix_expr
+                        if inner.as_rule() == Rule::postfix_expr {
+                            self.parse_postfix_expr(inner)
+                        } else {
+                            Ok(Expression::Literal(Literal::Int(0)))
+                        }
+                    }
                 }
             }
-            Rule::assignment | Rule::or_expr | Rule::and_expr | Rule::bit_or_expr | 
-            Rule::bit_xor_expr | Rule::bit_and_expr | Rule::equality | Rule::relational |
-            Rule::shift_expr | Rule::additive | Rule::multiplicative | Rule::power |
-            Rule::unary => {
-                // For complex expressions, just return a placeholder to avoid recursion
-                Ok(Expression::Literal(Literal::Int(0)))
-            }
+                Rule::assignment | Rule::or_expr | Rule::and_expr | Rule::bit_or_expr |
+                Rule::bit_xor_expr | Rule::bit_and_expr | Rule::equality | Rule::relational |
+                Rule::shift_expr | Rule::additive | Rule::power |
+                Rule::unary => {
+                    // For complex expressions, just return a placeholder to avoid recursion
+                    Ok(Expression::Literal(Literal::Int(0)))
+                }
+                Rule::multiplicative => {
+                    // Handle multiplicative expressions properly
+                    self.parse_binary_operation(pair)
+                }
             Rule::postfix_expr => {
                 self.parse_postfix_expr(pair)
             }
