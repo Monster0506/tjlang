@@ -1071,8 +1071,10 @@ dependencies = [
  "anyhow",
  "clap",
  "codespan",
+ "codespan-reporting",
  "miette",
  "serde_json",
+ "tjlang-diagnostics",
  "tjlang-lexer",
  "tjlang-parser",
  "tjlang-runtime",
@@ -1142,6 +1144,8 @@ dependencies = [
  "sha2",
  "thiserror 2.0.16",
  "tjlang-ast",
+ "tjlang-diagnostics",
+ "tjlang-parser",
  "url",
 ]
 
