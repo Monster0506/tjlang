@@ -6,6 +6,7 @@
 use crate::values::Value;
 use crate::interpreter::Interpreter;
 use std::collections::HashMap;
+use tjlang_diagnostics::debug_println;
 
 /// Native function registry for standard library functions
 pub struct StdlibRegistry {
@@ -17,12 +18,12 @@ pub type NativeFunction = fn(&mut Interpreter, &[Value]) -> Result<Value, String
 
 impl StdlibRegistry {
     pub fn new() -> Self {
-        println!("🔧 Creating stdlib registry...");
+        debug_println!("🔧 Creating stdlib registry...");
         let mut registry = Self {
             functions: HashMap::new(),
         };
         registry.register_stdlib_functions();
-        println!("🔧 Stdlib registry created (functions enabled)");
+        debug_println!("🔧 Stdlib registry created (functions enabled)");
         registry
     }
     
@@ -504,4 +505,5 @@ impl Default for StdlibRegistry {
         Self::new()
     }
 }
+
 

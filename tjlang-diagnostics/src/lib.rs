@@ -7,6 +7,7 @@ pub mod source_span;
 pub mod diagnostic;
 pub mod collection;
 pub mod helpers;
+pub mod utils;
 
 #[cfg(test)]
 mod tests;

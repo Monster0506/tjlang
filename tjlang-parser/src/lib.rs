@@ -17,7 +17,7 @@ pub use parser::PestParser;
 pub fn parse(source: &str, file_id: codespan::FileId) -> Result<(tjlang_ast::Program, tjlang_diagnostics::DiagnosticCollection), tjlang_diagnostics::DiagnosticCollection> {
     let mut parser = PestParser::new();
     
-    match parser.parse(source) {
+    match parser.parse(source, file_id) {
         Ok(program) => {
             // Only return error if there are actual errors, not warnings
             let has_errors = parser.diagnostics.iter().any(|d| d.severity == codespan_reporting::diagnostic::Severity::Error);
