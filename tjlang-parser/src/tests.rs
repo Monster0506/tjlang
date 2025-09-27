@@ -15,7 +15,8 @@ mod tests {
     fn test_parse_empty_program() {
         let source = "";
         let mut parser = PestParser::new();
-        let result = parser.parse(source);
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
         
         assert!(result.is_ok());
         let program = result.unwrap();
@@ -26,17 +27,82 @@ mod tests {
     fn test_parse_simple_statement() {
         let source = "x";
         let mut parser = PestParser::new();
-        let result = parser.parse(source);
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
         
         match &result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
                 
-                // The current parser creates a dummy variable declaration
-                if let ProgramUnit::Declaration(Declaration::Variable(var)) = &program.units[0] {
-                    assert_eq!(var.name, "main");
+                // The parser creates an expression for simple identifiers
+                if let ProgramUnit::Expression(Expression::Variable(name)) = &program.units[0] {
+                    assert_eq!(name, "x");
                 } else {
-                    panic!("Expected variable declaration");
+                    panic!("Expected variable expression, got: {:?}", program.units[0]);
+                }
+            }
+            Err(e) => {
+                println!("Parse error: {}", e);
+                panic!("Expected successful parse, got error: {}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_assignment_expression() {
+        let source = "i = 0";
+        let mut parser = PestParser::new();
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
+        
+        match &result {
+            Ok(program) => {
+                assert_eq!(program.units.len(), 1);
+                
+                // The parser should create a binary expression with Assign operator
+                if let ProgramUnit::Expression(Expression::Binary { left, operator, right, .. }) = &program.units[0] {
+                    if let Expression::Variable(name) = left.as_ref() {
+                        assert_eq!(name, "i");
+                    } else {
+                        panic!("Expected variable on left side of assignment, got: {:?}", left);
+                    }
+                    if let BinaryOperator::Assign = operator {
+                        // Correct operator
+                    } else {
+                        panic!("Expected Assign operator, got: {:?}", operator);
+                    }
+                    if let Expression::Literal(Literal::Int(0)) = right.as_ref() {
+                        // Correct
+                    } else {
+                        panic!("Expected integer literal on right side of assignment, got: {:?}", right);
+                    }
+                } else {
+                    panic!("Expected binary expression, got: {:?}", program.units[0]);
+                }
+            }
+            Err(e) => {
+                println!("Parse error: {}", e);
+                panic!("Expected successful parse, got error: {}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_simple_identifier() {
+        let source = "i";
+        let mut parser = PestParser::new();
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
+        
+        match &result {
+            Ok(program) => {
+                assert_eq!(program.units.len(), 1);
+                
+                // The parser should create a variable expression
+                if let ProgramUnit::Expression(Expression::Variable(name)) = &program.units[0] {
+                    assert_eq!(name, "i");
+                } else {
+                    panic!("Expected variable expression, got: {:?}", program.units[0]);
                 }
             }
             Err(e) => {
@@ -50,7 +116,8 @@ mod tests {
     fn test_parse_multiple_statements() {
         let source = "x y z";
         let mut parser = PestParser::new();
-        let result = parser.parse(source);
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
         
         assert!(result.is_ok());
         let program = result.unwrap();
@@ -62,7 +129,8 @@ mod tests {
     fn test_parse_invalid_syntax() {
         let source = "+++";  // This should fail because we don't have unary operators defined
         let mut parser = PestParser::new();
-        let result = parser.parse(source);
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
         
         match &result {
             Ok(program) => {
@@ -80,7 +148,8 @@ mod tests {
     fn test_parse_semicolons_invalid() {
         let source = "x;";
         let mut parser = PestParser::new();
-        let result = parser.parse(source);
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
         
         // This should fail because semicolons are not allowed
         assert!(result.is_err());
@@ -90,7 +159,8 @@ mod tests {
     fn test_parse_variable_declaration() {
         let source = "x: int = 42";
         let mut parser = PestParser::new();
-        let result = parser.parse(source);
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
         
         match result {
             Ok(program) => {
@@ -120,7 +190,8 @@ mod tests {
     fn test_parse_binary_expressions() {
         let source = "1 + 2";
         let mut parser = PestParser::new();
-        let result = parser.parse(source);
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
         
         match result {
             Ok(program) => {
@@ -147,7 +218,8 @@ mod tests {
         for (source, description) in test_cases {
             // println!("Testing {}: {}", description, source);
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
             
             match result {
                 Ok(program) => {
@@ -174,7 +246,8 @@ mod tests {
         
         for source in test_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
             
             match result {
                 Ok(program) => {
@@ -198,7 +271,8 @@ mod tests {
         
         for source in test_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
             
             assert!(result.is_ok(), "Failed to parse logical expression: {}", source);
             let program = result.unwrap();
@@ -212,7 +286,8 @@ mod tests {
         // If this test runs, it means the grammar is syntactically correct
         let source = "x";
         let mut parser = PestParser::new();
-        let result = parser.parse(source);
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
         
         // Should not panic during compilation
         assert!(result.is_ok() || result.is_err()); // Either is fine, just no panic
@@ -321,7 +396,8 @@ mod tests {
             }
             
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
             
             match &result {
                 Ok(program) => {
@@ -359,7 +435,8 @@ mod tests {
         
         // Now test the full program
         let mut parser = PestParser::new();
-        let result = parser.parse(source);
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
         
         match result {
             Ok(program) => {
@@ -397,7 +474,8 @@ mod tests {
         
         println!("\n--- Testing full program ---");
         let mut parser = PestParser::new();
-        let result = parser.parse(source);
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
 
         match &result {
             Ok(program) => {
@@ -421,7 +499,8 @@ mod tests {
 
         for source in test_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(program) => {
@@ -741,7 +820,8 @@ mod tests {
 
         for source in test_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(_program) => {
@@ -768,7 +848,8 @@ mod tests {
 
         for source in impl_test_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(_program) => {
@@ -804,7 +885,8 @@ mod tests {
         for (trait_name, type_name) in trait_type_combinations {
             let source = format!("impl {}:{} {{ method() -> int {{ 42 }} }}", trait_name, type_name);
             let mut parser = PestParser::new();
-            let result = parser.parse(&source);
+            let file_id = create_test_file_id();
+            let result = parser.parse(&source, file_id);
 
             assert!(result.is_ok(), "Failed to parse impl block with trait '{}' and type '{}': {}", 
                 trait_name, type_name, result.unwrap_err());
@@ -826,7 +908,8 @@ mod tests {
 
         for source in method_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
 
             assert!(result.is_ok(), "Failed to parse impl block with method: {}", source);
         }
@@ -851,7 +934,8 @@ mod tests {
 
         for source in complex_method_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
 
             assert!(result.is_ok(), "Failed to parse impl block with complex methods: {}", source);
         }
@@ -876,7 +960,8 @@ mod tests {
 
         for source in edge_case_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
 
             assert!(result.is_ok(), "Failed to parse impl block edge case: {}", source);
         }
@@ -905,7 +990,8 @@ mod tests {
 
         for source in invalid_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
 
             assert!(result.is_err(), "Expected parsing to fail for invalid syntax: {}", source);
         }
@@ -943,7 +1029,8 @@ mod tests {
     fn test_parse_simple_type() {
         let source = "int";
         let mut parser = PestParser::new();
-        let result = parser.parse(source);
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
 
         match &result {
             Ok(_program) => {
@@ -970,7 +1057,8 @@ mod tests {
 
         for source in lambda_test_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(_program) => {
@@ -1023,7 +1111,8 @@ mod tests {
 
         for source in context_test_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(_program) => {
@@ -1083,7 +1172,8 @@ mod tests {
             // Wrap the type in a variable declaration to make it a valid program
             let program_source = format!("x: {} = 42", source);
             let mut parser = PestParser::new();
-            let result = parser.parse(&program_source);
+            let file_id = create_test_file_id();
+            let result = parser.parse(&program_source, file_id);
 
             match &result {
                 Ok(_program) => {
@@ -1135,7 +1225,8 @@ mod tests {
 
         for source in test_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(_program) => {
@@ -1178,7 +1269,8 @@ mod tests {
 
         for source in test_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(program) => {
@@ -1545,7 +1637,8 @@ mod tests {
         
         for source in test_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
             
             match result {
                 Ok(program) => {
@@ -1580,7 +1673,8 @@ mod tests {
         
         for source in test_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
             
             match result {
                 Ok(program) => {
@@ -1631,7 +1725,8 @@ mod tests {
 
         for source in ok_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
             assert!(result.is_ok(), "Failed to parse spawn expression: {}", source);
         }
 
@@ -1645,7 +1740,8 @@ mod tests {
 
         for source in err_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
             assert!(result.is_err(), "Expected failure for invalid spawn usage: {}", source);
         }
     }
@@ -1688,7 +1784,8 @@ mod tests {
         let mut parser = PestParser::new();
         
         // Test basic f-string literal in variable declaration
-        let result = parser.parse("x: str = f\"Hello world\"");
+        let file_id = create_test_file_id();
+        let result = parser.parse("x: str = f\"Hello world\"", file_id);
         match result {
             Ok(program) => {
                 if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
@@ -1710,7 +1807,8 @@ mod tests {
         }
         
         // Test f-string with interpolation syntax
-        let result = parser.parse("y: str = f\"Hello {name}\"");
+        let file_id = create_test_file_id();
+        let result = parser.parse("y: str = f\"Hello {name}\"", file_id);
         match result {
             Ok(program) => {
                 if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
@@ -1741,7 +1839,8 @@ mod tests {
         }
         
         // Test f-string with complex interpolation
-        let result = parser.parse("z: str = f\"Value: {x + y}\"");
+        let file_id = create_test_file_id();
+        let result = parser.parse("z: str = f\"Value: {x + y}\"", file_id);
         match result {
             Ok(program) => {
                 if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
@@ -1772,7 +1871,8 @@ mod tests {
         }
         
         // Test f-string with multiple interpolations
-        let result = parser.parse("msg: str = f\"Hello {name}, you are {age} years old\"");
+        let file_id = create_test_file_id();
+        let result = parser.parse("msg: str = f\"Hello {name}, you are {age} years old\"", file_id);
         match result {
             Ok(program) => {
                 if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
@@ -1827,7 +1927,8 @@ mod tests {
         }
         
         // Test f-string with only expressions
-        let result = parser.parse("result: str = f\"{x}{y}\"");
+        let file_id = create_test_file_id();
+        let result = parser.parse("result: str = f\"{x}{y}\"", file_id);
         match result {
             Ok(program) => {
                 if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
@@ -2047,7 +2148,8 @@ mod tests {
         
         for source in test_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
             
             match result {
                 Ok(program) => {
@@ -2175,7 +2277,8 @@ mod tests {
         
         for source in test_cases {
             let mut parser = PestParser::new();
-            let result = parser.parse(source);
+            let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
             
             match result {
                 Ok(program) => {
@@ -2231,7 +2334,8 @@ mod tests {
 
         for (src, expect_units) in cases {
             let mut p = PestParser::new();
-            let program = p.parse(src).expect("parse failed");
+            let file_id = create_test_file_id();
+            let program = p.parse(src, file_id).expect("parse failed");
             assert_eq!(program.units.len(), expect_units, "Unexpected unit count for {}", src);
         }
     }
@@ -2277,7 +2381,8 @@ mod tests {
     fn parse_ok_program_helper(src: &str) {
         use crate::parser::PestParser;
         let mut p = PestParser::new();
-        let result = p.parse(src);
+        let file_id = create_test_file_id();
+        let result = p.parse(src, file_id);
         assert!(result.is_ok(), "Failed to parse program with match: {}", src);
     }
 
@@ -2367,7 +2472,8 @@ mod tests {
         use crate::parser::PestParser;
         use tjlang_ast::{ProgramUnit, Declaration, ExportDecl};
         let mut p = PestParser::new();
-        let result = p.parse("impl Drawable: Point { draw() -> int { return 1 } clear() -> int { return 0 } }");
+        let file_id = create_test_file_id();
+        let result = p.parse("impl Drawable: Point { draw() -> int { return 1 } clear() -> int { return 0 } }", file_id);
         match result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
@@ -2449,7 +2555,8 @@ mod tests {
         use crate::parser::PestParser;
         use tjlang_ast::{ProgramUnit, Declaration, ExportDecl};
         let mut p = PestParser::new();
-        let result = p.parse("export def my_func() -> int { return 42 }");
+        let file_id = create_test_file_id();
+        let result = p.parse("export def my_func() -> int { return 42 }", file_id);
         match result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
@@ -2474,7 +2581,8 @@ mod tests {
         use crate::parser::PestParser;
         use tjlang_ast::{ProgramUnit, Declaration, ExportDecl};
         let mut p = PestParser::new();
-        let result = p.parse("export interface Drawable { draw() -> int }");
+        let file_id = create_test_file_id();
+        let result = p.parse("export interface Drawable { draw() -> int }", file_id);
         match result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
@@ -2499,7 +2607,8 @@ mod tests {
         use crate::parser::PestParser;
         use tjlang_ast::{ProgramUnit, Declaration, ExportDecl};
         let mut p = PestParser::new();
-        let result = p.parse("export type MyType = int");
+        let file_id = create_test_file_id();
+        let result = p.parse("export type MyType = int", file_id);
         match result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
@@ -2636,7 +2745,8 @@ mod tests {
         use crate::parser::PestParser;
         use tjlang_ast::{ProgramUnit, ExportDecl};
         let mut p = PestParser::new();
-        let result = p.parse("export draw");
+        let file_id = create_test_file_id();
+        let result = p.parse("export draw", file_id);
         match result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
@@ -2661,7 +2771,8 @@ mod tests {
         use crate::parser::PestParser;
         use tjlang_ast::{ProgramUnit, ExportDecl};
         let mut p = PestParser::new();
-        let result = p.parse("export { draw, fill }");
+        let file_id = create_test_file_id();
+        let result = p.parse("export { draw, fill }", file_id);
         match result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
@@ -2690,13 +2801,13 @@ mod tests {
         
         let cases = vec![
             // Basic C-style for loop
-            "for (i = 0; i < 10; i = i + 1) { pass }",
+            "for (i: int = 0; i < 10; i = i + 1) { pass }",
             // For loop with no initializer
             "for (; i < 10; i = i + 1) { pass }",
             // For loop with no condition
-            "for (i = 0; ; i = i + 1) { pass }",
+            "for (i: int  = 0; ; i = i + 1) { pass }",
             // For loop with no increment
-            "for (i = 0; i < 10; ) { pass }",
+            "for (i:int = 0; i < 10; ) { pass }",
             // For loop with only semicolons
             "for (;;) { pass }",
         ];
@@ -2713,7 +2824,8 @@ mod tests {
         use tjlang_ast::{ProgramUnit, Declaration, Statement, ForStatement};
         
         let mut p = PestParser::new();
-        let result = p.parse("def test() -> int { for (i = 0; i < 10; i = i + 1) { pass } return 0 }");
+        let file_id = create_test_file_id();
+        let result = p.parse("def test() -> int { for (i = 0; i < 10; i = i + 1) { pass } return 0 }", file_id);
         
         match result {
             Ok(program) => {
@@ -2743,7 +2855,8 @@ mod tests {
         use tjlang_ast::{ProgramUnit, Declaration, Statement, ForStatement};
         
         let mut p = PestParser::new();
-        let result = p.parse("def test() -> int { for (;;) { pass } return 0 }");
+        let file_id = create_test_file_id();
+        let result = p.parse("def test() -> int { for (;;) { pass } return 0 }", file_id);
         
         match result {
             Ok(program) => {

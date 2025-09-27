@@ -797,6 +797,7 @@ impl PestParser {
 
     /// Parse precedence chain to get to postfix_expr
     fn parse_precedence_chain(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        debug_println!("🔍 parse_precedence_chain: input rule: {:?}, content: '{}'", pair.as_rule(), pair.as_str());
         let mut current = pair;
         loop {
             let inner = current.into_inner().next().ok_or("Empty precedence chain")?;
@@ -930,25 +931,47 @@ impl PestParser {
     /// Parse expression with proper precedence - simplified non-recursive approach
     fn parse_expression(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        debug_println!("🔍 parse_expression: rule = {:?}, content = '{}'", pair.as_rule(), pair.as_str());
+        debug_println!("🔍 [ENTRY] parse_expression: rule = {:?}, content = '{}'", pair.as_rule(), pair.as_str());
         
         match pair.as_rule() {
             Rule::expression => {
                 // For the top-level expression rule, just parse its inner content
                 let inner = pair.into_inner().next().ok_or("Empty expression")?;
-                debug_println!("🔍 expression inner rule: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+                debug_println!("🔍 [INNER] expression inner rule: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
                 // Delegate to the appropriate sub-parser based on the inner rule
                 match inner.as_rule() {
                     Rule::assignment => {
                         // Handle assignment expressions
-                        let mut inner_iter = inner.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                        let left = inner_iter.next().ok_or("Missing left operand")?;
+                        debug_println!("🔍 assignment tokens:");
+                        for (i, token) in inner.clone().into_inner().enumerate() {
+                            debug_println!("  Token {}: '{}' (rule: {:?})", i, token.as_str(), token.as_rule());
+                        }
+                        
+                        let mut assignment_iter = inner.clone().into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                        let left = assignment_iter.next().ok_or("Missing left operand")?;
+                        debug_println!("🔍 assignment left: '{}'", left.as_str());
                         
                         // Check if there's an assignment operator
-                        if let Some(assign_op) = inner_iter.next() {
+                        if let Some(assign_op) = assignment_iter.next() {
+                            debug_println!("🔍 assignment operator: '{}' (rule: {:?})", assign_op.as_str(), assign_op.as_rule());
                             if assign_op.as_str() == "=" {
-                                // This is a real assignment - for now, return placeholder to avoid recursion
-                                Ok(Expression::Literal(Literal::Int(0)))
+                                // This is a real assignment - parse left and right sides
+                                let right = assignment_iter.next().ok_or("Missing right operand")?;
+                                
+                                debug_println!("🔍 [LEFT] About to parse left side: '{}' (rule: {:?})", left.as_str(), left.as_rule());
+                                let left_expr = self.parse_expression(left)?;
+                                debug_println!("🔍 [RIGHT] About to parse right side: '{}' (rule: {:?})", right.as_str(), right.as_rule());
+                                let right_expr = self.parse_expression(right)?;
+                                
+                                debug_println!("🔍 assignment left_expr: {:?}", left_expr);
+                                debug_println!("🔍 assignment right_expr: {:?}", right_expr);
+                                
+                                Ok(Expression::Binary {
+                                    left: Box::new(left_expr),
+                                    operator: BinaryOperator::Assign,
+                                    right: Box::new(right_expr),
+                                    span: self.create_span(inner.as_span()),
+                                })
                             } else {
                                 // This is not an assignment, treat the left side as the expression
                                 // Avoid recursion by delegating to the appropriate sub-parser
@@ -971,6 +994,7 @@ impl PestParser {
                     Rule::or_expr => {
                         // Handle or_expr by delegating to the appropriate sub-parser
                         // Use a helper function to traverse the precedence chain
+                        debug_println!("🔍 [OR_EXPR] or_expr case: calling parse_precedence_chain for '{}'", inner.as_str());
                         self.parse_precedence_chain(inner)
                     }
                     Rule::postfix_expr => self.parse_postfix_expr(inner),
@@ -998,7 +1022,7 @@ impl PestParser {
                     }
                 }
             }
-                Rule::assignment | Rule::or_expr | Rule::and_expr | Rule::bit_or_expr |
+                Rule::assignment | Rule::and_expr | Rule::bit_or_expr |
                 Rule::bit_xor_expr | Rule::bit_and_expr | Rule::equality | Rule::relational |
                 Rule::shift_expr | Rule::additive | Rule::power |
                 Rule::unary => {
@@ -1032,6 +1056,11 @@ impl PestParser {
                         Ok(Expression::Literal(Literal::Int(0)))
                     }
                 }
+            }
+            Rule::or_expr => {
+                // Handle or_expr directly
+                debug_println!("🔍 [DIRECT_OR_EXPR] Direct or_expr case: calling parse_precedence_chain for '{}'", pair.as_str());
+                self.parse_precedence_chain(pair)
             }
             _ => {
                 // Default case - return simple placeholder

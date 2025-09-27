@@ -7,9 +7,6 @@ pub mod parser;
 #[cfg(test)]
 mod tests;
 
-#[cfg(test)]
-mod ast_conversion_tests;
-
 /// Main pest parser
 pub use parser::PestParser;
 
