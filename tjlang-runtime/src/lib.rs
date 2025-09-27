@@ -6,6 +6,10 @@ pub mod values;
 pub mod interpreter;
 pub mod stdlib;
 pub mod stdlib_integration;
+pub mod primitive_methods;
+
+#[cfg(test)]
+mod tests;
 
 // Re-export main types
 pub use values::Value;

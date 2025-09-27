@@ -225,6 +225,37 @@ impl Interpreter {
             Expression::Call { callee, args, .. } => {
                 debug_println!("          📞 Function call with {} args", args.len());
                 debug_println!("          🔍 Callee expression: {:?}", callee);
+                
+                // Special handling for method calls on primitives
+                if let Expression::Member { target, member, .. } = callee.as_ref() {
+                    debug_println!("          🎯 Method call: {}.{}()", "target", member);
+                    let target_val = self.interpret_expression(target)?;
+                    debug_println!("          🎯 Target value: {:?}", std::mem::discriminant(&target_val));
+                    
+                    // For primitive methods that don't take arguments, execute directly
+                    if args.is_empty() {
+                        match member.as_str() {
+                            "to_string" => return Ok(Value::String(target_val.to_string())),
+                            "clone" => return Ok(target_val.clone()),
+                            "type_name" => return Ok(Value::String(crate::primitive_methods::get_type_name(&target_val))),
+                            "is_null" => return Ok(Value::Bool(matches!(target_val, Value::None))),
+                            "is_not_null" => return Ok(Value::Bool(!matches!(target_val, Value::None))),
+                            "hash" => return Ok(Value::Int(crate::primitive_methods::get_hash_code(&target_val))),
+                            "is_int" => return Ok(Value::Bool(matches!(target_val, Value::Int(_)))),
+                            "is_float" => return Ok(Value::Bool(matches!(target_val, Value::Float(_)))),
+                            "is_bool" => return Ok(Value::Bool(matches!(target_val, Value::Bool(_)))),
+                            "is_str" => return Ok(Value::Bool(matches!(target_val, Value::String(_)))),
+                            "is_none" => return Ok(Value::Bool(matches!(target_val, Value::None))),
+                            "debug_string" => return Ok(Value::String(format!("{:?}", target_val))),
+                            "pretty_string" => return Ok(Value::String(crate::primitive_methods::get_pretty_string(&target_val))),
+                            _ => {
+                                // Try type-specific methods
+                                return crate::primitive_methods::get_primitive_method(&target_val, member);
+                            }
+                        }
+                    }
+                }
+                
                 let callee_val = self.interpret_expression(callee)?;
                 debug_println!("          🎯 Callee resolved to: {:?}", callee_val);
                 let mut arg_values = Vec::new();
@@ -355,15 +386,16 @@ impl Interpreter {
                 debug_println!("            📞 Calling function: {}", name);
                 debug_println!("            📋 Available stdlib functions: {:?}", self.stdlib.get_function_names());
                 
-                // Check if it's a primitive method call
-                debug_println!("              🔍 Checking method call: name='{}', args.len()={}", name, args.len());
-                if name.starts_with("primitive_method::") {
-                    debug_println!("              🔧 Handling primitive method call: {}", name);
-                    // This is a primitive method call, execute the body directly
-                    let result = self.interpret_expression(body);
-                    debug_println!("              ✅ Primitive method call result: {:?}", result);
-                    return result;
-                }
+                        // Check if it's a primitive method call
+                        debug_println!("              🔍 Checking method call: name='{}', args.len()={}", name, args.len());
+                        if name.starts_with("primitive_method::") {
+                            debug_println!("              🔧 Handling primitive method call: {}", name);
+                            // This is a primitive method call, execute using the primitive methods module
+                            let method_name = name.strip_prefix("primitive_method::").unwrap_or(name);
+                            let result = crate::primitive_methods::execute_primitive_method(&Value::None, method_name, args);
+                            debug_println!("              ✅ Primitive method call result: {:?}", result);
+                            return result;
+                        }
                 
                 // First check if it's a stdlib function
                 if let Some(native_func) = self.stdlib.get_function(name) {
@@ -447,23 +479,24 @@ impl Interpreter {
     /// Get a method for a primitive value
     fn get_primitive_method(&self, target: &Value, method: &str) -> Result<Value, String> {
         debug_println!("🔧 get_primitive_method called: target={:?}, method={}", std::mem::discriminant(target), method);
+        
+        // For methods that don't require arguments, execute them directly
         match method {
-            "to_string" => {
-                // Create a special method function that carries the target value
-                let function_name = format!("primitive_method::{}", method);
-                debug_println!("🔧 Creating primitive method function: {}", function_name);
-                Ok(Value::Function {
-                    name: function_name,
-                    params: vec![],
-                    body: Expression::Literal(tjlang_ast::Literal::String(target.to_string())),
-                    closure: HashMap::new(),
-                })
-            },
-            "clone" => {
-                // Return a clone of the value
-                Ok(target.clone())
-            },
-            _ => Err(format!("No method '{}' found on {} value", method, self.get_value_type_name(target))),
+            "to_string" => Ok(Value::String(target.to_string())),
+            "clone" => Ok(target.clone()),
+            "type_name" => Ok(Value::String(crate::primitive_methods::get_type_name(target))),
+            "is_null" => Ok(Value::Bool(matches!(target, Value::None))),
+            "is_not_null" => Ok(Value::Bool(!matches!(target, Value::None))),
+            "hash" => Ok(Value::Int(crate::primitive_methods::get_hash_code(target))),
+            "is_int" => Ok(Value::Bool(matches!(target, Value::Int(_)))),
+            "is_float" => Ok(Value::Bool(matches!(target, Value::Float(_)))),
+            "is_bool" => Ok(Value::Bool(matches!(target, Value::Bool(_)))),
+            "is_str" => Ok(Value::Bool(matches!(target, Value::String(_)))),
+            "is_none" => Ok(Value::Bool(matches!(target, Value::None))),
+            "debug_string" => Ok(Value::String(format!("{:?}", target))),
+            "pretty_string" => Ok(Value::String(crate::primitive_methods::get_pretty_string(target))),
+            // Type-specific methods
+            _ => crate::primitive_methods::get_primitive_method(target, method),
         }
     }
     

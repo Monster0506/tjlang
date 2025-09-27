@@ -1,0 +1,261 @@
+//! Primitive method implementations for TJLang
+//! 
+//! This module provides methods that work on all primitive types (int, float, bool, str, None)
+
+use crate::values::Value;
+use std::collections::HashMap;
+use tjlang_diagnostics::debug_println;
+
+/// Get a method for a primitive value
+pub fn get_primitive_method(target: &Value, method: &str) -> Result<Value, String> {
+    debug_println!("🔧 get_primitive_method called: target={:?}, method={}", std::mem::discriminant(target), method);
+    
+    match method {
+        // Core methods that work on all primitives
+        "to_string" => Ok(Value::String(target.to_string())),
+        "clone" => Ok(target.clone()),
+        "equals" => {
+            // For methods that need arguments, we need to return a function
+            // But for now, let's handle simple methods directly
+            Err("equals method requires arguments - use execute_primitive_method instead".to_string())
+        },
+        "type_name" => Ok(Value::String(get_type_name(target))),
+        "is_null" => Ok(Value::Bool(matches!(target, Value::None))),
+        "is_not_null" => Ok(Value::Bool(!matches!(target, Value::None))),
+        "hash" => Ok(Value::Int(get_hash_code(target))),
+        
+        // Type checking methods
+        "is_int" => Ok(Value::Bool(matches!(target, Value::Int(_)))),
+        "is_float" => Ok(Value::Bool(matches!(target, Value::Float(_)))),
+        "is_bool" => Ok(Value::Bool(matches!(target, Value::Bool(_)))),
+        "is_str" => Ok(Value::Bool(matches!(target, Value::String(_)))),
+        "is_none" => Ok(Value::Bool(matches!(target, Value::None))),
+        
+        // Conversion methods
+        "to_int" => convert_to_int(target),
+        "to_float" => convert_to_float(target),
+        "to_bool" => convert_to_bool(target),
+        "to_str" => Ok(Value::String(target.to_string())),
+        
+        // Utility methods
+        "debug_string" => Ok(Value::String(format!("{:?}", target))),
+        "pretty_string" => Ok(Value::String(get_pretty_string(target))),
+        
+        // Type-specific methods
+        _ => get_type_specific_method(target, method),
+    }
+}
+
+/// Execute a primitive method call
+pub fn execute_primitive_method(target: &Value, method: &str, args: &[Value]) -> Result<Value, String> {
+    debug_println!("🔧 execute_primitive_method: method={}, args.len()={}", method, args.len());
+    
+    match method {
+        "equals" => {
+            if args.len() != 1 {
+                return Err("equals method requires exactly one argument".to_string());
+            }
+            Ok(Value::Bool(primitive_equals(target, &args[0])))
+        },
+        "to_int" => convert_to_int(target),
+        "to_float" => convert_to_float(target),
+        "to_bool" => convert_to_bool(target),
+        "to_str" => Ok(Value::String(target.to_string())),
+        "debug_string" => Ok(Value::String(format!("{:?}", target))),
+        "pretty_string" => Ok(Value::String(get_pretty_string(target))),
+        _ => get_type_specific_method(target, method),
+    }
+}
+
+/// Get type-specific methods
+fn get_type_specific_method(target: &Value, method: &str) -> Result<Value, String> {
+    match target {
+        Value::Int(_) => get_integer_method(target, method),
+        Value::Float(_) => get_float_method(target, method),
+        Value::Bool(_) => get_boolean_method(target, method),
+        Value::String(_) => get_string_method(target, method),
+        Value::None => get_none_method(target, method),
+        _ => Err(format!("No method '{}' found on {} value", method, get_type_name(target))),
+    }
+}
+
+/// Integer-specific methods
+fn get_integer_method(target: &Value, method: &str) -> Result<Value, String> {
+    if let Value::Int(value) = target {
+        match method {
+            "abs" => Ok(Value::Int(value.abs())),
+            "neg" => Ok(Value::Int(-value)),
+            "inc" => Ok(Value::Int(value + 1)),
+            "dec" => Ok(Value::Int(value - 1)),
+            "is_even" => Ok(Value::Bool(value % 2 == 0)),
+            "is_odd" => Ok(Value::Bool(value % 2 != 0)),
+            "is_positive" => Ok(Value::Bool(*value > 0)),
+            "is_negative" => Ok(Value::Bool(*value < 0)),
+            "is_zero" => Ok(Value::Bool(*value == 0)),
+            _ => Err(format!("No method '{}' found on integer", method)),
+        }
+    } else {
+        Err("Expected integer value".to_string())
+    }
+}
+
+/// Float-specific methods
+fn get_float_method(target: &Value, method: &str) -> Result<Value, String> {
+    if let Value::Float(value) = target {
+        match method {
+            "abs" => Ok(Value::Float(value.abs())),
+            "neg" => Ok(Value::Float(-value)),
+            "ceil" => Ok(Value::Float(value.ceil())),
+            "floor" => Ok(Value::Float(value.floor())),
+            "round" => Ok(Value::Float(value.round())),
+            "trunc" => Ok(Value::Float(value.trunc())),
+            "is_finite" => Ok(Value::Bool(value.is_finite())),
+            "is_infinite" => Ok(Value::Bool(value.is_infinite())),
+            "is_nan" => Ok(Value::Bool(value.is_nan())),
+            "is_positive" => Ok(Value::Bool(*value > 0.0)),
+            "is_negative" => Ok(Value::Bool(*value < 0.0)),
+            "is_zero" => Ok(Value::Bool(*value == 0.0)),
+            _ => Err(format!("No method '{}' found on float", method)),
+        }
+    } else {
+        Err("Expected float value".to_string())
+    }
+}
+
+/// Boolean-specific methods
+fn get_boolean_method(target: &Value, method: &str) -> Result<Value, String> {
+    if let Value::Bool(value) = target {
+        match method {
+            "not" => Ok(Value::Bool(!value)),
+            _ => Err(format!("No method '{}' found on boolean", method)),
+        }
+    } else {
+        Err("Expected boolean value".to_string())
+    }
+}
+
+/// String-specific methods
+fn get_string_method(target: &Value, method: &str) -> Result<Value, String> {
+    if let Value::String(value) = target {
+        match method {
+            "length" => Ok(Value::Int(value.len() as i64)),
+            "is_empty" => Ok(Value::Bool(value.is_empty())),
+            "is_not_empty" => Ok(Value::Bool(!value.is_empty())),
+            "trim" => Ok(Value::String(value.trim().to_string())),
+            "upper" => Ok(Value::String(value.to_uppercase())),
+            "lower" => Ok(Value::String(value.to_lowercase())),
+            "capitalize" => {
+                let mut chars = value.chars();
+                match chars.next() {
+                    None => Ok(Value::String(String::new())),
+                    Some(first) => Ok(Value::String(first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase())),
+                }
+            },
+            "reverse" => Ok(Value::String(value.chars().rev().collect())),
+            _ => Err(format!("No method '{}' found on string", method)),
+        }
+    } else {
+        Err("Expected string value".to_string())
+    }
+}
+
+/// None-specific methods
+fn get_none_method(_target: &Value, method: &str) -> Result<Value, String> {
+    match method {
+        "is_none" => Ok(Value::Bool(true)),
+        "is_not_none" => Ok(Value::Bool(false)),
+        _ => Err(format!("No method '{}' found on None", method)),
+    }
+}
+
+/// Helper functions
+pub fn get_type_name(value: &Value) -> String {
+    match value {
+        Value::Int(_) => "int".to_string(),
+        Value::Float(_) => "float".to_string(),
+        Value::Bool(_) => "bool".to_string(),
+        Value::String(_) => "str".to_string(),
+        Value::None => "None".to_string(),
+        _ => "unknown".to_string(),
+    }
+}
+
+pub fn get_hash_code(value: &Value) -> i64 {
+    match value {
+        Value::Int(i) => *i,
+        Value::Float(f) => f.to_bits() as i64,
+        Value::Bool(b) => if *b { 1 } else { 0 },
+        Value::String(s) => s.len() as i64,
+        Value::None => 0,
+        _ => 0,
+    }
+}
+
+pub fn get_pretty_string(value: &Value) -> String {
+    match value {
+        Value::Int(i) => i.to_string(),
+        Value::Float(f) => {
+            if f.fract() == 0.0 {
+                format!("{:.0}", f)
+            } else {
+                f.to_string()
+            }
+        },
+        Value::Bool(b) => b.to_string(),
+        Value::String(s) => format!("\"{}\"", s),
+        Value::None => "None".to_string(),
+        _ => format!("{:?}", value),
+    }
+}
+
+fn primitive_equals(left: &Value, right: &Value) -> bool {
+    match (left, right) {
+        (Value::Int(a), Value::Int(b)) => a == b,
+        (Value::Float(a), Value::Float(b)) => (a - b).abs() < f64::EPSILON,
+        (Value::Bool(a), Value::Bool(b)) => a == b,
+        (Value::String(a), Value::String(b)) => a == b,
+        (Value::None, Value::None) => true,
+        _ => false,
+    }
+}
+
+fn convert_to_int(value: &Value) -> Result<Value, String> {
+    match value {
+        Value::Int(i) => Ok(Value::Int(*i)),
+        Value::Float(f) => Ok(Value::Int(*f as i64)),
+        Value::Bool(b) => Ok(Value::Int(if *b { 1 } else { 0 })),
+        Value::String(s) => {
+            s.parse::<i64>()
+                .map(Value::Int)
+                .map_err(|_| format!("Cannot convert string '{}' to integer", s))
+        },
+        Value::None => Ok(Value::Int(0)),
+        _ => Err(format!("Cannot convert {} to integer", get_type_name(value))),
+    }
+}
+
+fn convert_to_float(value: &Value) -> Result<Value, String> {
+    match value {
+        Value::Int(i) => Ok(Value::Float(*i as f64)),
+        Value::Float(f) => Ok(Value::Float(*f)),
+        Value::Bool(b) => Ok(Value::Float(if *b { 1.0 } else { 0.0 })),
+        Value::String(s) => {
+            s.parse::<f64>()
+                .map(Value::Float)
+                .map_err(|_| format!("Cannot convert string '{}' to float", s))
+        },
+        Value::None => Ok(Value::Float(0.0)),
+        _ => Err(format!("Cannot convert {} to float", get_type_name(value))),
+    }
+}
+
+fn convert_to_bool(value: &Value) -> Result<Value, String> {
+    match value {
+        Value::Int(i) => Ok(Value::Bool(*i != 0)),
+        Value::Float(f) => Ok(Value::Bool(*f != 0.0)),
+        Value::Bool(b) => Ok(Value::Bool(*b)),
+        Value::String(s) => Ok(Value::Bool(!s.is_empty())),
+        Value::None => Ok(Value::Bool(false)),
+        _ => Err(format!("Cannot convert {} to boolean", get_type_name(value))),
+    }
+}

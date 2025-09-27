@@ -21,3 +21,6 @@ mod time_tests;
 mod error_tests;
 #[cfg(test)]
 mod testing_tests;
+#[cfg(test)]
+mod primitive_methods_tests;
+

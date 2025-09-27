@@ -21,7 +21,7 @@ pub struct IO;
 impl IO {
     /// Print a value to stdout
     pub fn print(value: &Value) -> Result<(), String> {
-        print!("{}", value.to_string());
+        print!("{}\n", value.to_string());
         io::stdout().flush().map_err(|e| e.to_string())?;
         Ok(())
     }
