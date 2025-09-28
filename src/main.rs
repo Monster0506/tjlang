@@ -80,7 +80,7 @@ fn run_program(file: &PathBuf, debug: bool, verbose: bool) -> Result<(), Box<dyn
         println!("---");
     }
     
-    println!("✅ Program completed successfully!");
+    println!("[DEBUG] Program completed successfully!");
     
     Ok(())
 }
@@ -154,6 +154,6 @@ fn run_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("🚀 TJLang Advanced Interpreter Demo");
     println!("====================================");
     
-    println!("\n✅ Demo completed successfully!");
+    println!("\n[DEBUG] Demo completed successfully!");
     Ok(())
 }

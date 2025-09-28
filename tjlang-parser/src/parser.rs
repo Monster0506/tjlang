@@ -797,18 +797,19 @@ impl PestParser {
 
     /// Parse precedence chain to get to postfix_expr
     fn parse_precedence_chain(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
-        debug_println!("🔍 parse_precedence_chain: input rule: {:?}, content: '{}'", pair.as_rule(), pair.as_str());
+        debug_println!("[DEBUG] parse_precedence_chain: input rule: {:?}, content: '{}'", pair.as_rule(), pair.as_str());
         let mut current = pair;
         loop {
             let inner = current.into_inner().next().ok_or("Empty precedence chain")?;
-            debug_println!("🔍 precedence chain: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+            debug_println!("[DEBUG] precedence chain: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
             match inner.as_rule() {
                 Rule::postfix_expr => {
+                    debug_println!("[DEBUG] Found postfix_expr in precedence chain, calling parse_postfix_expr");
                     return self.parse_postfix_expr(inner);
                 }
                 Rule::additive => {
                     // Handle binary operations like x + y
-                    debug_println!("🔍 Found additive rule, parsing binary operation");
+                    debug_println!("[DEBUG] Found additive rule, parsing binary operation");
                     return self.parse_binary_operation(inner);
                 }
                 Rule::multiplicative => {
@@ -837,11 +838,11 @@ impl PestParser {
 
     /// Parse binary operations like x + y, x * y, etc.
     fn parse_binary_operation(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
-        debug_println!("🔍 parse_binary_operation: content = '{}'", pair.as_str());
+        debug_println!("[DEBUG] parse_binary_operation: content = '{}'", pair.as_str());
         let span = self.create_span(pair.as_span());
         let rule = pair.as_rule();
         let children: Vec<_> = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE).collect();
-        debug_println!("🔍 Binary operation children: {} items", children.len());
+        debug_println!("[DEBUG] Binary operation children: {} items", children.len());
         for (i, child) in children.iter().enumerate() {
             debug_println!("  Child {}: {:?} = '{}'", i, child.as_rule(), child.as_str());
         }
@@ -849,7 +850,7 @@ impl PestParser {
         if children.len() == 1 {
             // Single operand, no operator - parse it directly
             let child = &children[0];
-            debug_println!("🔍 Single operand: {:?} = '{}'", child.as_rule(), child.as_str());
+            debug_println!("[DEBUG] Single operand: {:?} = '{}'", child.as_rule(), child.as_str());
             
             match child.as_rule() {
                 Rule::power => {
@@ -862,6 +863,7 @@ impl PestParser {
                 }
                 Rule::postfix_expr => {
                     // Handle postfix expressions like x(), x[], x.member
+                    debug_println!("[DEBUG] Found postfix_expr in binary operation, calling parse_postfix_expr");
                     return self.parse_postfix_expr(child.clone());
                 }
                 _ => {
@@ -889,7 +891,7 @@ impl PestParser {
                 right: Box::new(right),
                 span,
             };
-            debug_println!("🔍 Created binary operation: {:?}", result);
+            debug_println!("[DEBUG] Created binary operation: {:?}", result);
             return Ok(result);
         }
         
@@ -931,40 +933,40 @@ impl PestParser {
     /// Parse expression with proper precedence - simplified non-recursive approach
     fn parse_expression(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        debug_println!("🔍 [ENTRY] parse_expression: rule = {:?}, content = '{}'", pair.as_rule(), pair.as_str());
+        debug_println!("[DEBUG] [ENTRY] parse_expression: rule = {:?}, content = '{}'", pair.as_rule(), pair.as_str());
         
         match pair.as_rule() {
             Rule::expression => {
                 // For the top-level expression rule, just parse its inner content
                 let inner = pair.into_inner().next().ok_or("Empty expression")?;
-                debug_println!("🔍 [INNER] expression inner rule: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+                debug_println!("[DEBUG] [INNER] expression inner rule: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
                 // Delegate to the appropriate sub-parser based on the inner rule
                 match inner.as_rule() {
                     Rule::assignment => {
                         // Handle assignment expressions
-                        debug_println!("🔍 assignment tokens:");
+                        debug_println!("[DEBUG] assignment tokens:");
                         for (i, token) in inner.clone().into_inner().enumerate() {
                             debug_println!("  Token {}: '{}' (rule: {:?})", i, token.as_str(), token.as_rule());
                         }
                         
                         let mut assignment_iter = inner.clone().into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                         let left = assignment_iter.next().ok_or("Missing left operand")?;
-                        debug_println!("🔍 assignment left: '{}'", left.as_str());
+                        debug_println!("[DEBUG] assignment left: '{}'", left.as_str());
                         
                         // Check if there's an assignment operator
                         if let Some(assign_op) = assignment_iter.next() {
-                            debug_println!("🔍 assignment operator: '{}' (rule: {:?})", assign_op.as_str(), assign_op.as_rule());
+                            debug_println!("[DEBUG] assignment operator: '{}' (rule: {:?})", assign_op.as_str(), assign_op.as_rule());
                             if assign_op.as_str() == "=" {
                                 // This is a real assignment - parse left and right sides
                                 let right = assignment_iter.next().ok_or("Missing right operand")?;
                                 
-                                debug_println!("🔍 [LEFT] About to parse left side: '{}' (rule: {:?})", left.as_str(), left.as_rule());
+                                debug_println!("[DEBUG] [LEFT] About to parse left side: '{}' (rule: {:?})", left.as_str(), left.as_rule());
                                 let left_expr = self.parse_expression(left)?;
-                                debug_println!("🔍 [RIGHT] About to parse right side: '{}' (rule: {:?})", right.as_str(), right.as_rule());
+                                debug_println!("[DEBUG] [RIGHT] About to parse right side: '{}' (rule: {:?})", right.as_str(), right.as_rule());
                                 let right_expr = self.parse_expression(right)?;
                                 
-                                debug_println!("🔍 assignment left_expr: {:?}", left_expr);
-                                debug_println!("🔍 assignment right_expr: {:?}", right_expr);
+                                debug_println!("[DEBUG] assignment left_expr: {:?}", left_expr);
+                                debug_println!("[DEBUG] assignment right_expr: {:?}", right_expr);
                                 
                                 Ok(Expression::Binary {
                                     left: Box::new(left_expr),
@@ -975,7 +977,7 @@ impl PestParser {
                             } else {
                                 // This is not an assignment, treat the left side as the expression
                                 // Avoid recursion by delegating to the appropriate sub-parser
-                                debug_println!("🔍 assignment left side rule: {:?}, content: '{}'", left.as_rule(), left.as_str());
+                                debug_println!("[DEBUG] assignment left side rule: {:?}, content: '{}'", left.as_rule(), left.as_str());
                                 match left.as_rule() {
                                     Rule::postfix_expr => self.parse_postfix_expr(left),
                                     _ => Ok(Expression::Literal(Literal::Int(0)))
@@ -984,7 +986,7 @@ impl PestParser {
                         } else {
                             // No assignment operator, treat the left side as the expression
                             // Avoid recursion by delegating to the appropriate sub-parser
-                            debug_println!("🔍 assignment left side rule: {:?}, content: '{}'", left.as_rule(), left.as_str());
+                            debug_println!("[DEBUG] assignment left side rule: {:?}, content: '{}'", left.as_rule(), left.as_str());
                             match left.as_rule() {
                                 Rule::postfix_expr => self.parse_postfix_expr(left),
                                 _ => Ok(Expression::Literal(Literal::Int(0)))
@@ -994,7 +996,7 @@ impl PestParser {
                     Rule::or_expr => {
                         // Handle or_expr by delegating to the appropriate sub-parser
                         // Use a helper function to traverse the precedence chain
-                        debug_println!("🔍 [OR_EXPR] or_expr case: calling parse_precedence_chain for '{}'", inner.as_str());
+                        debug_println!("[DEBUG] [OR_EXPR] or_expr case: calling parse_precedence_chain for '{}'", inner.as_str());
                         self.parse_precedence_chain(inner)
                     }
                     Rule::postfix_expr => self.parse_postfix_expr(inner),
@@ -1059,7 +1061,7 @@ impl PestParser {
             }
             Rule::or_expr => {
                 // Handle or_expr directly
-                debug_println!("🔍 [DIRECT_OR_EXPR] Direct or_expr case: calling parse_precedence_chain for '{}'", pair.as_str());
+                debug_println!("[DEBUG] [DIRECT_OR_EXPR] Direct or_expr case: calling parse_precedence_chain for '{}'", pair.as_str());
                 self.parse_precedence_chain(pair)
             }
             _ => {
@@ -1076,7 +1078,7 @@ impl PestParser {
         }
         
         let span = pair.as_span();
-        debug_println!("🔍 parse_expression: depth={}, rule={:?}, content='{}'", depth, pair.as_rule(), pair.as_str());
+        debug_println!("[DEBUG] parse_expression: depth={}, rule={:?}, content='{}'", depth, pair.as_rule(), pair.as_str());
         
         match pair.as_rule() {
             Rule::expression => {
@@ -2215,6 +2217,7 @@ impl PestParser {
 
     /// Parse postfix expression
     fn parse_postfix_expr(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+        debug_println!("[DEBUG] parse_postfix_expr called with: '{}'", pair.as_str());
         let span = pair.as_span();
         let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
         
@@ -2249,6 +2252,7 @@ impl PestParser {
             }
         }
         
+        debug_println!("[DEBUG] parse_postfix_expr returning: {:?}", expr);
         Ok(expr)
     }
 

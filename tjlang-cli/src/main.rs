@@ -120,7 +120,7 @@ fn run_program(file: &PathBuf, debug: bool, verbose: bool) -> Result<(), Box<dyn
     }
     let (ast, parse_diagnostics) = match parse(&source, file_id) {
         Ok((ast, diagnostics)) => {
-            debug_println!("✅ Parse successful! AST units: {}", ast.units.len());
+            debug_println!("[DEBUG] Parse successful! AST units: {}", ast.units.len());
             for (i, unit) in ast.units.iter().enumerate() {
                 debug_println!("  Unit {}: {:?}", i, std::mem::discriminant(unit));
             }
@@ -152,20 +152,20 @@ fn run_program(file: &PathBuf, debug: bool, verbose: bool) -> Result<(), Box<dyn
     if verbose {
         debug_println!("🏃 Running interpreter...");
     }
-    debug_println!("🔧 Creating interpreter...");
+    debug_println!("[DEBUG] Creating interpreter...");
     let mut interpreter = Interpreter::new();
-    debug_println!("🔧 Interpreter created successfully");
-    debug_println!("🔧 Starting program interpretation...");
-    debug_println!("🔧 AST units: {}", ast.units.len());
+    debug_println!("[DEBUG] Interpreter created successfully");
+    debug_println!("[DEBUG] Starting program interpretation...");
+    debug_println!("[DEBUG] AST units: {}", ast.units.len());
     for (i, unit) in ast.units.iter().enumerate() {
-        debug_println!("🔧 Unit {}: {:?}", i, std::mem::discriminant(unit));
+        debug_println!("[DEBUG] Unit {}: {:?}", i, std::mem::discriminant(unit));
     }
     
-    debug_println!("🔧 About to call interpret_program...");
+    debug_println!("[DEBUG] About to call interpret_program...");
     
     let result = match interpreter.interpret_program(&ast) {
         Ok(result) => {
-            debug_println!("✅ Program completed successfully!");
+            debug_println!("[DEBUG] Program completed successfully!");
             debug_println!("📤 Result type: {:?}", std::mem::discriminant(&result));
             debug_println!("📤 Result: {}", result.to_string());
             result
@@ -176,14 +176,14 @@ fn run_program(file: &PathBuf, debug: bool, verbose: bool) -> Result<(), Box<dyn
         }
     };
     
-    debug_println!("🔧 After interpret_program call");
+    debug_println!("[DEBUG] After interpret_program call");
     
     Ok(())
 }
 
 /// Start an interactive REPL
 fn start_repl(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
-    debug_println!("🎯 TJLang Interactive REPL");
+    debug_println!("[DEBUG] TJLang Interactive REPL");
     debug_println!("Type 'help' for commands, 'exit' to quit");
     debug_println!("---");
     
@@ -220,7 +220,7 @@ fn start_repl(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
             },
             "gc" => {
                 debug_println!("Running garbage collection...");
-                debug_println!("  ✅ GC completed - 0 objects collected");
+                debug_println!("GC completed - 0 objects collected");
             },
             "stats" => {
                 debug_println!("Runtime statistics:");
@@ -234,10 +234,10 @@ fn start_repl(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
                 // Simulate TJLang code execution
                 debug_println!("📤 Result: {}", input);
                 if debug {
-                    debug_println!("  🔤 Tokenized: {}", input);
-                    debug_println!("  🌳 Parsed: Expression");
-                    debug_println!("  ⚙️ Compiled: Bytecode");
-                    debug_println!("  🏃 Executed: Success");
+                    debug_println!("Tokenized: {}", input);
+                    debug_println!("Parsed: Expression");
+                    debug_println!("Compiled: Bytecode");
+                    debug_println!("Executed: Success");
                 }
             }
         }
@@ -248,34 +248,34 @@ fn start_repl(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
 
 /// Show interpreter information
 fn show_info() {
-    debug_println!("🎯 TJLang Advanced Interpreter v1.0.0");
+    debug_println!("TJLang Advanced Interpreter v1.0.0");
     debug_println!("=====================================");
     debug_println!("");
-    debug_println!("🚀 Features:");
-    debug_println!("  • Virtual Machine with bytecode");
-    debug_println!("  • Advanced Garbage Collection");
-    debug_println!("  • Concurrency Runtime (green threads, channels)");
-    debug_println!("  • Pattern Matching Engine");
-    debug_println!("  • Type System with inference");
-    debug_println!("  • Module System");
+    debug_println!("Features:");
+    debug_println!("  - Virtual Machine with bytecode");
+    debug_println!("  - Advanced Garbage Collection");
+    debug_println!("  - Concurrency Runtime (green threads, channels)");
+    debug_println!("  - Pattern Matching Engine");
+    debug_println!("  - Type System with inference");
+    debug_println!("  - Module System");
     debug_println!("");
-    debug_println!("📚 Commands:");
+    debug_println!("Commands:");
     debug_println!("  tjlang run <file>     - Run a TJLang program");
     debug_println!("  tjlang repl           - Start interactive REPL");
     debug_println!("  tjlang info          - Show this information");
     debug_println!("  tjlang demo          - Run the advanced demo");
     debug_println!("");
-    debug_println!("🔧 Advanced Features:");
-    debug_println!("  • Generational Garbage Collection");
-    debug_println!("  • Green Thread Concurrency");
-    debug_println!("  • Advanced Pattern Matching");
-    debug_println!("  • Runtime Type Checking");
-    debug_println!("  • Dynamic Module Loading");
+    debug_println!("Advanced Features:");
+    debug_println!("  - Generational Garbage Collection");
+    debug_println!("  - Green Thread Concurrency");
+    debug_println!("  - Advanced Pattern Matching");
+    debug_println!("  - Runtime Type Checking");
+    debug_println!("  - Dynamic Module Loading");
 }
 
 /// Run the TJLang interpreter demo
 fn run_demo() -> Result<(), Box<dyn std::error::Error>> {
-    debug_println!("🚀 TJLang Interpreter Demo");
+    debug_println!("TJLang Interpreter Demo");
     debug_println!("==========================");
     
     // Demo 1: Simple arithmetic
@@ -294,9 +294,9 @@ fn run_demo() -> Result<(), Box<dyn std::error::Error>> {
     debug_println!("\n4. Functions Demo");
     demo_functions()?;
     
-    debug_println!("\n✅ All demos completed successfully!");
+    debug_println!("\n[DEBUG] All demos completed successfully!");
     debug_println!("");
-    debug_println!("🎯 This demonstrates the TJLang interpreter:");
+    debug_println!("[DEBUG] This demonstrates the TJLang interpreter:");
     debug_println!("  • Real AST interpretation");
     debug_println!("  • Variable storage and lookup");
     debug_println!("  • Expression evaluation");

@@ -66,6 +66,7 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         debug_println!("📦 Registering stdlib functions...");
+        debug_println!("🔍 DEBUG: Interpreter::new() called");
         let environment = Environment::new();
         let functions = HashMap::new();
         let stdlib = StdlibRegistry::new();
@@ -76,13 +77,14 @@ impl Interpreter {
             stdlib,
         };
         interpreter.register_stdlib_functions();
-        debug_println!("✅ Interpreter created successfully (stdlib enabled)");
+        debug_println!("[DEBUG] Interpreter created successfully (stdlib enabled)");
         
         interpreter
     }
     
     /// Register all stdlib functions in the environment
     fn register_stdlib_functions(&mut self) {
+        debug_println!("🔍 DEBUG: register_stdlib_functions called");
         let function_names = self.stdlib.get_function_names();
         debug_println!("📋 Found {} stdlib functions to register", function_names.len());
         
@@ -104,13 +106,14 @@ impl Interpreter {
         
         // Register modules as structs
         for (module_name, functions) in modules {
-            debug_println!("  📝 Registering module: {}", module_name);
+            debug_println!("🔍 DEBUG: Registering module: {}", module_name);
+            debug_println!("🔍 DEBUG: Functions in {}: {:?}", module_name, functions.keys().collect::<Vec<_>>());
             let module_value = Value::Struct {
                 name: module_name.clone(),
                 fields: functions,
             };
             self.environment.define(module_name.clone(), module_value);
-            debug_println!("  ✅ Module {} registered successfully", module_name);
+            debug_println!("🔍 DEBUG: Module {} registered successfully", module_name);
         }
         
         debug_println!("🎉 All stdlib functions registered successfully");
@@ -118,7 +121,7 @@ impl Interpreter {
     
     /// Interpret a complete program
     pub fn interpret_program(&mut self, program: &Program) -> Result<Value, String> {
-        debug_println!("🔍 Starting program interpretation...");
+        debug_println!("[DEBUG] Starting program interpretation...");
         debug_println!("📊 Program has {} units", program.units.len());
         
         // First pass: collect all function declarations
@@ -130,7 +133,7 @@ impl Interpreter {
                 self.functions.insert(func.name.clone(), func.clone());
             }
         }
-        debug_println!("✅ Registered {} functions", self.functions.len());
+        debug_println!("[DEBUG] Registered {} functions", self.functions.len());
         
         // Second pass: execute the program
         debug_println!("🏃 Second pass: executing program...");
@@ -141,12 +144,12 @@ impl Interpreter {
                 ProgramUnit::Declaration(decl) => {
                     debug_println!("    🔧 Interpreting declaration: {:?}", std::mem::discriminant(decl));
                     result = self.interpret_declaration(decl)?;
-                    debug_println!("    ✅ Declaration result: {:?}", result);
+                    debug_println!("    [DEBUG] Declaration result: {:?}", result);
                 },
                 ProgramUnit::Expression(expr) => {
-                    debug_println!("    🎯 Interpreting expression: {:?}", std::mem::discriminant(expr));
+                    debug_println!("    [DEBUG] Interpreting expression: {:?}", std::mem::discriminant(expr));
                     result = self.interpret_expression(expr)?;
-                    debug_println!("    ✅ Expression result: {:?}", result);
+                    debug_println!("    [DEBUG] Expression result: {:?}", result);
                 },
                 _ => {
                     debug_println!("    ⏭️ Skipping unknown unit type");
@@ -160,7 +163,7 @@ impl Interpreter {
     
     /// Interpret a declaration
     fn interpret_declaration(&mut self, decl: &Declaration) -> Result<Value, String> {
-        debug_println!("      🔍 Interpreting declaration: {:?}", std::mem::discriminant(decl));
+        debug_println!("      [DEBUG] Interpreting declaration: {:?}", std::mem::discriminant(decl));
         match decl {
             Declaration::Function(func) => {
                 debug_println!("        📋 Processing function: {}", func.name);
@@ -174,14 +177,14 @@ impl Interpreter {
                     closure: HashMap::new(),
                 };
                 self.environment.define(func.name.clone(), func_value);
-                debug_println!("        ✅ Function {} stored in environment", func.name);
+                debug_println!("        [DEBUG] Function {} stored in environment", func.name);
                 Ok(Value::None)
             },
             Declaration::Variable(var) => {
                 debug_println!("        📝 Processing variable: {}", var.name);
                 let value = self.interpret_expression(&var.value)?;
                 self.environment.define(var.name.clone(), value.clone());
-                debug_println!("        ✅ Variable {} stored with value: {:?}", var.name, value);
+                debug_println!("        [DEBUG] Variable {} stored with value: {:?}", var.name, value);
                 Ok(value)
             },
             _ => {
@@ -193,14 +196,14 @@ impl Interpreter {
     
     /// Interpret an expression
     pub fn interpret_expression(&mut self, expr: &Expression) -> Result<Value, String> {
-        debug_println!("        🔍 Interpreting expression: {:?}", std::mem::discriminant(expr));
+        debug_println!("        [DEBUG] Interpreting expression: {:?}", std::mem::discriminant(expr));
         match expr {
             Expression::Literal(literal) => {
                 debug_println!("          📝 Literal: {:?}", literal);
                 self.interpret_literal(literal)
             },
             Expression::Variable(name) => {
-                debug_println!("          🔍 Variable: {}", name);
+                debug_println!("          [DEBUG] Variable: {}", name);
                 self.environment.get(name)
                     .cloned()
                     .ok_or_else(|| format!("Undefined variable: {}", name))
@@ -224,16 +227,18 @@ impl Interpreter {
             },
             Expression::Call { callee, args, .. } => {
                 debug_println!("          📞 Function call with {} args", args.len());
-                debug_println!("          🔍 Callee expression: {:?}", callee);
+                debug_println!("          [DEBUG] Callee expression: {:?}", callee);
                 
                 // Special handling for method calls on primitives
                 if let Expression::Member { target, member, .. } = callee.as_ref() {
-                    debug_println!("          🎯 Method call: {}.{}()", "target", member);
+                    debug_println!("          [DEBUG] Method call: {}.{}()", "target", member);
                     let target_val = self.interpret_expression(target)?;
-                    debug_println!("          🎯 Target value: {:?}", std::mem::discriminant(&target_val));
+                    debug_println!("          [DEBUG] Target value: {:?}", std::mem::discriminant(&target_val));
                     
-                    // For primitive methods that don't take arguments, execute directly
-                    if args.is_empty() {
+                    // Only apply primitive method handling to actual primitive types, not structs
+                    let is_primitive = matches!(target_val, Value::Int(_) | Value::Float(_) | Value::Bool(_) | Value::String(_) | Value::None | Value::Tuple(_) | Value::Vec(_) | Value::Set(_) | Value::Map(_));
+                    
+                    if is_primitive && args.is_empty() {
                         match member.as_str() {
                             "to_string" => return Ok(Value::String(target_val.to_string())),
                             "clone" => return Ok(target_val.clone()),
@@ -248,16 +253,74 @@ impl Interpreter {
                             "is_none" => return Ok(Value::Bool(matches!(target_val, Value::None))),
                             "debug_string" => return Ok(Value::String(format!("{:?}", target_val))),
                             "pretty_string" => return Ok(Value::String(crate::primitive_methods::get_pretty_string(&target_val))),
+                            "reverse" => {
+                                // Special handling for reverse as in-place modification
+                                if matches!(target_val, Value::Vec(_)) {
+                                    let result = crate::primitive_methods::get_primitive_method(&target_val, member)?;
+                                    // If the target is a simple variable reference, update it in the environment
+                                    if let Expression::Variable(var_name) = &**target {
+                                        debug_println!("          🔄 Updating variable {} in-place", var_name);
+                                        self.environment.define(var_name.clone(), result.clone());
+                                    }
+                                    return Ok(result);
+                                } else {
+                                    return crate::primitive_methods::get_primitive_method(&target_val, member);
+                                }
+                            },
                             _ => {
                                 // Try type-specific methods
                                 return crate::primitive_methods::get_primitive_method(&target_val, member);
                             }
                         }
+                    } else if is_primitive {
+                        // For primitive methods that do take arguments
+                        let mut arg_values = Vec::new();
+                        for arg in args {
+                            arg_values.push(self.interpret_expression(arg)?);
+                        }
+                        
+                        // Special handling for collection methods that should modify in-place
+                        if matches!(target_val, Value::Vec(_)) && matches!(member.as_str(), "push" | "pop" | "insert" | "remove" | "set" | "reverse" | "sort") {
+                            // For vector methods that modify in-place, we need to update the original variable
+                            let result = crate::primitive_methods::execute_primitive_method(&target_val, member, &arg_values)?;
+                            
+                            // If the target is a simple variable reference, update it in the environment
+                            if let Expression::Variable(var_name) = &**target { // Fixed: &**target to dereference Box<Expression>
+                                debug_println!("          🔄 Updating variable {} in-place", var_name);
+                                self.environment.define(var_name.clone(), result.clone());
+                            }
+                            
+                            return Ok(result);
+                        } else if matches!(target_val, Value::Set(_)) && matches!(member.as_str(), "insert" | "remove") {
+                            // For set methods that modify in-place
+                            let result = crate::primitive_methods::execute_primitive_method(&target_val, member, &arg_values)?;
+                            
+                            // If the target is a simple variable reference, update it in the environment
+                            if let Expression::Variable(var_name) = &**target {
+                                debug_println!("          🔄 Updating variable {} in-place", var_name);
+                                self.environment.define(var_name.clone(), result.clone());
+                            }
+                            
+                            return Ok(result);
+                        } else if matches!(target_val, Value::Map(_)) && matches!(member.as_str(), "insert" | "set" | "remove" | "clear") {
+                            // For map methods that modify in-place
+                            let result = crate::primitive_methods::execute_primitive_method(&target_val, member, &arg_values)?;
+                            
+                            // If the target is a simple variable reference, update it in the environment
+                            if let Expression::Variable(var_name) = &**target {
+                                debug_println!("          🔄 Updating variable {} in-place", var_name);
+                                self.environment.define(var_name.clone(), result.clone());
+                            }
+                            
+                            return Ok(result);
+                        }
+                        
+                        return crate::primitive_methods::execute_primitive_method(&target_val, member, &arg_values);
                     }
                 }
                 
                 let callee_val = self.interpret_expression(callee)?;
-                debug_println!("          🎯 Callee resolved to: {:?}", callee_val);
+                debug_println!("          [DEBUG] Callee resolved to: {:?}", callee_val);
                 let mut arg_values = Vec::new();
                 for (i, arg) in args.iter().enumerate() {
                     debug_println!("            📥 Evaluating arg {}: {:?}", i, std::mem::discriminant(arg));
@@ -267,14 +330,14 @@ impl Interpreter {
                 }
                 debug_println!("          🚀 Calling function: {:?} with args: {:?}", callee_val, arg_values);
                 let result = self.interpret_call(&callee_val, &arg_values);
-                debug_println!("          ✅ Function call result: {:?}", result);
+                debug_println!("          [DEBUG] Function call result: {:?}", result);
                 result
             },
             Expression::Member { target, member, .. } => {
-                debug_println!("          🎯 Member access: {}", member);
+                debug_println!("          [DEBUG] Member access: {}", member);
                 let target_val = self.interpret_expression(target)?;
-                debug_println!("          🎯 Target value: {:?}", std::mem::discriminant(&target_val));
-                debug_println!("          🎯 Target value content: {:?}", target_val);
+                debug_println!("          [DEBUG] Target value: {:?}", std::mem::discriminant(&target_val));
+                debug_println!("          [DEBUG] Target value content: {:?}", target_val);
                 self.interpret_member_access(&target_val, member)
             },
             Expression::Index { target, index, .. } => {
@@ -380,20 +443,20 @@ impl Interpreter {
     
     /// Interpret a function call
     pub fn interpret_call(&mut self, callee: &Value, args: &[Value]) -> Result<Value, String> {
-        debug_println!("            🔍 interpret_call: {:?}", std::mem::discriminant(callee));
+        debug_println!("            [DEBUG] interpret_call: {:?}", std::mem::discriminant(callee));
         match callee {
             Value::Function { name, body, .. } => {
                 debug_println!("            📞 Calling function: {}", name);
                 debug_println!("            📋 Available stdlib functions: {:?}", self.stdlib.get_function_names());
                 
                         // Check if it's a primitive method call
-                        debug_println!("              🔍 Checking method call: name='{}', args.len()={}", name, args.len());
+                        debug_println!("              [DEBUG] Checking method call: name='{}', args.len()={}", name, args.len());
                         if name.starts_with("primitive_method::") {
                             debug_println!("              🔧 Handling primitive method call: {}", name);
                             // This is a primitive method call, execute using the primitive methods module
                             let method_name = name.strip_prefix("primitive_method::").unwrap_or(name);
                             let result = crate::primitive_methods::execute_primitive_method(&Value::None, method_name, args);
-                            debug_println!("              ✅ Primitive method call result: {:?}", result);
+                            debug_println!("              [DEBUG] Primitive method call result: {:?}", result);
                             return result;
                         }
                 
@@ -401,15 +464,15 @@ impl Interpreter {
                 if let Some(native_func) = self.stdlib.get_function(name) {
                     debug_println!("              🚀 Calling stdlib function: {} with args: {:?}", name, args);
                     let result = native_func(self, args);
-                    debug_println!("              ✅ Stdlib function result: {:?}", result);
+                    debug_println!("              [DEBUG] Stdlib function result: {:?}", result);
                     return result;
                 }
                 
-                debug_println!("              🔍 Looking up user function: {}", name);
+                debug_println!("              [DEBUG] Looking up user function: {}", name);
                 debug_println!("              📋 Available functions: {:?}", self.functions.keys().collect::<Vec<_>>());
                 // Look up the actual function declaration
                 if let Some(func_decl) = self.functions.get(name) {
-                    debug_println!("              ✅ Found function declaration for: {}", name);
+                    debug_println!("              [DEBUG] Found function declaration for: {}", name);
                     debug_println!("              📝 Function params: {:?}", func_decl.params);
                     debug_println!("              📝 Function body: {:?}", func_decl.body);
                     // Clone the function declaration to avoid borrow conflicts
@@ -424,12 +487,12 @@ impl Interpreter {
                     }
                     
                     debug_println!("              🏃 Executing function body...");
-                    debug_println!("              🔍 Function body: {:?}", func_decl.body);
+                    debug_println!("              [DEBUG] Function body: {:?}", func_decl.body);
                     // Save current environment and switch to new one
                     let old_env = std::mem::replace(&mut self.environment, new_env);
                     let result = self.interpret_block(&func_decl.body);
                     self.environment = old_env;
-                    debug_println!("              ✅ Function {} completed with result: {:?}", name, result);
+                    debug_println!("              [DEBUG] Function {} completed with result: {:?}", name, result);
                     result
                 } else {
                     debug_println!("              ❌ Function '{}' not found", name);
@@ -460,17 +523,21 @@ impl Interpreter {
     
     /// Interpret member access
     fn interpret_member_access(&self, target: &Value, member: &str) -> Result<Value, String> {
-        debug_println!("🔧 interpret_member_access called: target={:?}, member={}", std::mem::discriminant(target), member);
+        debug_println!("🔍 DEBUG: interpret_member_access called: target={:?}, member={}", target, member);
         match target {
-            Value::Struct { fields, .. } => {
-                debug_println!("🔧 Struct member access");
-                fields.get(member)
-                    .cloned()
-                    .ok_or_else(|| format!("No field '{}' found", member))
+            Value::Struct { fields, name } => {
+                debug_println!("🔍 DEBUG: Found struct '{}' with fields: {:?}", name, fields.keys().collect::<Vec<_>>());
+                if let Some(field_value) = fields.get(member) {
+                    debug_println!("🔍 DEBUG: Found field '{}' in struct '{}'", member, name);
+                    Ok(field_value.clone())
+                } else {
+                    debug_println!("🔍 DEBUG: Field '{}' not found in struct '{}'", member, name);
+                    Err(format!("No field '{}' found", member))
+                }
             },
             // Handle method calls on primitive values
             _ => {
-                debug_println!("🔧 Primitive method access");
+                debug_println!("🔍 DEBUG: Object is not a struct, trying primitive methods");
                 self.get_primitive_method(target, member)
             }
         }
@@ -493,6 +560,7 @@ impl Interpreter {
             "is_bool" => Ok(Value::Bool(matches!(target, Value::Bool(_)))),
             "is_str" => Ok(Value::Bool(matches!(target, Value::String(_)))),
             "is_none" => Ok(Value::Bool(matches!(target, Value::None))),
+            "is_tuple" => Ok(Value::Bool(matches!(target, Value::Tuple(_)))),
             "debug_string" => Ok(Value::String(format!("{:?}", target))),
             "pretty_string" => Ok(Value::String(crate::primitive_methods::get_pretty_string(target))),
             // Type-specific methods
@@ -533,7 +601,14 @@ impl Interpreter {
                     Err("Index out of bounds".to_string())
                 }
             },
-            _ => Err("Cannot index non-vector value or invalid index type".to_string()),
+            (Value::Tuple(tuple), Value::Int(idx)) => {
+                if *idx >= 0 && (*idx as usize) < tuple.len() {
+                    Ok(tuple[*idx as usize].clone())
+                } else {
+                    Err("Index out of bounds".to_string())
+                }
+            },
+            _ => Err("Cannot index non-vector/tuple value or invalid index type".to_string()),
         }
     }
     
@@ -574,9 +649,9 @@ impl Interpreter {
         let mut result = Value::None;
         for (i, stmt) in block.statements.iter().enumerate() {
             debug_println!("                  📝 Statement {}: {:?}", i, std::mem::discriminant(stmt));
-            debug_println!("                  🔍 Statement {} details: {:?}", i, stmt);
+            debug_println!("                  [DEBUG] Statement {} details: {:?}", i, stmt);
             result = self.interpret_statement(stmt)?;
-            debug_println!("                  ✅ Statement {} result: {:?}", i, result);
+            debug_println!("                  [DEBUG] Statement {} result: {:?}", i, result);
         }
         debug_println!("                🎉 Block completed with result: {:?}", result);
         Ok(result)
@@ -584,7 +659,7 @@ impl Interpreter {
     
     /// Interpret a statement
     fn interpret_statement(&mut self, stmt: &Statement) -> Result<Value, String> {
-        debug_println!("                    🔍 interpret_statement: {:?}", std::mem::discriminant(stmt));
+        debug_println!("                    [DEBUG] interpret_statement: {:?}", std::mem::discriminant(stmt));
         match stmt {
             Statement::Expression(expr) => {
                 debug_println!("                      📝 Expression statement");
@@ -766,6 +841,8 @@ pub struct Closure {
     pub body: Expression,
     pub environment: Environment,
 }
+
+
 
 
 

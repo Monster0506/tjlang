@@ -3,6 +3,9 @@ name = "tjlang-runtime"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+debug = []
+
 [dependencies]
 anyhow = "1.0.100"
 thiserror = "2.0.16"

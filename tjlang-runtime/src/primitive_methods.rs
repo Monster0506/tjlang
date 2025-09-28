@@ -8,7 +8,7 @@ use tjlang_diagnostics::debug_println;
 
 /// Get a method for a primitive value
 pub fn get_primitive_method(target: &Value, method: &str) -> Result<Value, String> {
-    debug_println!("🔧 get_primitive_method called: target={:?}, method={}", std::mem::discriminant(target), method);
+    debug_println!("[DEBUG] get_primitive_method called: target={:?}, method={}", std::mem::discriminant(target), method);
     
     match method {
         // Core methods that work on all primitives
@@ -30,6 +30,7 @@ pub fn get_primitive_method(target: &Value, method: &str) -> Result<Value, Strin
         "is_bool" => Ok(Value::Bool(matches!(target, Value::Bool(_)))),
         "is_str" => Ok(Value::Bool(matches!(target, Value::String(_)))),
         "is_none" => Ok(Value::Bool(matches!(target, Value::None))),
+        "is_tuple" => Ok(Value::Bool(matches!(target, Value::Tuple(_)))),
         
         // Conversion methods
         "to_int" => convert_to_int(target),
@@ -48,7 +49,18 @@ pub fn get_primitive_method(target: &Value, method: &str) -> Result<Value, Strin
 
 /// Execute a primitive method call
 pub fn execute_primitive_method(target: &Value, method: &str, args: &[Value]) -> Result<Value, String> {
-    debug_println!("🔧 execute_primitive_method: method={}, args.len()={}", method, args.len());
+    debug_println!("[DEBUG] execute_primitive_method: method={}, args.len()={}", method, args.len());
+    
+    // Handle collection methods with arguments
+    if let Value::Vec(vec) = target {
+        return execute_vec_method(vec, method, args);
+    }
+    if let Value::Set(set) = target {
+        return execute_set_method(set, method, args);
+    }
+    if let Value::Map(map) = target {
+        return execute_map_method(map, method, args);
+    }
     
     match method {
         "equals" => {
@@ -75,6 +87,10 @@ fn get_type_specific_method(target: &Value, method: &str) -> Result<Value, Strin
         Value::Bool(_) => get_boolean_method(target, method),
         Value::String(_) => get_string_method(target, method),
         Value::None => get_none_method(target, method),
+        Value::Tuple(_) => get_tuple_method(target, method),
+        Value::Vec(_) => get_vec_method(target, method),
+        Value::Set(_) => get_set_method(target, method),
+        Value::Map(_) => get_map_method(target, method),
         _ => Err(format!("No method '{}' found on {} value", method, get_type_name(target))),
     }
 }
@@ -257,5 +273,335 @@ fn convert_to_bool(value: &Value) -> Result<Value, String> {
         Value::String(s) => Ok(Value::Bool(!s.is_empty())),
         Value::None => Ok(Value::Bool(false)),
         _ => Err(format!("Cannot convert {} to boolean", get_type_name(value))),
+    }
+}
+
+/// Tuple-specific methods
+fn get_tuple_method(target: &Value, method: &str) -> Result<Value, String> {
+    if let Value::Tuple(tuple) = target {
+        match method {
+            "length" => Ok(Value::Int(tuple.len() as i64)),
+            "is_empty" => Ok(Value::Bool(tuple.is_empty())),
+            "is_not_empty" => Ok(Value::Bool(!tuple.is_empty())),
+            _ => Err(format!("No method '{}' found on tuple", method)),
+        }
+    } else {
+        Err("Expected tuple value".to_string())
+    }
+}
+
+/// Vector-specific methods
+fn get_vec_method(target: &Value, method: &str) -> Result<Value, String> {
+    if let Value::Vec(vec) = target {
+        match method {
+            // Basic properties (no arguments needed)
+            "length" => Ok(Value::Int(vec.len() as i64)),
+            "len" => Ok(Value::Int(vec.len() as i64)),
+            "capacity" => Ok(Value::Int(vec.capacity() as i64)),
+            "is_empty" => Ok(Value::Bool(vec.is_empty())),
+            "is_not_empty" => Ok(Value::Bool(!vec.is_empty())),
+            "reverse" => {
+                let mut new_vec = vec.clone();
+                new_vec.reverse();
+                Ok(Value::Vec(new_vec))
+            },
+            
+            // Methods that require arguments - these will be handled by the interpreter
+            "push" | "pop" | "insert" | "remove" | "get" | "get_mut" | "set" | 
+            "slice" | "append" | "extend" | "sort" | "sort_by" | 
+            "shuffle" | "unique" | "filter" | "map" | "reduce" | "fold" | 
+            "any" | "all" | "find" | "find_index" | "contains" | "index_of" | 
+            "last_index_of" => {
+                Err(format!("{} method requires arguments - use execute_primitive_method instead", method))
+            },
+            
+            _ => Err(format!("No method '{}' found on vector", method)),
+        }
+    } else {
+        Err("Expected vector value".to_string())
+    }
+}
+
+/// Execute vector methods with arguments
+fn execute_vec_method(vec: &Vec<Value>, method: &str, args: &[Value]) -> Result<Value, String> {
+    debug_println!("[DEBUG] execute_vec_method called: method={}, args={:?}", method, args);
+    
+    match method {
+        "push" => {
+            if args.len() != 1 {
+                return Err("push method requires exactly 1 argument".to_string());
+            }
+            let mut new_vec = vec.clone();
+            new_vec.push(args[0].clone());
+            Ok(Value::Vec(new_vec))
+        },
+        "get" => {
+            if args.len() != 1 {
+                return Err("get method requires exactly 1 argument".to_string());
+            }
+            if let Value::Int(index) = &args[0] {
+                if *index >= 0 && (*index as usize) < vec.len() {
+                    Ok(vec[*index as usize].clone())
+                } else {
+                    Err("Index out of bounds".to_string())
+                }
+            } else {
+                Err("get method requires integer index".to_string())
+            }
+        },
+        "set" => {
+            if args.len() != 2 {
+                return Err("set method requires exactly 2 arguments".to_string());
+            }
+            if let Value::Int(index) = &args[0] {
+                if *index >= 0 && (*index as usize) < vec.len() {
+                    let mut new_vec = vec.clone();
+                    new_vec[*index as usize] = args[1].clone();
+                    Ok(Value::Vec(new_vec))
+                } else {
+                    Err("Index out of bounds".to_string())
+                }
+            } else {
+                Err("set method requires integer index".to_string())
+            }
+        },
+        "pop" => {
+            if args.len() != 0 {
+                return Err("pop method takes no arguments".to_string());
+            }
+            let mut new_vec = vec.clone();
+            if let Some(value) = new_vec.pop() {
+                Ok(value)
+            } else {
+                Err("Cannot pop from empty vector".to_string())
+            }
+        },
+        "insert" => {
+            if args.len() != 2 {
+                return Err("insert method requires exactly 2 arguments".to_string());
+            }
+            if let Value::Int(index) = &args[0] {
+                if *index >= 0 && (*index as usize) <= vec.len() {
+                    let mut new_vec = vec.clone();
+                    new_vec.insert(*index as usize, args[1].clone());
+                    Ok(Value::Vec(new_vec))
+                } else {
+                    Err("Index out of bounds".to_string())
+                }
+            } else {
+                Err("insert method requires integer index".to_string())
+            }
+        },
+        "remove" => {
+            if args.len() != 1 {
+                return Err("remove method requires exactly 1 argument".to_string());
+            }
+            if let Value::Int(index) = &args[0] {
+                if *index >= 0 && (*index as usize) < vec.len() {
+                    let mut new_vec = vec.clone();
+                    let removed = new_vec.remove(*index as usize);
+                    Ok(removed)
+                } else {
+                    Err("Index out of bounds".to_string())
+                }
+            } else {
+                Err("remove method requires integer index".to_string())
+            }
+        },
+        "slice" => {
+            if args.len() != 2 {
+                return Err("slice method requires exactly 2 arguments".to_string());
+            }
+            if let (Value::Int(start), Value::Int(end)) = (&args[0], &args[1]) {
+                if *start >= 0 && *end >= 0 && *start as usize <= vec.len() && *end as usize <= vec.len() && *start <= *end {
+                    let slice: Vec<Value> = vec[*start as usize..*end as usize].to_vec();
+                    Ok(Value::Vec(slice))
+                } else {
+                    Err("Invalid slice bounds".to_string())
+                }
+            } else {
+                Err("slice method requires integer start and end".to_string())
+            }
+        },
+        "reverse" => {
+            if args.len() != 0 {
+                return Err("reverse method takes no arguments".to_string());
+            }
+            let mut new_vec = vec.clone();
+            new_vec.reverse();
+            Ok(Value::Vec(new_vec))
+        },
+        "sort" => {
+            if args.len() != 0 {
+                return Err("sort method takes no arguments".to_string());
+            }
+            let mut new_vec = vec.clone();
+            // Note: This will only work for comparable types
+            new_vec.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+            Ok(Value::Vec(new_vec))
+        },
+        _ => Err(format!("No method '{}' found on vector", method)),
+    }
+}
+
+/// Set-specific methods
+fn get_set_method(target: &Value, method: &str) -> Result<Value, String> {
+    if let Value::Set(set) = target {
+        match method {
+            // Basic properties (no arguments needed)
+            "length" => Ok(Value::Int(set.len() as i64)),
+            "len" => Ok(Value::Int(set.len() as i64)),
+            "is_empty" => Ok(Value::Bool(set.is_empty())),
+            "is_not_empty" => Ok(Value::Bool(!set.is_empty())),
+            
+            // Methods that require arguments - these will be handled by the interpreter
+            "insert" | "remove" | "contains" | "union" | "intersection" | 
+            "difference" | "symmetric_difference" | "is_subset" | "is_superset" | 
+            "is_disjoint" => {
+                Err(format!("{} method requires arguments - use execute_primitive_method instead", method))
+            },
+            
+            _ => Err(format!("No method '{}' found on set", method)),
+        }
+    } else {
+        Err("Expected set value".to_string())
+    }
+}
+
+/// Execute set methods with arguments
+fn execute_set_method(set: &std::collections::HashSet<Value>, method: &str, args: &[Value]) -> Result<Value, String> {
+    debug_println!("[DEBUG] execute_set_method called: method={}, args={:?}", method, args);
+    
+    match method {
+        "insert" => {
+            if args.len() != 1 {
+                return Err("insert method requires exactly 1 argument".to_string());
+            }
+            let mut new_set = set.clone();
+            new_set.insert(args[0].clone());
+            Ok(Value::Set(new_set))
+        },
+        "remove" => {
+            if args.len() != 1 {
+                return Err("remove method requires exactly 1 argument".to_string());
+            }
+            let mut new_set = set.clone();
+            if new_set.remove(&args[0]) {
+                Ok(Value::Bool(true))
+            } else {
+                Ok(Value::Bool(false))
+            }
+        },
+        "contains" => {
+            if args.len() != 1 {
+                return Err("contains method requires exactly 1 argument".to_string());
+            }
+            Ok(Value::Bool(set.contains(&args[0])))
+        },
+        _ => Err(format!("No method '{}' found on set", method)),
+    }
+}
+
+/// Map-specific methods
+fn get_map_method(target: &Value, method: &str) -> Result<Value, String> {
+    if let Value::Map(map) = target {
+        match method {
+            // Basic properties (no arguments needed)
+            "length" => Ok(Value::Int(map.len() as i64)),
+            "len" => Ok(Value::Int(map.len() as i64)),
+            "is_empty" => Ok(Value::Bool(map.is_empty())),
+            "is_not_empty" => Ok(Value::Bool(!map.is_empty())),
+            
+            // Methods that require arguments - these will be handled by the interpreter
+            "insert" | "remove" | "get" | "set" | "contains_key" | "keys" | 
+            "values" | "entries" | "clear" => {
+                Err(format!("{} method requires arguments - use execute_primitive_method instead", method))
+            },
+            
+            _ => Err(format!("No method '{}' found on map", method)),
+        }
+    } else {
+        Err("Expected map value".to_string())
+    }
+}
+
+/// Execute map methods with arguments
+fn execute_map_method(map: &HashMap<Value, Value>, method: &str, args: &[Value]) -> Result<Value, String> {
+    debug_println!("[DEBUG] execute_map_method called: method={}, args={:?}", method, args);
+    
+    match method {
+        "insert" => {
+            if args.len() != 2 {
+                return Err("insert method requires exactly 2 arguments".to_string());
+            }
+            let mut new_map = map.clone();
+            new_map.insert(args[0].clone(), args[1].clone());
+            Ok(Value::Map(new_map))
+        },
+        "set" => {
+            if args.len() != 2 {
+                return Err("set method requires exactly 2 arguments".to_string());
+            }
+            let mut new_map = map.clone();
+            new_map.insert(args[0].clone(), args[1].clone());
+            Ok(Value::Map(new_map))
+        },
+        "get" => {
+            if args.len() != 1 {
+                return Err("get method requires exactly 1 argument".to_string());
+            }
+            if let Some(value) = map.get(&args[0]) {
+                Ok(value.clone())
+            } else {
+                Ok(Value::None)
+            }
+        },
+        "remove" => {
+            if args.len() != 1 {
+                return Err("remove method requires exactly 1 argument".to_string());
+            }
+            let mut new_map = map.clone();
+            if let Some(value) = new_map.remove(&args[0]) {
+                Ok(value)
+            } else {
+                Ok(Value::None)
+            }
+        },
+        "contains_key" => {
+            if args.len() != 1 {
+                return Err("contains_key method requires exactly 1 argument".to_string());
+            }
+            Ok(Value::Bool(map.contains_key(&args[0])))
+        },
+        "keys" => {
+            if args.len() != 0 {
+                return Err("keys method takes no arguments".to_string());
+            }
+            let keys: Vec<Value> = map.keys().cloned().collect();
+            Ok(Value::Vec(keys))
+        },
+        "values" => {
+            if args.len() != 0 {
+                return Err("values method takes no arguments".to_string());
+            }
+            let values: Vec<Value> = map.values().cloned().collect();
+            Ok(Value::Vec(values))
+        },
+        "entries" => {
+            if args.len() != 0 {
+                return Err("entries method takes no arguments".to_string());
+            }
+            let entries: Vec<Value> = map.iter()
+                .map(|(k, v)| Value::Tuple(vec![k.clone(), v.clone()]))
+                .collect();
+            Ok(Value::Vec(entries))
+        },
+        "clear" => {
+            if args.len() != 0 {
+                return Err("clear method takes no arguments".to_string());
+            }
+            Ok(Value::Map(HashMap::new()))
+        },
+        _ => Err(format!("No method '{}' found on map", method)),
     }
 }

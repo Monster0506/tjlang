@@ -7,10 +7,12 @@ use crate::values::Value;
 use crate::interpreter::Interpreter;
 use std::collections::HashMap;
 use tjlang_diagnostics::debug_println;
+use tjlang_ast::{Expression, Literal};
 
 /// Native function registry for standard library functions
 pub struct StdlibRegistry {
     functions: HashMap<String, NativeFunction>,
+    structs: HashMap<String, Value>,
 }
 
 /// Native function type that can be called from TJLang code
@@ -21,6 +23,7 @@ impl StdlibRegistry {
         debug_println!("🔧 Creating stdlib registry...");
         let mut registry = Self {
             functions: HashMap::new(),
+            structs: HashMap::new(),
         };
         registry.register_stdlib_functions();
         debug_println!("🔧 Stdlib registry created (functions enabled)");
@@ -52,10 +55,12 @@ impl StdlibRegistry {
         
         // TESTING Module functions
         self.register_testing_functions();
+        
     }
     
     /// Register IO module functions
     fn register_io_functions(&mut self) {
+        // Basic output functions
         self.functions.insert("IO::print".to_string(), |_interpreter, args| {
             if args.len() != 1 {
                 return Err("IO::print expects 1 argument".to_string());
@@ -73,10 +78,31 @@ impl StdlibRegistry {
                 .map(|_| Value::None)
                 .map_err(|e| e.to_string())
         });
-        
+
+        self.functions.insert("IO::printf".to_string(), |_interpreter, args| {
+            if args.len() < 1 {
+                return Err("IO::printf expects at least 1 argument".to_string());
+            }
+            let format = match &args[0] {
+                Value::String(s) => s,
+                _ => return Err("IO::printf expects string format".to_string()),
+            };
+            let format_args = &args[1..];
+            crate::stdlib::io::IO::printf(format, format_args)
+                .map(|_| Value::None)
+                .map_err(|e| e.to_string())
+        });
+
+        // Input functions
         self.functions.insert("IO::read_line".to_string(), |_interpreter, _args| {
             crate::stdlib::io::IO::read_line()
                 .map(|s| Value::String(s))
+                .map_err(|e| e.to_string())
+        });
+        
+        self.functions.insert("IO::read_char".to_string(), |_interpreter, _args| {
+            crate::stdlib::io::IO::read_char()
+                .map(|c| Value::String(c.to_string()))
                 .map_err(|e| e.to_string())
         });
         
@@ -97,15 +123,270 @@ impl StdlibRegistry {
                 .map(|b| Value::Bool(b))
                 .map_err(|e| e.to_string())
         });
-        
+
+        // Colored output functions
+        self.functions.insert("IO::print_color".to_string(), |_interpreter, args| {
+            if args.len() != 2 {
+                return Err("IO::print_color expects 2 arguments".to_string());
+            }
+            let text = match &args[0] {
+                Value::String(s) => s,
+                _ => return Err("IO::print_color expects string text".to_string()),
+            };
+            let color = match &args[1] {
+                Value::String(s) => s,
+                _ => return Err("IO::print_color expects string color".to_string()),
+            };
+            // Convert string color to Color enum
+            let color_enum = match color.as_str() {
+                "red" => crate::stdlib::io::Color::Red,
+                "green" => crate::stdlib::io::Color::Green,
+                "yellow" => crate::stdlib::io::Color::Yellow,
+                "blue" => crate::stdlib::io::Color::Blue,
+                "magenta" => crate::stdlib::io::Color::Magenta,
+                "cyan" => crate::stdlib::io::Color::Cyan,
+                "white" => crate::stdlib::io::Color::White,
+                "black" => crate::stdlib::io::Color::Black,
+                "reset" => crate::stdlib::io::Color::Reset,
+                _ => return Err("Invalid color name".to_string()),
+            };
+            crate::stdlib::io::IO::print_color(text, color_enum)
+                .map(|_| Value::None)
+                .map_err(|e| e.to_string())
+        });
+
+        self.functions.insert("IO::print_error".to_string(), |_interpreter, args| {
+            if args.len() != 1 {
+                return Err("IO::print_error expects 1 argument".to_string());
+            }
+            let message = match &args[0] {
+                Value::String(s) => s,
+                _ => return Err("IO::print_error expects string message".to_string()),
+            };
+            crate::stdlib::io::IO::print_error(message)
+                .map(|_| Value::None)
+                .map_err(|e| e.to_string())
+        });
+
+        self.functions.insert("IO::print_warning".to_string(), |_interpreter, args| {
+            if args.len() != 1 {
+                return Err("IO::print_warning expects 1 argument".to_string());
+            }
+            let message = match &args[0] {
+                Value::String(s) => s,
+                _ => return Err("IO::print_warning expects string message".to_string()),
+            };
+            crate::stdlib::io::IO::print_warning(message)
+                .map(|_| Value::None)
+                .map_err(|e| e.to_string())
+        });
+
+        self.functions.insert("IO::print_success".to_string(), |_interpreter, args| {
+            if args.len() != 1 {
+                return Err("IO::print_success expects 1 argument".to_string());
+            }
+            let message = match &args[0] {
+                Value::String(s) => s,
+                _ => return Err("IO::print_success expects string message".to_string()),
+            };
+            crate::stdlib::io::IO::print_success(message)
+                .map(|_| Value::None)
+                .map_err(|e| e.to_string())
+        });
+
+        self.functions.insert("IO::print_info".to_string(), |_interpreter, args| {
+            if args.len() != 1 {
+                return Err("IO::print_info expects 1 argument".to_string());
+            }
+            let message = match &args[0] {
+                Value::String(s) => s,
+                _ => return Err("IO::print_info expects string message".to_string()),
+            };
+            crate::stdlib::io::IO::print_info(message)
+                .map(|_| Value::None)
+                .map_err(|e| e.to_string())
+        });
+
+        self.functions.insert("IO::print_debug".to_string(), |_interpreter, args| {
+            if args.len() != 1 {
+                return Err("IO::print_debug expects 1 argument".to_string());
+            }
+            let message = match &args[0] {
+                Value::String(s) => s,
+                _ => return Err("IO::print_debug expects string message".to_string()),
+            };
+            crate::stdlib::io::IO::print_debug(message)
+                .map(|_| Value::None)
+                .map_err(|e| e.to_string())
+        });
+
+        // Terminal control functions
+        debug_println!("🔧 Registering IO::clear_screen");
         self.functions.insert("IO::clear_screen".to_string(), |_interpreter, _args| {
+            debug_println!("🔧 IO::clear_screen called");
             crate::stdlib::io::IO::clear_screen()
                 .map(|_| Value::None)
                 .map_err(|e| e.to_string())
         });
-        
+
+        self.functions.insert("IO::move_cursor".to_string(), |_interpreter, args| {
+            if args.len() != 2 {
+                return Err("IO::move_cursor expects 2 arguments".to_string());
+            }
+            let row = match &args[0] {
+                Value::Int(i) => *i as u16,
+                _ => return Err("IO::move_cursor expects int row".to_string()),
+            };
+            let col = match &args[1] {
+                Value::Int(i) => *i as u16,
+                _ => return Err("IO::move_cursor expects int col".to_string()),
+            };
+            crate::stdlib::io::IO::move_cursor(row, col)
+                .map(|_| Value::None)
+                .map_err(|e| e.to_string())
+        });
+
+        self.functions.insert("IO::hide_cursor".to_string(), |_interpreter, _args| {
+            crate::stdlib::io::IO::hide_cursor()
+                .map(|_| Value::None)
+                .map_err(|e| e.to_string())
+        });
+
+        self.functions.insert("IO::show_cursor".to_string(), |_interpreter, _args| {
+            crate::stdlib::io::IO::show_cursor()
+                .map(|_| Value::None)
+                .map_err(|e| e.to_string())
+        });
+
+        self.functions.insert("IO::get_terminal_size".to_string(), |_interpreter, _args| {
+            crate::stdlib::io::IO::get_terminal_size()
+                .map(|(w, h)| Value::Tuple(vec![Value::Int(w as i64), Value::Int(h as i64)]))
+                .map_err(|e| e.to_string())
+        });
+
         self.functions.insert("IO::is_terminal".to_string(), |_interpreter, _args| {
             Ok(Value::Bool(crate::stdlib::io::IO::is_terminal()))
+        });
+
+        self.functions.insert("IO::is_input_terminal".to_string(), |_interpreter, _args| {
+            Ok(Value::Bool(crate::stdlib::io::IO::is_input_terminal()))
+        });
+
+        // User interaction functions
+        self.functions.insert("IO::prompt".to_string(), |_interpreter, args| {
+            if args.len() != 1 {
+                return Err("IO::prompt expects 1 argument".to_string());
+            }
+            let message = match &args[0] {
+                Value::String(s) => s,
+                _ => return Err("IO::prompt expects string message".to_string()),
+            };
+            crate::stdlib::io::IO::prompt(message)
+                .map(|s| Value::String(s))
+                .map_err(|e| e.to_string())
+        });
+
+        self.functions.insert("IO::prompt_with_default".to_string(), |_interpreter, args| {
+            if args.len() != 2 {
+                return Err("IO::prompt_with_default expects 2 arguments".to_string());
+            }
+            let message = match &args[0] {
+                Value::String(s) => s,
+                _ => return Err("IO::prompt_with_default expects string message".to_string()),
+            };
+            let default = match &args[1] {
+                Value::String(s) => s,
+                _ => return Err("IO::prompt_with_default expects string default".to_string()),
+            };
+            crate::stdlib::io::IO::prompt_with_default(message, default)
+                .map(|s| Value::String(s))
+                .map_err(|e| e.to_string())
+        });
+
+        self.functions.insert("IO::confirm".to_string(), |_interpreter, args| {
+            if args.len() != 1 {
+                return Err("IO::confirm expects 1 argument".to_string());
+            }
+            let message = match &args[0] {
+                Value::String(s) => s,
+                _ => return Err("IO::confirm expects string message".to_string()),
+            };
+            crate::stdlib::io::IO::confirm(message)
+                .map(|b| Value::Bool(b))
+                .map_err(|e| e.to_string())
+        });
+
+        // Progress bar and spinner functions
+        self.functions.insert("IO::create_progress_bar".to_string(), |_interpreter, args| {
+            if args.len() != 1 {
+                return Err("IO::create_progress_bar expects 1 argument".to_string());
+            }
+            let total = match &args[0] {
+                Value::Int(i) => *i as u64,
+                _ => return Err("IO::create_progress_bar expects int total".to_string()),
+            };
+            // Note: ProgressBar is a struct that would need to be stored in the interpreter
+            // For now, we'll return a placeholder value
+            Ok(Value::String(format!("ProgressBar(total={})", total)))
+        });
+
+        self.functions.insert("IO::create_spinner".to_string(), |_interpreter, _args| {
+            // Note: Spinner is a struct that would need to be stored in the interpreter
+            // For now, we'll return a placeholder value
+            Ok(Value::String("Spinner".to_string()))
+        });
+
+        // Select functions - these are complex because they need to handle arrays
+        self.functions.insert("IO::select".to_string(), |_interpreter, args| {
+            if args.len() != 2 {
+                return Err("IO::select expects 2 arguments".to_string());
+            }
+            let message = match &args[0] {
+                Value::String(s) => s,
+                _ => return Err("IO::select expects string message".to_string()),
+            };
+            let options = match &args[1] {
+                Value::Vec(v) => {
+                    let mut string_options = Vec::new();
+                    for option in v {
+                        match option {
+                            Value::String(s) => string_options.push(s.clone()),
+                            _ => return Err("IO::select options must be strings".to_string()),
+                        }
+                    }
+                    string_options
+                },
+                _ => return Err("IO::select expects array of strings".to_string()),
+            };
+            crate::stdlib::io::IO::select(message, &options)
+                .map(|i| Value::Int(i as i64))
+                .map_err(|e| e.to_string())
+        });
+
+        self.functions.insert("IO::multi_select".to_string(), |_interpreter, args| {
+            if args.len() != 2 {
+                return Err("IO::multi_select expects 2 arguments".to_string());
+            }
+            let message = match &args[0] {
+                Value::String(s) => s,
+                _ => return Err("IO::multi_select expects string message".to_string()),
+            };
+            let options = match &args[1] {
+                Value::Vec(v) => {
+                    let mut string_options = Vec::new();
+                    for option in v {
+                        match option {
+                            Value::String(s) => string_options.push(s.clone()),
+                            _ => return Err("IO::multi_select options must be strings".to_string()),
+                        }
+                    }
+                    string_options
+                },
+                _ => return Err("IO::multi_select expects array of strings".to_string()),
+            };
+            crate::stdlib::io::IO::multi_select(message, &options)
+                .map(|indices| Value::Vec(indices.into_iter().map(|i| Value::Int(i as i64)).collect()))
+                .map_err(|e| e.to_string())
         });
     }
     
@@ -396,6 +677,16 @@ impl StdlibRegistry {
                 return Err("Index out of bounds".to_string());
             }
             Ok(vec[index].clone())
+        });
+        
+        // Set creation functions
+        self.functions.insert("COLLECTIONS::set_new".to_string(), |_interpreter, _args| {
+            Ok(Value::Set(std::collections::HashSet::new()))
+        });
+        
+        // Map creation functions  
+        self.functions.insert("COLLECTIONS::map_new".to_string(), |_interpreter, _args| {
+            Ok(Value::Map(std::collections::HashMap::new()))
         });
     }
     

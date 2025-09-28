@@ -14,6 +14,8 @@ use crate::values::Value;
 use std::io::{self, Write, Read, BufRead, BufReader, BufWriter};
 use std::fs::File;
 use std::path::Path;
+use std::str::FromStr;
+
 
 /// IO module for input/output operations
 pub struct IO;
@@ -21,7 +23,7 @@ pub struct IO;
 impl IO {
     /// Print a value to stdout
     pub fn print(value: &Value) -> Result<(), String> {
-        print!("{}\n", value.to_string());
+        print!("{}", value.to_string());
         io::stdout().flush().map_err(|e| e.to_string())?;
         Ok(())
     }
@@ -75,10 +77,15 @@ impl IO {
             _ => Err("Invalid boolean value".to_string()),
         }
     }
+
+
+
+
+    /// print with color
+    pub fn print_color<C: IntoColor>(text: &str, color: C) -> Result<(), String> {
+        let color_enum = color.into_color()?;
     
-    /// Print with color
-    pub fn print_color(text: &str, color: Color) -> Result<(), String> {
-        let color_code = match color {
+        let color_code = match color_enum {
             Color::Red => "\x1b[31m",
             Color::Green => "\x1b[32m",
             Color::Yellow => "\x1b[33m",
@@ -89,6 +96,7 @@ impl IO {
             Color::Black => "\x1b[30m",
             Color::Reset => "\x1b[0m",
         };
+    
         print!("{}{}{}", color_code, text, "\x1b[0m");
         io::stdout().flush().map_err(|e| e.to_string())?;
         Ok(())
@@ -248,6 +256,41 @@ pub enum Color {
     Reset,
 }
 
+
+impl FromStr for Color {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "red" => Ok(Color::Red),
+            "green" => Ok(Color::Green),
+            "yellow" => Ok(Color::Yellow),
+            "blue" => Ok(Color::Blue),
+            "magenta" => Ok(Color::Magenta),
+            "cyan" => Ok(Color::Cyan),
+            "white" => Ok(Color::White),
+            "black" => Ok(Color::Black),
+            "reset" => Ok(Color::Reset),
+            _ => Err(format!("Unknown color: {}", s)),
+        }
+    }
+}
+
+pub trait IntoColor {
+    fn into_color(self) -> Result<Color, String>;
+}
+
+impl IntoColor for Color {
+    fn into_color(self) -> Result<Color, String> {
+        Ok(self)
+    }
+}
+
+impl<'a> IntoColor for &'a str {
+    fn into_color(self) -> Result<Color, String> {
+        self.parse::<Color>()
+    }
+}
 /// Progress bar for long operations
 pub struct ProgressBar {
     total: u64,
