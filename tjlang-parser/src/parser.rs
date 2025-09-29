@@ -133,11 +133,11 @@ impl PestParser {
     /// Handle pest parsing errors with rich diagnostics
     fn handle_pest_error(&mut self, error: &pest::error::Error<Rule>, source: &str, file_id: codespan::FileId) {
         match error {
-            pest::error::Error { location, .. } => {
-                let pos = match location {
-                    pest::error::InputLocation::Pos(pos) => *pos,
-                    pest::error::InputLocation::Span((start, _)) => *start,
-                };
+                    pest::error::Error { location, .. } => {
+                        let pos = match location {
+                            pest::error::InputLocation::Pos(pos) => *pos,
+                            pest::error::InputLocation::Span((start, _)) => *start,
+                        };
                 
                 // Create a span for the error location
                 let span = pest::Span::new(source, pos, pos + 1)
@@ -447,7 +447,7 @@ impl PestParser {
 
     /// Parse statement from pest pair
     fn parse_statement(&mut self, pair: Pair<Rule>) -> Result<Option<Statement>, Box<dyn std::error::Error>> {
-        debug_println!("Parsing statement rule: {:?}, content: '{}'", pair.as_rule(), pair.as_str());
+        debug_println!("[DEBUG] parse_statement: rule={:?}, content='{}'", pair.as_rule(), pair.as_str());
         match pair.as_rule() {
             Rule::statement => {
                 let inner = pair.into_inner().next().ok_or("Empty statement")?;
@@ -466,6 +466,7 @@ impl PestParser {
                         Ok(Some(Statement::Block(block)))
                     }
                     Rule::if_stmt => {
+                        debug_println!("[DEBUG] parse_statement: found if_stmt rule");
                         let if_stmt = self.parse_if_stmt(inner)?;
                         Ok(Some(Statement::If(if_stmt)))
                     }
@@ -663,6 +664,7 @@ impl PestParser {
         let mut statements = Vec::new();
         
         for inner_pair in pair.into_inner() {
+            debug_println!("[DEBUG] parse_block: inner_pair rule={:?}, content='{}'", inner_pair.as_rule(), inner_pair.as_str());
             if let Some(statement) = self.parse_statement(inner_pair)? {
                 statements.push(statement);
             }
@@ -807,6 +809,12 @@ impl PestParser {
                     debug_println!("[DEBUG] Found postfix_expr in precedence chain, calling parse_postfix_expr");
                     return self.parse_postfix_expr(inner);
                 }
+            Rule::relational => {
+                // Handle comparison operations like x > y, x < y, etc.
+                debug_println!("[DEBUG] Found relational rule, parsing binary operation");
+                debug_println!("[DEBUG] Relational content: '{}'", inner.as_str());
+                return self.parse_binary_operation(inner);
+                }
                 Rule::additive => {
                     // Handle binary operations like x + y
                     debug_println!("[DEBUG] Found additive rule, parsing binary operation");
@@ -841,6 +849,7 @@ impl PestParser {
         debug_println!("[DEBUG] parse_binary_operation: content = '{}'", pair.as_str());
         let span = self.create_span(pair.as_span());
         let rule = pair.as_rule();
+        let content = pair.as_str().to_string(); // Get content before moving pair
         let children: Vec<_> = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE).collect();
         debug_println!("[DEBUG] Binary operation children: {} items", children.len());
         for (i, child) in children.iter().enumerate() {
@@ -866,6 +875,16 @@ impl PestParser {
                     debug_println!("[DEBUG] Found postfix_expr in binary operation, calling parse_postfix_expr");
                     return self.parse_postfix_expr(child.clone());
                 }
+                Rule::shift_expr | Rule::additive | Rule::multiplicative => {
+                    // Handle these rules by parsing their single operand as an expression
+                    debug_println!("[DEBUG] Found {:?} with single operand '{}', parsing as expression", child.as_rule(), child.as_str());
+                    debug_println!("[DEBUG] Calling parse_expression for single operand '{}'", child.as_str());
+                    debug_println!("[DEBUG] Child rule: {:?}, content: '{}'", child.as_rule(), child.as_str());
+                    debug_println!("[DEBUG] About to call parse_expression with rule: {:?}", child.as_rule());
+                    let result = self.parse_expression(child.clone());
+                    debug_println!("[DEBUG] Single operand result: {:?}", result);
+                    return result;
+                }
                 _ => {
                     // For other rules, try to parse as expression
                     return self.parse_expression(child.clone());
@@ -875,13 +894,32 @@ impl PestParser {
         
         if children.len() == 2 {
             // Binary operation: left + right (operator is implicit)
+            debug_println!("[DEBUG] parse_binary_operation: parsing 2 children for rule {:?}", rule);
+            debug_println!("[DEBUG] Child 0: rule={:?}, content='{}'", children[0].as_rule(), children[0].as_str());
+            debug_println!("[DEBUG] Child 1: rule={:?}, content='{}'", children[1].as_rule(), children[1].as_str());
             let left = self.parse_expression(children[0].clone())?;
+            debug_println!("[DEBUG] Left parsed as: {:?}", left);
             let right = self.parse_expression(children[1].clone())?;
+            debug_println!("[DEBUG] Right parsed as: {:?}", right);
             
             // Determine operator based on the rule context
             let operator = match rule {
                 Rule::additive => BinaryOperator::Add, // Default to + for additive
                 Rule::multiplicative => BinaryOperator::Multiply, // Default to * for multiplicative
+                Rule::relational => {
+                    // For relational operations, we need to find the operator in the content
+                    if content.contains(">=") {
+                        BinaryOperator::GreaterThanEqual
+                    } else if content.contains("<=") {
+                        BinaryOperator::LessThanEqual
+                    } else if content.contains(">") {
+                        BinaryOperator::GreaterThan
+                    } else if content.contains("<") {
+                        BinaryOperator::LessThan
+                    } else {
+                        BinaryOperator::Add // Fallback
+                    }
+                },
                 _ => BinaryOperator::Add, // Default fallback
             };
             
@@ -936,6 +974,13 @@ impl PestParser {
         debug_println!("[DEBUG] [ENTRY] parse_expression: rule = {:?}, content = '{}'", pair.as_rule(), pair.as_str());
         
         match pair.as_rule() {
+            Rule::shift_expr => {
+                // Handle shift_expr directly
+                debug_println!("[DEBUG] [DIRECT_SHIFT_EXPR] Direct shift_expr case: calling parse_precedence_chain for '{}'", pair.as_str());
+                let result = self.parse_precedence_chain(pair);
+                debug_println!("[DEBUG] [DIRECT_SHIFT_EXPR] parse_precedence_chain result: {:?}", result);
+                result
+            }
             Rule::expression => {
                 // For the top-level expression rule, just parse its inner content
                 let inner = pair.into_inner().next().ok_or("Empty expression")?;
@@ -1064,8 +1109,25 @@ impl PestParser {
                 debug_println!("[DEBUG] [DIRECT_OR_EXPR] Direct or_expr case: calling parse_precedence_chain for '{}'", pair.as_str());
                 self.parse_precedence_chain(pair)
             }
+            Rule::shift_expr => {
+                // Handle shift_expr directly
+                debug_println!("[DEBUG] [DIRECT_SHIFT_EXPR] Direct shift_expr case: calling parse_precedence_chain for '{}'", pair.as_str());
+                let result = self.parse_precedence_chain(pair);
+                debug_println!("[DEBUG] [DIRECT_SHIFT_EXPR] parse_precedence_chain result: {:?}", result);
+                result
+            }
+            Rule::and_expr | Rule::bit_or_expr | Rule::bit_xor_expr | Rule::bit_and_expr | 
+            Rule::equality | Rule::relational | Rule::shift_expr | Rule::additive | 
+            Rule::multiplicative | Rule::power | Rule::unary | Rule::postfix_expr => {
+                // Handle all expression rules by delegating to precedence chain
+                debug_println!("[DEBUG] [EXPR_RULE] Found {:?} rule, calling parse_precedence_chain for '{}'", pair.as_rule(), pair.as_str());
+                let result = self.parse_precedence_chain(pair);
+                debug_println!("[DEBUG] [EXPR_RULE] parse_precedence_chain result: {:?}", result);
+                result
+            }
             _ => {
                 // Default case - return simple placeholder
+                debug_println!("[DEBUG] [DEFAULT] Unhandled rule {:?} for '{}', returning Literal(Int(0))", pair.as_rule(), pair.as_str());
                 Ok(Expression::Literal(Literal::Int(0)))
             }
         }
@@ -1212,22 +1274,28 @@ impl PestParser {
                 Ok(left)
             }
             Rule::relational => {
+                println!("🔍 PARSER: relational rule, content: '{}'", pair.as_str());
                 let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                println!("🔍 PARSER: relational left: {:?}", left);
                 
                 while let Some(op_pair) = inner.next() {
+                    println!("🔍 PARSER: relational operator: '{}'", op_pair.as_str());
                     match op_pair.as_str() {
                         "<" => {
                             let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            println!("🔍 PARSER: relational right: {:?}", right);
                             left = Expression::Binary {
                                 left: Box::new(left),
                                 operator: BinaryOperator::LessThan,
                                 right: Box::new(right),
                                 span: self.create_span(span),
                             };
+                            println!("🔍 PARSER: relational result: {:?}", left);
                         }
                         ">" => {
                             let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            println!("🔍 PARSER: relational right: {:?}", right);
                             left = Expression::Binary {
                                 left: Box::new(left),
                                 operator: BinaryOperator::GreaterThan,
@@ -1334,7 +1402,10 @@ impl PestParser {
                             let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
                             left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::ShiftRight, right: Box::new(right), span: self.create_span(span) };
                         }
-                        _ => { left = self.parse_expression(op_pair)?; }
+                        _ => { 
+                            // This should not happen for shift operations, but if it does, just return the left operand
+                            break;
+                        }
                     }
                 }
                 Ok(left)
@@ -1524,7 +1595,15 @@ impl PestParser {
     /// Parse if statement
     fn parse_if_stmt(&mut self, pair: Pair<Rule>) -> Result<IfStatement, Box<dyn std::error::Error>> {
         let span = pair.as_span();
+        debug_println!("[DEBUG] parse_if_stmt: content='{}'", pair.as_str());
         let mut inner = pair.into_inner();
+        
+        // Debug: print all tokens
+        let tokens: Vec<_> = inner.clone().collect();
+        debug_println!("[DEBUG] parse_if_stmt tokens: {}", tokens.len());
+        for (i, token) in tokens.iter().enumerate() {
+            debug_println!("[DEBUG]   Token {}: rule={:?}, content='{}'", i, token.as_rule(), token.as_str());
+        }
         
         // The "if" keyword is consumed by the grammar, so the first inner pair is the expression
         let condition_pair = inner.next().ok_or_else(|| {
@@ -1559,6 +1638,8 @@ impl PestParser {
         
         // Parse elif branches
         let mut elif_branches = Vec::new();
+        // Capture a non-elif token (most likely the else_branch) without losing it
+        let mut pending_else_pair: Option<Pair<Rule>> = None;
         while let Some(branch_pair) = inner.next() {
             if branch_pair.as_rule() == Rule::elif_branch {
                 let branch_span = branch_pair.as_span();
@@ -1601,14 +1682,17 @@ impl PestParser {
                     span: self.create_span(branch_span),
                 });
             } else {
-                // This should be the else branch
+                // Not an elif. Save it so we can handle as else (if applicable)
+                pending_else_pair = Some(branch_pair);
                 break;
             }
         }
         
         // Parse else branch if present
-        let else_block = if let Some(else_pair) = inner.next() {
+        let else_block = if let Some(else_pair) = pending_else_pair.or_else(|| inner.next()) {
+            debug_println!("[DEBUG] Found else_pair: rule={:?}, content='{}'", else_pair.as_rule(), else_pair.as_str());
             if else_pair.as_rule() == Rule::else_branch {
+                debug_println!("[DEBUG] Parsing else_branch");
                 let else_span = else_pair.as_span();
                 let mut else_inner = else_pair.into_inner();
                 
@@ -1621,11 +1705,14 @@ impl PestParser {
                     );
                     "Missing else block"
                 })?;
+                debug_println!("[DEBUG] Parsing else block");
                 Some(self.parse_block(else_block_pair)?)
             } else {
+                debug_println!("[DEBUG] else_pair is not else_branch, rule={:?}", else_pair.as_rule());
                 None
             }
         } else {
+            debug_println!("[DEBUG] No else_pair found");
             None
         };
         
