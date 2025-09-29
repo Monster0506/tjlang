@@ -4,7 +4,7 @@ def main() -> int {
     # Test core methods on integers
     x: int = 42
     IO.print("test")
-    IO.println("")
+    IO.println()
     IO.println("=== INTEGER METHODS ===")
     IO.println("x: int = 42")
     IO.println("x.to_string(): " + x.to_string())
@@ -117,39 +117,87 @@ def main() -> int {
     IO.println("After clear")
 
     IO.print_success("Print Success")
-    IO.println("")
+    IO.println()
     IO.print_warning("Print Warning")
-    IO.println("")
+    IO.println()
     IO.print_error("Print Error")
-    IO.println("")
+    IO.println()
     IO.print_debug("Print Debug")
-    IO.println("")
-    IO.println("")
+    IO.println()
+    IO.print_info("Print Info")
+    IO.println()
+    IO.println()
     IO.print_color("Print Color Magenta", "magenta")
-    IO.println("")
+    IO.println()
     IO.print_color("Print Color Green", "green")
-    IO.println("")
+    IO.println()
     IO.print_color("Print Color Red", "red")
-    IO.println("")
+    IO.println()
     IO.print_color("Print Color Yellow", "yellow")
-    IO.println("")
+    IO.println()
     IO.print_color("Print Color Cyan", "cyan")
-    IO.println("")
+    IO.println()
     IO.print_color("Print Color Blue", "blue")
-    IO.println("")
+    IO.println()
     IO.print_color("Print Color Black", "black")
-    IO.println("")
+    IO.println()
     IO.print_color("Print Color White", "white")
-    IO.println("")
+    IO.println()
     IO.print_color("Print Color Reset", "reset")
-    IO.println("")
+    IO.println()
 
     # Test terminal size
+
+    IO.print("Enter a name: ")
+    name: str = IO.read_line()
+    IO.print("Enter an int: ")
+    age: int = IO.read_int()
+    IO.printf("Name: {}, Age: {}", [name, age]) 
+    IO.println()
+    IO.printf("Name: {1}, Age: {0}", [name, age]) 
+
+    IO.println()
+    IO.print("Enter a decimal: ")
+    num: float = IO.read_float() 
+    IO.println("You entered: " + num.to_string())
+    
+    IO.print("true/1/yes/y/on or false/0/no/n/off: ")
+    b: bool  = IO.read_bool()
+    IO.printf("You entered {}", [b.to_string()])
+
+    IO.clear_screen()
+
+    IO.move_cursor(5, 3)
+    IO.println("test")
+
     size: Tuple<int, int> = IO.get_terminal_size()
     IO.println("Terminal size: " + size.to_string())
-    name: str = "Alice"
-    age: int = 25
-    IO.printf("Name: {}, Age: {}",[name, age])  # Prints: Name: Alice, Age: 25
+
+    IO.println("Is terminal: "+ IO.is_terminal().to_string())
+    IO.println("Is input terminal: "+ IO.is_input_terminal().to_string())
+
+
+    r: str = IO.prompt("What is your name")
+    IO.printf("Your name is {}", r)
+    IO.println()
+    
+    k: str = IO.prompt_with_default("What is your name", "tj")
+    IO.printf("Your name is {}", k)
+    IO.println()
+
+    confirm: bool = IO.confirm("Confirm?")
+    IO.printf("Confirmed? {}", confirm.to_string)
+    IO.println()
+
+    options: [str] = ["Apple", "Banana", "Cherry", "Date"]
+    choice: int = IO.select("Choose an option:", options)
+    IO.println("You selected: " + options[choice])
+
+    selections: Vec<int> = IO.multi_select("Choose fruits (comma-separated):", options)
+    IO.println("You selected: " + selections.to_string())
+
+
+
     return 0
 }
 
