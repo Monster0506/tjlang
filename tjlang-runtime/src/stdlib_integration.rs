@@ -29,35 +29,35 @@ impl StdlibRegistry {
         debug_println!("🔧 Stdlib registry created (functions enabled)");
         registry
     }
-
+    
     /// Register all standard library functions
     fn register_stdlib_functions(&mut self) {
         // IO Module functions
         self.register_io_functions();
-
+        
         // FILE Module functions
         self.register_file_functions();
-
+        
         // MATH Module functions
         self.register_math_functions();
-
+        
         // STRING Module functions
         self.register_string_functions();
-
+        
         // COLLECTIONS Module functions
         self.register_collections_functions();
-
+        
         // TIME Module functions
         self.register_time_functions();
-
+        
         // ERROR Module functions
         self.register_error_functions();
-
+        
         // TESTING Module functions
         self.register_testing_functions();
-
+        
     }
-
+    
     /// Register IO module functions
     fn register_io_functions(&mut self) {
         // Basic output functions
@@ -69,22 +69,16 @@ impl StdlibRegistry {
                 .map(|_| Value::None)
                 .map_err(|e| e.to_string())
         });
-
+        
         self.functions.insert("IO::println".to_string(), |_interpreter, args| {
-            match args.len() {
-                0 => {
-                    crate::stdlib::io::IO::println(&Value::String("".to_string()))
-                        .map(|_| Value::None)
-                        .map_err(|e| e.to_string())
-                }
-                1 => {
-                    crate::stdlib::io::IO::println(&args[0])
-                        .map(|_| Value::None)
-                        .map_err(|e| e.to_string())
-                }
-                _ => Err("IO::println expects 0 or 1 argument".to_string()),
+            if args.len() != 1 {
+                return Err("IO::println expects 1 argument".to_string());
             }
+            crate::stdlib::io::IO::println(&args[0])
+                .map(|_| Value::None)
+                .map_err(|e| e.to_string())
         });
+
         self.functions.insert("IO::printf".to_string(), |_interpreter, args| {
             if args.len() < 1 {
                 return Err("IO::printf expects at least 1 argument".to_string());
@@ -105,25 +99,25 @@ impl StdlibRegistry {
                 .map(|s| Value::String(s))
                 .map_err(|e| e.to_string())
         });
-
+        
         self.functions.insert("IO::read_char".to_string(), |_interpreter, _args| {
             crate::stdlib::io::IO::read_char()
                 .map(|c| Value::String(c.to_string()))
                 .map_err(|e| e.to_string())
         });
-
+        
         self.functions.insert("IO::read_int".to_string(), |_interpreter, _args| {
             crate::stdlib::io::IO::read_int()
                 .map(|i| Value::Int(i))
                 .map_err(|e| e.to_string())
         });
-
+        
         self.functions.insert("IO::read_float".to_string(), |_interpreter, _args| {
             crate::stdlib::io::IO::read_float()
                 .map(|f| Value::Float(f))
                 .map_err(|e| e.to_string())
         });
-
+        
         self.functions.insert("IO::read_bool".to_string(), |_interpreter, _args| {
             crate::stdlib::io::IO::read_bool()
                 .map(|b| Value::Bool(b))
@@ -395,7 +389,7 @@ impl StdlibRegistry {
                 .map_err(|e| e.to_string())
         });
     }
-
+    
     /// Register FILE module functions
     fn register_file_functions(&mut self) {
         self.functions.insert("FILE::read_to_string".to_string(), |_interpreter, args| {
@@ -410,7 +404,7 @@ impl StdlibRegistry {
                 .map(|s| Value::String(s))
                 .map_err(|e| e.to_string())
         });
-
+        
         self.functions.insert("FILE::write_string".to_string(), |_interpreter, args| {
             if args.len() != 2 {
                 return Err("FILE::write_string expects 2 arguments".to_string());
@@ -427,7 +421,7 @@ impl StdlibRegistry {
                 .map(|_| Value::None)
                 .map_err(|e| e.to_string())
         });
-
+        
         self.functions.insert("FILE::exists".to_string(), |_interpreter, args| {
             if args.len() != 1 {
                 return Err("FILE::exists expects 1 argument".to_string());
@@ -438,7 +432,7 @@ impl StdlibRegistry {
             };
             Ok(Value::Bool(crate::stdlib::file::FILE::exists(path)))
         });
-
+        
         self.functions.insert("FILE::is_file".to_string(), |_interpreter, args| {
             if args.len() != 1 {
                 return Err("FILE::is_file expects 1 argument".to_string());
@@ -449,7 +443,7 @@ impl StdlibRegistry {
             };
             Ok(Value::Bool(crate::stdlib::file::FILE::is_file(path)))
         });
-
+        
         self.functions.insert("FILE::is_dir".to_string(), |_interpreter, args| {
             if args.len() != 1 {
                 return Err("FILE::is_dir expects 1 argument".to_string());
@@ -461,7 +455,7 @@ impl StdlibRegistry {
             Ok(Value::Bool(crate::stdlib::file::FILE::is_dir(path)))
         });
     }
-
+    
     /// Register MATH module functions
     fn register_math_functions(&mut self) {
         // Basic arithmetic
@@ -481,7 +475,7 @@ impl StdlibRegistry {
             };
             Ok(Value::Float(crate::stdlib::math::MATH::add(a, b)))
         });
-
+        
         self.functions.insert("MATH::subtract".to_string(), |_interpreter, args| {
             if args.len() != 2 {
                 return Err("MATH::subtract expects 2 arguments".to_string());
@@ -498,7 +492,7 @@ impl StdlibRegistry {
             };
             Ok(Value::Float(crate::stdlib::math::MATH::subtract(a, b)))
         });
-
+        
         self.functions.insert("MATH::multiply".to_string(), |_interpreter, args| {
             if args.len() != 2 {
                 return Err("MATH::multiply expects 2 arguments".to_string());
@@ -515,7 +509,7 @@ impl StdlibRegistry {
             };
             Ok(Value::Float(crate::stdlib::math::MATH::multiply(a, b)))
         });
-
+        
         self.functions.insert("MATH::divide".to_string(), |_interpreter, args| {
             if args.len() != 2 {
                 return Err("MATH::divide expects 2 arguments".to_string());
@@ -532,7 +526,7 @@ impl StdlibRegistry {
             };
             Ok(Value::Float(crate::stdlib::math::MATH::divide(a, b)))
         });
-
+        
         self.functions.insert("MATH::sqrt".to_string(), |_interpreter, args| {
             if args.len() != 1 {
                 return Err("MATH::sqrt expects 1 argument".to_string());
@@ -544,7 +538,7 @@ impl StdlibRegistry {
             };
             Ok(Value::Float(crate::stdlib::math::MATH::sqrt(a)))
         });
-
+        
         self.functions.insert("MATH::sin".to_string(), |_interpreter, args| {
             if args.len() != 1 {
                 return Err("MATH::sin expects 1 argument".to_string());
@@ -556,7 +550,7 @@ impl StdlibRegistry {
             };
             Ok(Value::Float(crate::stdlib::math::MATH::sin(a)))
         });
-
+        
         self.functions.insert("MATH::cos".to_string(), |_interpreter, args| {
             if args.len() != 1 {
                 return Err("MATH::cos expects 1 argument".to_string());
@@ -568,17 +562,17 @@ impl StdlibRegistry {
             };
             Ok(Value::Float(crate::stdlib::math::MATH::cos(a)))
         });
-
+        
         // Constants
         self.functions.insert("MATH::PI".to_string(), |_interpreter, _args| {
             Ok(Value::Float(crate::stdlib::math::MATH::PI))
         });
-
+        
         self.functions.insert("MATH::E".to_string(), |_interpreter, _args| {
             Ok(Value::Float(crate::stdlib::math::MATH::E))
         });
     }
-
+    
     /// Register STRING module functions
     fn register_string_functions(&mut self) {
         self.functions.insert("STRING::length".to_string(), |_interpreter, args| {
@@ -591,7 +585,7 @@ impl StdlibRegistry {
             };
             Ok(Value::Int(crate::stdlib::string::STRING::length(s) as i64))
         });
-
+        
         self.functions.insert("STRING::to_uppercase".to_string(), |_interpreter, args| {
             if args.len() != 1 {
                 return Err("STRING::to_uppercase expects 1 argument".to_string());
@@ -602,7 +596,7 @@ impl StdlibRegistry {
             };
             Ok(Value::String(crate::stdlib::string::STRING::to_uppercase(s)))
         });
-
+        
         self.functions.insert("STRING::to_lowercase".to_string(), |_interpreter, args| {
             if args.len() != 1 {
                 return Err("STRING::to_lowercase expects 1 argument".to_string());
@@ -613,7 +607,7 @@ impl StdlibRegistry {
             };
             Ok(Value::String(crate::stdlib::string::STRING::to_lowercase(s)))
         });
-
+        
         self.functions.insert("STRING::contains".to_string(), |_interpreter, args| {
             if args.len() != 2 {
                 return Err("STRING::contains expects 2 arguments".to_string());
@@ -628,7 +622,7 @@ impl StdlibRegistry {
             };
             Ok(Value::Bool(crate::stdlib::string::STRING::contains(s, pattern)))
         });
-
+        
         self.functions.insert("STRING::replace".to_string(), |_interpreter, args| {
             if args.len() != 3 {
                 return Err("STRING::replace expects 3 arguments".to_string());
@@ -648,13 +642,13 @@ impl StdlibRegistry {
             Ok(Value::String(crate::stdlib::string::STRING::replace(s, from, to)))
         });
     }
-
+    
     /// Register COLLECTIONS module functions
     fn register_collections_functions(&mut self) {
         self.functions.insert("COLLECTIONS::array_new".to_string(), |_interpreter, _args| {
             Ok(Value::Vec(Vec::new()))
         });
-
+        
         self.functions.insert("COLLECTIONS::array_push".to_string(), |_interpreter, args| {
             if args.len() != 2 {
                 return Err("COLLECTIONS::array_push expects 2 arguments".to_string());
@@ -666,7 +660,7 @@ impl StdlibRegistry {
             vec.push(args[1].clone());
             Ok(Value::Vec(vec))
         });
-
+        
         self.functions.insert("COLLECTIONS::array_get".to_string(), |_interpreter, args| {
             if args.len() != 2 {
                 return Err("COLLECTIONS::array_get expects 2 arguments".to_string());
@@ -684,17 +678,17 @@ impl StdlibRegistry {
             }
             Ok(vec[index].clone())
         });
-
+        
         // Set creation functions
         self.functions.insert("COLLECTIONS::set_new".to_string(), |_interpreter, _args| {
             Ok(Value::Set(std::collections::HashSet::new()))
         });
-
+        
         // Map creation functions  
         self.functions.insert("COLLECTIONS::map_new".to_string(), |_interpreter, _args| {
             Ok(Value::Map(std::collections::HashMap::new()))
         });
-
+        
         // Queue creation functions
         self.functions.insert("COLLECTIONS::queue_new".to_string(), |_interpreter, _args| {
             debug_println!("🔍 DEBUG: COLLECTIONS::queue_new called");
@@ -703,7 +697,7 @@ impl StdlibRegistry {
                 fields: std::collections::HashMap::new(),
             })
         });
-
+        
         // Priority Queue creation functions
         self.functions.insert("COLLECTIONS::priority_queue_new".to_string(), |_interpreter, _args| {
             Ok(Value::Struct {
@@ -711,7 +705,7 @@ impl StdlibRegistry {
                 fields: std::collections::HashMap::new(),
             })
         });
-
+        
         // BTree creation functions
         self.functions.insert("COLLECTIONS::btree_map_new".to_string(), |_interpreter, _args| {
             Ok(Value::Struct {
@@ -719,14 +713,14 @@ impl StdlibRegistry {
                 fields: std::collections::HashMap::new(),
             })
         });
-
+        
         self.functions.insert("COLLECTIONS::btree_set_new".to_string(), |_interpreter, _args| {
             Ok(Value::Struct {
                 name: "BTreeSet".to_string(),
                 fields: std::collections::HashMap::new(),
             })
         });
-
+        
         // Advanced collection creation functions
         self.functions.insert("COLLECTIONS::counter_new".to_string(), |_interpreter, _args| {
             Ok(Value::Struct {
@@ -734,42 +728,42 @@ impl StdlibRegistry {
                 fields: std::collections::HashMap::new(),
             })
         });
-
+        
         self.functions.insert("COLLECTIONS::default_dict_new".to_string(), |_interpreter, _args| {
             Ok(Value::Struct {
                 name: "DefaultDict".to_string(),
                 fields: std::collections::HashMap::new(),
             })
         });
-
+        
         self.functions.insert("COLLECTIONS::chain_map_new".to_string(), |_interpreter, _args| {
             Ok(Value::Struct {
                 name: "ChainMap".to_string(),
                 fields: std::collections::HashMap::new(),
             })
         });
-
+        
         self.functions.insert("COLLECTIONS::named_tuple_new".to_string(), |_interpreter, _args| {
             Ok(Value::Struct {
                 name: "NamedTuple".to_string(),
                 fields: std::collections::HashMap::new(),
             })
         });
-
+        
         self.functions.insert("COLLECTIONS::ordered_dict_new".to_string(), |_interpreter, _args| {
             Ok(Value::Struct {
                 name: "OrderedDict".to_string(),
                 fields: std::collections::HashMap::new(),
             })
         });
-
+        
         self.functions.insert("COLLECTIONS::deque_new".to_string(), |_interpreter, _args| {
             Ok(Value::Struct {
                 name: "Deque".to_string(),
                 fields: std::collections::HashMap::new(),
             })
         });
-
+        
         self.functions.insert("COLLECTIONS::heap_new".to_string(), |_interpreter, _args| {
             Ok(Value::Struct {
                 name: "Heap".to_string(),
@@ -777,17 +771,17 @@ impl StdlibRegistry {
             })
         });
     }
-
+    
     /// Register TIME module functions
     fn register_time_functions(&mut self) {
         self.functions.insert("TIME::now".to_string(), |_interpreter, _args| {
             Ok(Value::Float(crate::stdlib::time::TIME::now() as f64))
         });
-
+        
         self.functions.insert("TIME::now_string".to_string(), |_interpreter, _args| {
             Ok(Value::String(crate::stdlib::time::TIME::now_string()))
         });
-
+        
         self.functions.insert("TIME::sleep".to_string(), |_interpreter, args| {
             if args.len() != 1 {
                 return Err("TIME::sleep expects 1 argument".to_string());
@@ -801,7 +795,7 @@ impl StdlibRegistry {
             Ok(Value::None)
         });
     }
-
+    
     /// Register ERROR module functions
     fn register_error_functions(&mut self) {
         self.functions.insert("ERROR::new".to_string(), |_interpreter, args| {
@@ -814,7 +808,7 @@ impl StdlibRegistry {
             };
             Ok(Value::String(crate::stdlib::error::ERROR::new(message)))
         });
-
+        
         self.functions.insert("ERROR::log".to_string(), |_interpreter, args| {
             if args.len() != 1 {
                 return Err("ERROR::log expects 1 argument".to_string());
@@ -827,7 +821,7 @@ impl StdlibRegistry {
             Ok(Value::None)
         });
     }
-
+    
     /// Register TESTING module functions
     fn register_testing_functions(&mut self) {
         self.functions.insert("TESTING::assert_true".to_string(), |_interpreter, args| {
@@ -846,7 +840,7 @@ impl StdlibRegistry {
                 .map(|_| Value::None)
                 .map_err(|e| e.to_string())
         });
-
+        
         self.functions.insert("TESTING::assert_equal".to_string(), |_interpreter, args| {
             if args.len() != 3 {
                 return Err("TESTING::assert_equal expects 3 arguments".to_string());
@@ -862,17 +856,17 @@ impl StdlibRegistry {
                 .map_err(|e| e.to_string())
         });
     }
-
+    
     /// Get a native function by name
     pub fn get_function(&self, name: &str) -> Option<&NativeFunction> {
         self.functions.get(name)
     }
-
+    
     /// Check if a function exists
     pub fn has_function(&self, name: &str) -> bool {
         self.functions.contains_key(name)
     }
-
+    
     /// Get all available function names
     pub fn get_function_names(&self) -> Vec<String> {
         self.functions.keys().cloned().collect()

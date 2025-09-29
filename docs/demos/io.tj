@@ -196,8 +196,6 @@ def main() -> int {
     selections: Vec<int> = IO.multi_select("Choose fruits (comma-separated):", options)
     IO.println("You selected: " + selections.to_string())
 
-
-
     return 0
 }
 

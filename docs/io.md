@@ -97,25 +97,25 @@ if continue {
 
 Terminal colors and styled output for better user experience.
 
-### `print_color(text: str, color: str) -> Result<(), str>`
+### `print_color(text: str, color: Color) -> Result<(), str>`
 Prints text in the specified color.
 
 ```tjlang
-IO.print_color("Error message", "red")
-IO.print_color("Success message", "green")
-IO.print_color("Warning message", "yellow")
+IO.print_color("Error message", Color::Red)
+IO.print_color("Success message", Color::Green)
+IO.print_color("Warning message", Color::Yellow)
 ```
 
 ### Available Colors
-- `Red` - Red text
-- `Green` - Green text  
-- `Yellow` - Yellow text
-- `Blue` - Blue text
-- `Magenta` - Magenta text
-- `Cyan` - Cyan text
-- `White` - White text
-- `Black` - Black text
-- `Reset` - Reset to default
+- `Color::Red` - Red text
+- `Color::Green` - Green text  
+- `Color::Yellow` - Yellow text
+- `Color::Blue` - Blue text
+- `Color::Magenta` - Magenta text
+- `Color::Cyan` - Cyan text
+- `Color::White` - White text
+- `Color::Black` - Black text
+- `Color::Reset` - Reset to default
 
 ### `print_error(message: str) -> Result<(), str>`
 Prints an error message in red.
