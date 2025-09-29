@@ -1,0 +1,156 @@
+def main() -> int {
+    IO.println("Testing comprehensive primitive methods...")
+
+    # Test core methods on integers
+    x: int = 42
+    IO.print("test")
+    IO.println("")
+    IO.println("=== INTEGER METHODS ===")
+    IO.println("x: int = 42")
+    IO.println("x.to_string(): " + x.to_string())
+    IO.println("x.clone(): " + x.clone().to_string())
+    IO.println("x.is_int(): " + x.is_int().to_string())
+    IO.println("x.is_positive(): " + x.is_positive().to_string())
+    IO.println("x.is_even(): " + x.is_even().to_string())
+    IO.println("x.abs(): " + x.abs().to_string())
+    IO.println("x.neg(): " + x.neg().to_string())
+    IO.println("x.inc(): " + x.inc().to_string())
+    IO.println("x.dec(): " + x.dec().to_string())
+    IO.println("x.is_odd(): " + x.is_odd().to_string())
+    IO.println("x.is_negative(): " + x.is_negative().to_string())
+    IO.println("x.is_zero(): " + x.is_zero().to_string())
+
+    # Test core methods on floats
+    y: float = 3.14
+    IO.println("=== FLOAT METHODS ===")
+    IO.println("y: float = 3.14")
+    IO.println("y.to_string(): " + y.to_string())
+    IO.println("y.is_float(): " + y.is_float().to_string())
+    IO.println("y.is_finite(): " + y.is_finite().to_string())
+    IO.println("y.ceil(): " + y.ceil().to_string())
+    IO.println("y.floor(): " + y.floor().to_string())
+    IO.println("y.round(): " + y.round().to_string())
+    IO.println("y.trunc(): " + y.trunc().to_string())
+    IO.println("y.is_infinite(): " + y.is_infinite().to_string())
+    IO.println("y.is_nan(): " + y.is_nan().to_string())
+    IO.println("y.is_positive(): " + y.is_positive().to_string())
+    IO.println("y.is_negative(): " + y.is_negative().to_string())
+    IO.println("y.is_zero(): " + y.is_zero().to_string())
+    IO.println("y.abs(): " + y.abs().to_string())
+    IO.println("y.neg(): " + y.neg().to_string())
+
+    # Test core methods on booleans
+    z: bool = true
+    IO.println("=== BOOLEAN METHODS ===")
+    IO.println("z: bool = true")
+    IO.println("z.to_string(): " + z.to_string())
+    IO.println("z.is_bool(): " + z.is_bool().to_string())
+
+    # Test core methods on strings
+    s: str = "Hello World"
+    IO.println("=== STRING METHODS ===")
+    IO.println("s: str = 'Hello World'")
+    IO.println("s.to_string(): " + s)
+    IO.println("s.is_str(): " + s.is_str().to_string())
+    IO.println("s.length(): " + s.length().to_string())
+    IO.println("s.is_empty(): " + s.is_empty().to_string())
+    IO.println("s.is_not_empty(): " + s.is_not_empty().to_string())
+    IO.println("s.upper(): " + s.upper())
+    IO.println("s.lower(): " + s.lower())
+    IO.println("s.capitalize(): " + s.capitalize())
+    IO.println("s.reverse(): " + s.reverse())
+    IO.println("s.trim(): " + "  hello  ".trim())
+
+    # Test core methods on Option
+    n: Option<int> = None
+    IO.println("=== OPTION METHODS ===")
+    IO.println("n: Option<int> = None")
+    IO.println("n.to_string(): " + n.to_string())
+    IO.println("n.is_none(): " + n.is_none().to_string())
+    IO.println("n.is_null(): " + n.is_null().to_string())
+    IO.println("n.is_not_null(): " + n.is_not_null().to_string())
+
+    # Test type conversions
+    IO.println("=== TYPE CONVERSIONS ===")
+    IO.println("42.to_float(): " + 42.to_float().to_string())
+    IO.println("3.14.to_int(): " + 3.14.to_int().to_string())
+    IO.println("true.to_int(): " + true.to_int().to_string())
+    IO.println("false.to_int(): " + false.to_int().to_string())
+    IO.println("true.to_float(): " + true.to_float().to_string())
+    IO.println("false.to_float(): " + false.to_float().to_string())
+    IO.println("true.to_bool(): " + true.to_bool().to_string())
+    IO.println("false.to_bool(): " + false.to_bool().to_string())
+    IO.println("1.to_bool(): " + 1.to_bool().to_string())
+    IO.println("0.to_bool(): " + 0.to_bool().to_string())
+    IO.println("1.0.to_bool(): " + 1.0.to_bool().to_string())
+    IO.println("0.0.to_bool(): " + 0.0.to_bool().to_string())
+    IO.println("hello.to_bool(): " + "hello".to_bool().to_string())
+    IO.println("empty.to_bool(): " + "".to_bool().to_string())
+
+    # Test null checking
+    IO.println("=== NULL CHECKING ===")
+    IO.println("x.is_null(): " + x.is_null().to_string())
+    IO.println("x.is_not_null(): " + x.is_not_null().to_string())
+    IO.println("n.is_null(): " + n.is_null().to_string())
+    IO.println("n.is_not_null(): " + n.is_not_null().to_string())
+
+    # Test hash codes
+    IO.println("=== HASH CODES ===")
+    IO.println("x.hash(): " + x.hash().to_string())
+    IO.println("y.hash(): " + y.hash().to_string())
+    IO.println("z.hash(): " + z.hash().to_string())
+    IO.println("s.hash(): " + s.hash().to_string())
+    IO.println("n.hash(): " + n.hash().to_string())
+
+    # Test debug and pretty strings
+    IO.println("=== DEBUG STRINGS ===")
+    IO.println("x.debug_string(): " + x.debug_string())
+    IO.println("y.debug_string(): " + y.debug_string())
+    IO.println("s.debug_string(): " + s.debug_string())
+    IO.println("z.debug_string(): " + z.debug_string())
+    IO.println("x.pretty_string(): " + x.pretty_string())
+    IO.println("y.pretty_string(): " + y.pretty_string())
+    IO.println("s.pretty_string(): " + s.pretty_string())
+    IO.println("z.pretty_string(): " + z.pretty_string())
+
+    IO.clear_screen()
+    IO.println("After clear")
+
+    IO.print_success("Print Success")
+    IO.println("")
+    IO.print_warning("Print Warning")
+    IO.println("")
+    IO.print_error("Print Error")
+    IO.println("")
+    IO.print_debug("Print Debug")
+    IO.println("")
+    IO.println("")
+    IO.print_color("Print Color Magenta", "magenta")
+    IO.println("")
+    IO.print_color("Print Color Green", "green")
+    IO.println("")
+    IO.print_color("Print Color Red", "red")
+    IO.println("")
+    IO.print_color("Print Color Yellow", "yellow")
+    IO.println("")
+    IO.print_color("Print Color Cyan", "cyan")
+    IO.println("")
+    IO.print_color("Print Color Blue", "blue")
+    IO.println("")
+    IO.print_color("Print Color Black", "black")
+    IO.println("")
+    IO.print_color("Print Color White", "white")
+    IO.println("")
+    IO.print_color("Print Color Reset", "reset")
+    IO.println("")
+
+    # Test terminal size
+    size: Tuple<int, int> = IO.get_terminal_size()
+    IO.println("Terminal size: " + size.to_string())
+    name: str = "Alice"
+    age: int = 25
+    IO.printf("Name: {}, Age: {}",[name, age])  # Prints: Name: Alice, Age: 25
+    return 0
+}
+
+main()

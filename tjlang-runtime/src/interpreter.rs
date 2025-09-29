@@ -856,11 +856,3 @@ pub struct Closure {
     pub environment: Environment,
 }
 
-
-
-
-
-
-
-
-

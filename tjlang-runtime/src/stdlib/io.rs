@@ -36,8 +36,44 @@ impl IO {
     
     /// Print formatted string to stdout
     pub fn printf(format: &str, args: &[Value]) -> Result<(), String> {
-        // TODO: Implement proper formatting
-        print!("{}", format);
+        // Simple printf implementation - replace {} with arguments
+        let mut result = format.to_string();
+        
+        // Flatten arrays in arguments
+        let mut flattened_args = Vec::new();
+        for arg in args {
+            match arg {
+                Value::Vec(vec) => {
+                    // Unpack array elements
+                    for item in vec {
+                        flattened_args.push(item.clone());
+                    }
+                },
+                _ => {
+                    // Keep non-array arguments as-is
+                    flattened_args.push(arg.clone());
+                }
+            }
+        }
+        
+        // Handle indexed placeholders like {0}, {1}, etc.
+        for (i, arg) in flattened_args.iter().enumerate() {
+            let placeholder = format!("{{{}}}", i);
+            result = result.replace(&placeholder, &arg.to_string());
+        }
+        
+        // Handle single {} without index (only if no indexed placeholders were found)
+        if !result.contains("{0}") && !result.contains("{1}") && !result.contains("{2}") {
+            for arg in &flattened_args {
+                if result.contains("{}") {
+                    result = result.replacen("{}", &arg.to_string(), 1);
+                } else {
+                    break;
+                }
+            }
+        }
+        
+        print!("{}", result);
         io::stdout().flush().map_err(|e| e.to_string())?;
         Ok(())
     }
