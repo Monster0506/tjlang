@@ -428,7 +428,8 @@ impl Interpreter {
     
     /// Interpret a binary operation
     fn interpret_binary_operation(&self, left: &Value, op: &BinaryOperator, right: &Value) -> Result<Value, String> {
-        match op {
+        debug_println!("🔍 interpret_binary_operation: left={:?}, op={:?}, right={:?}", left, op, right);
+        let result = match op {
             BinaryOperator::Add => self.add_values(left, right),
             BinaryOperator::Subtract => self.subtract_values(left, right),
             BinaryOperator::Multiply => self.multiply_values(left, right),
@@ -443,7 +444,9 @@ impl Interpreter {
             BinaryOperator::And => Ok(Value::Bool(self.is_truthy(left) && self.is_truthy(right))),
             BinaryOperator::Or => Ok(Value::Bool(self.is_truthy(left) || self.is_truthy(right))),
             _ => Err("Unsupported binary operator".to_string()),
-        }
+        };
+        debug_println!("🔍 interpret_binary_operation result: {:?}", result);
+        result
     }
     
     /// Interpret a unary operation
@@ -461,7 +464,6 @@ impl Interpreter {
         match callee {
             Value::Function { name, body, .. } => {
                 debug_println!("            📞 Calling function: {}", name);
-                debug_println!("            📋 Available stdlib functions: {:?}", self.stdlib.get_function_names());
                 
                         // Check if it's a primitive method call
                         debug_println!("              [DEBUG] Checking method call: name='{}', args.len()={}", name, args.len());
@@ -695,12 +697,39 @@ impl Interpreter {
             },
             Statement::If(if_stmt) => {
                 let condition_val = self.interpret_expression(&if_stmt.condition)?;
+                debug_println!("🔍 IF: condition = {:?}, is_truthy = {}", condition_val, self.is_truthy(&condition_val));
+                debug_println!("🔍 IF: elif_branches = {}, else_block = {}", if_stmt.elif_branches.len(), if_stmt.else_block.is_some());
+                
                 if self.is_truthy(&condition_val) {
+                    debug_println!("🔍 IF: executing then_block");
                     self.interpret_block(&if_stmt.then_block)
-                } else if let Some(else_block) = &if_stmt.else_block {
-                    self.interpret_block(else_block)
                 } else {
-                    Ok(Value::None)
+                    debug_println!("🔍 IF: condition false, checking elif branches");
+                    // Check elif branches
+                    let mut executed = false;
+                    for elif_branch in &if_stmt.elif_branches {
+                        let elif_condition_val = self.interpret_expression(&elif_branch.condition)?;
+                        debug_println!("🔍 IF: elif condition = {:?}, is_truthy = {}", elif_condition_val, self.is_truthy(&elif_condition_val));
+                        if self.is_truthy(&elif_condition_val) {
+                            executed = true;
+                            debug_println!("🔍 IF: executing elif block");
+                            return self.interpret_block(&elif_branch.block);
+                        }
+                    }
+                    
+                    // If no elif branch was executed, check else block
+                    if !executed {
+                        if let Some(else_block) = &if_stmt.else_block {
+                            debug_println!("🔍 IF: executing else block");
+                            self.interpret_block(else_block)
+                        } else {
+                            debug_println!("🔍 IF: no else block, returning None");
+                            Ok(Value::None)
+                        }
+                    } else {
+                        debug_println!("🔍 IF: elif executed, returning None");
+                        Ok(Value::None)
+                    }
                 }
             },
             Statement::While(while_stmt) => {

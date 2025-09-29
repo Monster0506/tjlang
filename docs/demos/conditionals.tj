@@ -1,0 +1,54 @@
+def main() -> int {
+    IO.println("Testing TJLang If Statement Logic...")
+
+    IO.println("=== Testing Boolean Conditions ===")
+    x: int = 5
+    IO.println("x = " + x.to_string())
+
+    if x>3 {
+        IO.println("x > 3 is TRUE")
+    } else {
+        IO.println("x > 3 is FALSE")
+    }
+
+    if x < 3 {
+        IO.println("x < 3 is TRUE")
+    } else {
+        IO.println("x < 3 is FALSE")
+    }
+
+    IO.println("=== Testing with Different Values ===")
+    y: int = 5
+    IO.println("y = " + y.to_string())
+
+    if y > 3 {
+        IO.println("y > 3 is TRUE")
+    } else {
+        IO.println("y > 3 is FALSE")
+    }
+
+    if y < 3 {
+        IO.println("y < 3 is TRUE")
+    } else {
+        IO.println("y < 3 is FALSE")
+    }
+
+    IO.println("=== Testing Elif Logic ===")
+    z: int = 7
+    IO.println("z = " + z.to_string())
+    
+    if z < 5 {
+        IO.println("z < 5 is TRUE")
+    } elif z < 10 {
+        IO.println("z < 10 is TRUE (elif branch)")
+    } elif z < 8 {
+        IO.println("z < 8 is TRUE (elif branch) Should never run")
+    } else {
+        IO.println("z >= 10 is TRUE (else branch)")
+    }
+
+    IO.println("If statement debug test completed")
+    return 0
+}
+
+main()
