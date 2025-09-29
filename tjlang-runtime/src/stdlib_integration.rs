@@ -688,6 +688,88 @@ impl StdlibRegistry {
         self.functions.insert("COLLECTIONS::map_new".to_string(), |_interpreter, _args| {
             Ok(Value::Map(std::collections::HashMap::new()))
         });
+        
+        // Queue creation functions
+        self.functions.insert("COLLECTIONS::queue_new".to_string(), |_interpreter, _args| {
+            debug_println!("🔍 DEBUG: COLLECTIONS::queue_new called");
+            Ok(Value::Struct {
+                name: "Queue".to_string(),
+                fields: std::collections::HashMap::new(),
+            })
+        });
+        
+        // Priority Queue creation functions
+        self.functions.insert("COLLECTIONS::priority_queue_new".to_string(), |_interpreter, _args| {
+            Ok(Value::Struct {
+                name: "PriorityQueue".to_string(),
+                fields: std::collections::HashMap::new(),
+            })
+        });
+        
+        // BTree creation functions
+        self.functions.insert("COLLECTIONS::btree_map_new".to_string(), |_interpreter, _args| {
+            Ok(Value::Struct {
+                name: "BTreeMap".to_string(),
+                fields: std::collections::HashMap::new(),
+            })
+        });
+        
+        self.functions.insert("COLLECTIONS::btree_set_new".to_string(), |_interpreter, _args| {
+            Ok(Value::Struct {
+                name: "BTreeSet".to_string(),
+                fields: std::collections::HashMap::new(),
+            })
+        });
+        
+        // Advanced collection creation functions
+        self.functions.insert("COLLECTIONS::counter_new".to_string(), |_interpreter, _args| {
+            Ok(Value::Struct {
+                name: "Counter".to_string(),
+                fields: std::collections::HashMap::new(),
+            })
+        });
+        
+        self.functions.insert("COLLECTIONS::default_dict_new".to_string(), |_interpreter, _args| {
+            Ok(Value::Struct {
+                name: "DefaultDict".to_string(),
+                fields: std::collections::HashMap::new(),
+            })
+        });
+        
+        self.functions.insert("COLLECTIONS::chain_map_new".to_string(), |_interpreter, _args| {
+            Ok(Value::Struct {
+                name: "ChainMap".to_string(),
+                fields: std::collections::HashMap::new(),
+            })
+        });
+        
+        self.functions.insert("COLLECTIONS::named_tuple_new".to_string(), |_interpreter, _args| {
+            Ok(Value::Struct {
+                name: "NamedTuple".to_string(),
+                fields: std::collections::HashMap::new(),
+            })
+        });
+        
+        self.functions.insert("COLLECTIONS::ordered_dict_new".to_string(), |_interpreter, _args| {
+            Ok(Value::Struct {
+                name: "OrderedDict".to_string(),
+                fields: std::collections::HashMap::new(),
+            })
+        });
+        
+        self.functions.insert("COLLECTIONS::deque_new".to_string(), |_interpreter, _args| {
+            Ok(Value::Struct {
+                name: "Deque".to_string(),
+                fields: std::collections::HashMap::new(),
+            })
+        });
+        
+        self.functions.insert("COLLECTIONS::heap_new".to_string(), |_interpreter, _args| {
+            Ok(Value::Struct {
+                name: "Heap".to_string(),
+                fields: std::collections::HashMap::new(),
+            })
+        });
     }
     
     /// Register TIME module functions

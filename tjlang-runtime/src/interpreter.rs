@@ -267,6 +267,20 @@ impl Interpreter {
                                     return crate::primitive_methods::get_primitive_method(&target_val, member);
                                 }
                             },
+                            "sort" => {
+                                // Special handling for sort as in-place modification
+                                if matches!(target_val, Value::Vec(_)) {
+                                    let result = crate::primitive_methods::get_primitive_method(&target_val, member)?;
+                                    // If the target is a simple variable reference, update it in the environment
+                                    if let Expression::Variable(var_name) = &**target {
+                                        debug_println!("          🔄 Updating variable {} in-place", var_name);
+                                        self.environment.define(var_name.clone(), result.clone());
+                                    }
+                                    return Ok(result);
+                                } else {
+                                    return crate::primitive_methods::get_primitive_method(&target_val, member);
+                                }
+                            },
                             _ => {
                                 // Try type-specific methods
                                 return crate::primitive_methods::get_primitive_method(&target_val, member);
@@ -280,7 +294,7 @@ impl Interpreter {
                         }
                         
                         // Special handling for collection methods that should modify in-place
-                        if matches!(target_val, Value::Vec(_)) && matches!(member.as_str(), "push" | "pop" | "insert" | "remove" | "set" | "reverse" | "sort") {
+                        if matches!(target_val, Value::Vec(_)) && matches!(member.as_str(), "push" | "pop" | "insert" | "remove" | "set" | "reverse" | "sort" | "sort_by") {
                             // For vector methods that modify in-place, we need to update the original variable
                             let result = crate::primitive_methods::execute_primitive_method(&target_val, member, &arg_values)?;
                             

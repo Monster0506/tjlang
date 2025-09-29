@@ -2590,6 +2590,24 @@ impl PestParser {
                     Ok(Type::Identifier(name))
                 }
             }
+            Rule::qualified_name => {
+                let qualified_name = inner.as_str().to_string();
+                // Check if there are type parameters
+                if let Some(type_params_pair) = inner.into_inner().next() {
+                    if type_params_pair.as_rule() == Rule::type_params {
+                        let type_params = self.parse_type_params(type_params_pair)?;
+                        Ok(Type::Generic {
+                            name: qualified_name,
+                            type_args: type_params,
+                            span: self.create_span(span),
+                        })
+                    } else {
+                        Ok(Type::Identifier(qualified_name))
+                    }
+                } else {
+                    Ok(Type::Identifier(qualified_name))
+                }
+            }
             Rule::result_type => {
                 let mut inner = inner.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 // Skip "Result"

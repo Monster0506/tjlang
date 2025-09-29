@@ -157,8 +157,26 @@ impl IO {
     
     /// Get terminal size
     pub fn get_terminal_size() -> Result<(u16, u16), String> {
-        // TODO: Implement proper terminal size detection
-        Ok((80, 24))
+        use terminal_size::{Width, Height, terminal_size};
+        
+        match terminal_size() {
+            Some((Width(w), Height(h))) => Ok((w, h)),
+            None => {
+                // Fallback to environment variables or default values
+                if let Ok(columns) = std::env::var("COLUMNS") {
+                    if let Ok(cols) = columns.parse::<u16>() {
+                        if let Ok(rows) = std::env::var("LINES") {
+                            if let Ok(rows) = rows.parse::<u16>() {
+                                return Ok((cols, rows));
+                            }
+                        }
+                        return Ok((cols, 24)); // Default height
+                    }
+                }
+                // Final fallback
+                Ok((80, 24))
+            }
+        }
     }
     
     /// Check if output is a terminal

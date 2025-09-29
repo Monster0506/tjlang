@@ -305,10 +305,29 @@ fn get_vec_method(target: &Value, method: &str) -> Result<Value, String> {
                 new_vec.reverse();
                 Ok(Value::Vec(new_vec))
             },
+            "sort" => {
+                let mut new_vec = vec.clone();
+                // Improved sorting that handles different types more effectively
+                new_vec.sort_by(|a, b| {
+                    match (a, b) {
+                        // Integer comparison
+                        (Value::Int(x), Value::Int(y)) => x.cmp(y),
+                        // Float comparison
+                        (Value::Float(x), Value::Float(y)) => x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal),
+                        // String comparison
+                        (Value::String(x), Value::String(y)) => x.cmp(y),
+                        // Boolean comparison (false < true)
+                        (Value::Bool(x), Value::Bool(y)) => x.cmp(y),
+                        // Mixed types: convert to string for comparison
+                        _ => a.to_string().cmp(&b.to_string()),
+                    }
+                });
+                Ok(Value::Vec(new_vec))
+            },
             
             // Methods that require arguments - these will be handled by the interpreter
             "push" | "pop" | "insert" | "remove" | "get" | "get_mut" | "set" | 
-            "slice" | "append" | "extend" | "sort" | "sort_by" | 
+            "slice" | "append" | "extend" | "sort_by" | 
             "shuffle" | "unique" | "filter" | "map" | "reduce" | "fold" | 
             "any" | "all" | "find" | "find_index" | "contains" | "index_of" | 
             "last_index_of" => {
@@ -436,9 +455,49 @@ fn execute_vec_method(vec: &Vec<Value>, method: &str, args: &[Value]) -> Result<
                 return Err("sort method takes no arguments".to_string());
             }
             let mut new_vec = vec.clone();
-            // Note: This will only work for comparable types
-            new_vec.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+            // Improved sorting that handles different types more effectively
+            new_vec.sort_by(|a, b| {
+                match (a, b) {
+                    // Integer comparison
+                    (Value::Int(x), Value::Int(y)) => x.cmp(y),
+                    // Float comparison
+                    (Value::Float(x), Value::Float(y)) => x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal),
+                    // String comparison
+                    (Value::String(x), Value::String(y)) => x.cmp(y),
+                    // Boolean comparison (false < true)
+                    (Value::Bool(x), Value::Bool(y)) => x.cmp(y),
+                    // Mixed types: convert to string for comparison
+                    _ => a.to_string().cmp(&b.to_string()),
+                }
+            });
             Ok(Value::Vec(new_vec))
+        },
+        "sort_by" => {
+            if args.len() != 1 {
+                return Err("sort_by method requires exactly 1 argument (comparison function)".to_string());
+            }
+            
+            // Check if the argument is a closure (lambda function)
+            match &args[0] {
+                Value::Closure { params, body, .. } => {
+                    if params.len() != 2 {
+                        return Err("sort_by comparison function must take exactly 2 parameters".to_string());
+                    }
+                    
+                    let mut new_vec = vec.clone();
+                    // For now, we'll use a simple comparison based on the closure
+                    // In a full implementation, we would execute the closure for each comparison
+                    new_vec.sort_by(|a, b| {
+                        // For now, use string comparison as a fallback
+                        // TODO: Execute the closure with parameters a and b
+                        a.to_string().cmp(&b.to_string())
+                    });
+                    Ok(Value::Vec(new_vec))
+                },
+                _ => {
+                    return Err("sort_by requires a lambda function as argument".to_string());
+                }
+            }
         },
         _ => Err(format!("No method '{}' found on vector", method)),
     }
@@ -486,11 +545,8 @@ fn execute_set_method(set: &std::collections::HashSet<Value>, method: &str, args
                 return Err("remove method requires exactly 1 argument".to_string());
             }
             let mut new_set = set.clone();
-            if new_set.remove(&args[0]) {
-                Ok(Value::Bool(true))
-            } else {
-                Ok(Value::Bool(false))
-            }
+            new_set.remove(&args[0]);
+            Ok(Value::Set(new_set))
         },
         "contains" => {
             if args.len() != 1 {
@@ -561,11 +617,8 @@ fn execute_map_method(map: &HashMap<Value, Value>, method: &str, args: &[Value])
                 return Err("remove method requires exactly 1 argument".to_string());
             }
             let mut new_map = map.clone();
-            if let Some(value) = new_map.remove(&args[0]) {
-                Ok(value)
-            } else {
-                Ok(Value::None)
-            }
+            new_map.remove(&args[0]);
+            Ok(Value::Map(new_map))
         },
         "contains_key" => {
             if args.len() != 1 {
