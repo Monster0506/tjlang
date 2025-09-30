@@ -859,39 +859,24 @@ impl PestParser {
         if children.len() == 1 {
             // Single operand, no operator - parse it directly
             let child = &children[0];
-            if content.contains("$ 5") {
-                println!("[TEMP] Single operand for '1 $ 5': rule={:?}, content='{}'", child.as_rule(), child.as_str());
-            }
             debug_println!("[DEBUG] Single operand: {:?} = '{}'", child.as_rule(), child.as_str());
             
             match child.as_rule() {
                 Rule::power => {
                     // Handle power expressions like x ** y
-                    if content.contains("$ 5") {
-                        println!("[TEMP] Calling parse_binary_operation for power");
-                    }
                     return self.parse_binary_operation(child.clone());
                 }
                 Rule::unary => {
                     // Handle unary expressions like -x, !x
-                    if content.contains("$ 5") {
-                        println!("[TEMP] Calling parse_binary_operation for unary");
-                    }
                     return self.parse_binary_operation(child.clone());
                 }
                 Rule::postfix_expr => {
                     // Handle postfix expressions like x(), x[], x.member
-                    if content.contains("$ 5") {
-                        println!("[TEMP] Calling parse_postfix_expr for postfix_expr");
-                    }
                     debug_println!("[DEBUG] Found postfix_expr in binary operation, calling parse_postfix_expr");
                     return self.parse_postfix_expr(child.clone());
                 }
                 Rule::shift_expr | Rule::additive | Rule::multiplicative => {
                     // Handle these rules by parsing their single operand as an expression
-                    if content.contains("$ 5") {
-                        println!("[TEMP] Found {:?}, calling parse_expression", child.as_rule());
-                    }
                     debug_println!("[DEBUG] Found {:?} with single operand '{}', parsing as expression", child.as_rule(), child.as_str());
                     debug_println!("[DEBUG] Calling parse_expression for single operand '{}'", child.as_str());
                     debug_println!("[DEBUG] Child rule: {:?}, content: '{}'", child.as_rule(), child.as_str());
@@ -902,9 +887,6 @@ impl PestParser {
                 }
                 _ => {
                     // For other rules, try to parse as expression
-                    if content.contains("$ 5") {
-                        println!("[TEMP] DEFAULT case, calling parse_expression for rule={:?}", child.as_rule());
-                    }
                     return self.parse_expression(child.clone());
                 }
             }
@@ -1289,28 +1271,28 @@ impl PestParser {
                 Ok(left)
             }
             Rule::relational => {
-                println!("[DEBUG] PARSER: relational rule, content: '{}'", pair.as_str());
+                debug_println!("[DEBUG] PARSER: relational rule, content: '{}'", pair.as_str());
                 let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
-                println!("[DEBUG] PARSER: relational left: {:?}", left);
+                debug_println!("[DEBUG] PARSER: relational left: {:?}", left);
                 
                 while let Some(op_pair) = inner.next() {
-                    println!("[DEBUG] PARSER: relational operator: '{}'", op_pair.as_str());
+                    debug_println!("[DEBUG] PARSER: relational operator: '{}'", op_pair.as_str());
                     match op_pair.as_str() {
                         "<" => {
                             let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
-                            println!("[DEBUG] PARSER: relational right: {:?}", right);
+                            debug_println!("[DEBUG] PARSER: relational right: {:?}", right);
                             left = Expression::Binary {
                                 left: Box::new(left),
                                 operator: BinaryOperator::LessThan,
                                 right: Box::new(right),
                                 span: self.create_span(span),
                             };
-                            println!("[DEBUG] PARSER: relational result: {:?}", left);
+                            debug_println!("[DEBUG] PARSER: relational result: {:?}", left);
                         }
                         ">" => {
                             let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
-                            println!("[DEBUG] PARSER: relational right: {:?}", right);
+                            debug_println!("[DEBUG] PARSER: relational right: {:?}", right);
                             left = Expression::Binary {
                                 left: Box::new(left),
                                 operator: BinaryOperator::GreaterThan,
