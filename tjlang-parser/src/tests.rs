@@ -2899,27 +2899,4 @@ mod tests {
 
         println!("✓ All range expression with method calls tests passed");
     }
-
-
-}
-
-            // Range with function call
-            "0$get_max()",
-            // Range with binary expression
-            "0$(x * 2)",
-            // Range with nested calls
-            "0$obj.get_size().value",
-        ];
-
-        for source in test_cases {
-            let mut parser = PestParser::new();
-            let file_id = create_test_file_id();
-            let result = parser.parse(source, file_id);
-            assert!(result.is_ok(), "Failed to parse range expression: {}", source);
-        }
-
-        println!("✓ All range expression with method calls tests passed");
-    }
-
-
 }

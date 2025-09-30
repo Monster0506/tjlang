@@ -964,8 +964,58 @@ impl PestParser {
             });
         }
         
-        // Fallback for complex expressions
-        Ok(Expression::Literal(Literal::Int(0)))
+        // Handle chained operations like "a" + b + "c" + d (more than 3 children)
+        // Format: operand, operator, operand, operator, operand, ...
+        if children.len() > 3 && children.len() % 2 == 1 {
+            debug_println!("[DEBUG] [BIN_OP] Chained operation with {} children", children.len());
+            
+            // Parse first operand
+            let mut left = self.parse_expression(children[0].clone())?;
+            
+            // Iterate through operator-operand pairs
+            let mut i = 1;
+            while i < children.len() {
+                let op = children[i].as_str();
+                i += 1;
+                
+                if i >= children.len() {
+                    return Err("Missing right operand after operator".into());
+                }
+                
+                let right = self.parse_expression(children[i].clone())?;
+                i += 1;
+                
+                let operator = match op {
+                    "+" => BinaryOperator::Add,
+                    "-" => BinaryOperator::Subtract,
+                    "*" => BinaryOperator::Multiply,
+                    "/" => BinaryOperator::Divide,
+                    "%" => BinaryOperator::Modulo,
+                    "==" => BinaryOperator::Equal,
+                    "!=" => BinaryOperator::NotEqual,
+                    "<" => BinaryOperator::LessThan,
+                    "<=" => BinaryOperator::LessThanEqual,
+                    ">" => BinaryOperator::GreaterThan,
+                    ">=" => BinaryOperator::GreaterThanEqual,
+                    "and" => BinaryOperator::And,
+                    "or" => BinaryOperator::Or,
+                    _ => return Err(format!("Unknown binary operator: {}", op).into()),
+                };
+                
+                // Build left-associative tree
+                left = Expression::Binary {
+                    left: Box::new(left),
+                    operator,
+                    right: Box::new(right),
+                    span: span.clone(),
+                };
+            }
+            
+            return Ok(left);
+        }
+        
+        // Fallback for unexpected structures
+        Err(format!("Unexpected binary operation structure with {} children", children.len()).into())
     }
 
     /// Parse expression with proper precedence - simplified non-recursive approach

@@ -1302,7 +1302,6 @@ while not COLLECTIONS.priority_queue_is_empty(&pq) {
 ```
 
 This comprehensive collections module provides powerful data structures and algorithms for efficient data manipulation in TJLang, enabling complex data processing tasks with clean, functional interfaces.
-
 numbers: Vec<int> = [1, 2, 3, 4, 5]
 squared: Iterator<int> = COLLECTIONS.iterator_map(numbers.iter(), |x| x * x)
 ```

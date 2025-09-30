@@ -146,8 +146,10 @@ bit_and_expr = { equality ~ ("&" ~ equality)* }
 equality = { relational ~ (("==" | "!=") ~ relational)* }
 relational = { shift_expr ~ (("<=" | ">=" | "<" | ">") ~ shift_expr)* }
 shift_expr = { additive ~ (("<<" | ">>") ~ additive)* }
-additive = { multiplicative ~ (("+" | "-") ~ multiplicative)* }
-multiplicative = { power ~ (("*" | "/" | "%") ~ power)* }
+additive = { multiplicative ~ ((additive_op ~ multiplicative)*) }
+additive_op = { "+" | "-" }
+multiplicative = { power ~ ((multiplicative_op ~ power)*) }
+multiplicative_op = { "*" | "/" | "%" }
 power = { unary ~ ("**" ~ power)? }
 unary = { ("-" | "!" | "~" | "not")? ~ (range_expr | postfix_expr) }
 postfix_expr = { primary ~ (call_suffix | index_suffix | member_suffix)* }
