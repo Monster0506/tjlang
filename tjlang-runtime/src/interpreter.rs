@@ -212,6 +212,18 @@ impl Interpreter {
                 debug_println!("          ➕ Binary operation: {:?}", operator);
                 debug_println!("          📝 Left operand: {:?}", left);
                 debug_println!("          📝 Right operand: {:?}", right);
+                
+                // Special handling for assignment
+                if *operator == BinaryOperator::Assign {
+                    if let Expression::Variable(var_name) = left.as_ref() {
+                        let value = self.interpret_expression(right)?;
+                        self.environment.define(var_name.clone(), value.clone());
+                        return Ok(value);
+                    } else {
+                        return Err("Left side of assignment must be a variable".to_string());
+                    }
+                }
+                
                 let left_val = self.interpret_expression(left)?;
                 debug_println!("          📝 Left value: {:?}", left_val);
                 let right_val = self.interpret_expression(right)?;
@@ -796,9 +808,32 @@ impl Interpreter {
                             return Err(format!("Cannot iterate over value of type: {:?}", iter_val));
                         }
                     },
-                    ForStatement::CStyle { .. } => {
-                        // C-style for loops not implemented yet
-                        return Err("C-style for loops not implemented".to_string());
+                    ForStatement::CStyle { initializer, condition, increment, body, .. } => {
+                        debug_println!("[DEBUG] FOR_LOOP: C-style loop");
+                        
+                        // Execute initializer if present
+                        if let Some(init_stmt) = initializer {
+                            self.interpret_statement(init_stmt)?;
+                        }
+                        
+                        // Loop while condition is true (or forever if no condition)
+                        loop {
+                            // Check condition if present
+                            if let Some(cond_expr) = condition {
+                                let cond_val = self.interpret_expression(cond_expr)?;
+                                if !self.is_truthy(&cond_val) {
+                                    break;
+                                }
+                            }
+                            
+                            // Execute body
+                            self.interpret_block(body)?;
+                            
+                            // Execute increment if present
+                            if let Some(inc_expr) = increment {
+                                self.interpret_expression(inc_expr)?;
+                            }
+                        }
                     }
                 }
                 Ok(Value::None)
