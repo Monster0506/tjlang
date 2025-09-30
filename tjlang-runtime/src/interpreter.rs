@@ -66,7 +66,7 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         debug_println!("📦 Registering stdlib functions...");
-        debug_println!("🔍 DEBUG: Interpreter::new() called");
+        debug_println!("[DEBUG] DEBUG: Interpreter::new() called");
         let environment = Environment::new();
         let functions = HashMap::new();
         let stdlib = StdlibRegistry::new();
@@ -84,7 +84,7 @@ impl Interpreter {
     
     /// Register all stdlib functions in the environment
     fn register_stdlib_functions(&mut self) {
-        debug_println!("🔍 DEBUG: register_stdlib_functions called");
+        debug_println!("[DEBUG] DEBUG: register_stdlib_functions called");
         let function_names = self.stdlib.get_function_names();
         debug_println!("📋 Found {} stdlib functions to register", function_names.len());
         
@@ -106,14 +106,14 @@ impl Interpreter {
         
         // Register modules as structs
         for (module_name, functions) in modules {
-            debug_println!("🔍 DEBUG: Registering module: {}", module_name);
-            debug_println!("🔍 DEBUG: Functions in {}: {:?}", module_name, functions.keys().collect::<Vec<_>>());
+            debug_println!("[DEBUG] DEBUG: Registering module: {}", module_name);
+            debug_println!("[DEBUG] DEBUG: Functions in {}: {:?}", module_name, functions.keys().collect::<Vec<_>>());
             let module_value = Value::Struct {
                 name: module_name.clone(),
                 fields: functions,
             };
             self.environment.define(module_name.clone(), module_value);
-            debug_println!("🔍 DEBUG: Module {} registered successfully", module_name);
+            debug_println!("[DEBUG] DEBUG: Module {} registered successfully", module_name);
         }
         
         debug_println!("🎉 All stdlib functions registered successfully");
@@ -397,6 +397,22 @@ impl Interpreter {
                 }
                 Ok(Value::Vec(vec))
             },
+            Expression::Range { start, end, inclusive, .. } => {
+                debug_println!("          🔢 Range expression");
+                let start_val = self.interpret_expression(start)?;
+                let end_val = self.interpret_expression(end)?;
+                
+                if let (Value::Int(start_int), Value::Int(end_int)) = (start_val, end_val) {
+                    let vec: Vec<Value> = if *inclusive {
+                        (start_int..=end_int).map(|i| Value::Int(i)).collect()
+                    } else {
+                        (start_int..end_int).map(|i| Value::Int(i)).collect()
+                    };
+                    Ok(Value::Vec(vec))
+                } else {
+                    Err("Range bounds must be integers".to_string())
+                }
+            },
             _ => Err("Unsupported expression type".to_string()),
         }
     }
@@ -428,7 +444,7 @@ impl Interpreter {
     
     /// Interpret a binary operation
     fn interpret_binary_operation(&self, left: &Value, op: &BinaryOperator, right: &Value) -> Result<Value, String> {
-        debug_println!("🔍 interpret_binary_operation: left={:?}, op={:?}, right={:?}", left, op, right);
+        debug_println!("[DEBUG] interpret_binary_operation: left={:?}, op={:?}, right={:?}", left, op, right);
         let result = match op {
             BinaryOperator::Add => self.add_values(left, right),
             BinaryOperator::Subtract => self.subtract_values(left, right),
@@ -445,7 +461,7 @@ impl Interpreter {
             BinaryOperator::Or => Ok(Value::Bool(self.is_truthy(left) || self.is_truthy(right))),
             _ => Err("Unsupported binary operator".to_string()),
         };
-        debug_println!("🔍 interpret_binary_operation result: {:?}", result);
+        debug_println!("[DEBUG] interpret_binary_operation result: {:?}", result);
         result
     }
     
@@ -539,21 +555,21 @@ impl Interpreter {
     
     /// Interpret member access
     fn interpret_member_access(&self, target: &Value, member: &str) -> Result<Value, String> {
-        debug_println!("🔍 DEBUG: interpret_member_access called: target={:?}, member={}", target, member);
+        debug_println!("[DEBUG] DEBUG: interpret_member_access called: target={:?}, member={}", target, member);
         match target {
             Value::Struct { fields, name } => {
-                debug_println!("🔍 DEBUG: Found struct '{}' with fields: {:?}", name, fields.keys().collect::<Vec<_>>());
+                debug_println!("[DEBUG] DEBUG: Found struct '{}' with fields: {:?}", name, fields.keys().collect::<Vec<_>>());
                 if let Some(field_value) = fields.get(member) {
-                    debug_println!("🔍 DEBUG: Found field '{}' in struct '{}'", member, name);
+                    debug_println!("[DEBUG] DEBUG: Found field '{}' in struct '{}'", member, name);
                     Ok(field_value.clone())
                 } else {
-                    debug_println!("🔍 DEBUG: Field '{}' not found in struct '{}'", member, name);
+                    debug_println!("[DEBUG] DEBUG: Field '{}' not found in struct '{}'", member, name);
                     Err(format!("No field '{}' found", member))
                 }
             },
             // Handle method calls on primitive values
             _ => {
-                debug_println!("🔍 DEBUG: Object is not a struct, trying primitive methods");
+                debug_println!("[DEBUG] DEBUG: Object is not a struct, trying primitive methods");
                 self.get_primitive_method(target, member)
             }
         }
@@ -697,22 +713,22 @@ impl Interpreter {
             },
             Statement::If(if_stmt) => {
                 let condition_val = self.interpret_expression(&if_stmt.condition)?;
-                debug_println!("🔍 IF: condition = {:?}, is_truthy = {}", condition_val, self.is_truthy(&condition_val));
-                debug_println!("🔍 IF: elif_branches = {}, else_block = {}", if_stmt.elif_branches.len(), if_stmt.else_block.is_some());
+                debug_println!("[DEBUG] IF: condition = {:?}, is_truthy = {}", condition_val, self.is_truthy(&condition_val));
+                debug_println!("[DEBUG] IF: elif_branches = {}, else_block = {}", if_stmt.elif_branches.len(), if_stmt.else_block.is_some());
                 
                 if self.is_truthy(&condition_val) {
-                    debug_println!("🔍 IF: executing then_block");
+                    debug_println!("[DEBUG] IF: executing then_block");
                     self.interpret_block(&if_stmt.then_block)
                 } else {
-                    debug_println!("🔍 IF: condition false, checking elif branches");
+                    debug_println!("[DEBUG] IF: condition false, checking elif branches");
                     // Check elif branches
                     let mut executed = false;
                     for elif_branch in &if_stmt.elif_branches {
                         let elif_condition_val = self.interpret_expression(&elif_branch.condition)?;
-                        debug_println!("🔍 IF: elif condition = {:?}, is_truthy = {}", elif_condition_val, self.is_truthy(&elif_condition_val));
+                        debug_println!("[DEBUG] IF: elif condition = {:?}, is_truthy = {}", elif_condition_val, self.is_truthy(&elif_condition_val));
                         if self.is_truthy(&elif_condition_val) {
                             executed = true;
-                            debug_println!("🔍 IF: executing elif block");
+                            debug_println!("[DEBUG] IF: executing elif block");
                             return self.interpret_block(&elif_branch.block);
                         }
                     }
@@ -720,15 +736,15 @@ impl Interpreter {
                     // If no elif branch was executed, check else block
                     if !executed {
                         if let Some(else_block) = &if_stmt.else_block {
-                            debug_println!("🔍 IF: executing else block");
+                            debug_println!("[DEBUG] IF: executing else block");
                             self.interpret_block(else_block)
                         } else {
-                            debug_println!("🔍 IF: no else block, returning None");
+                            debug_println!("[DEBUG] IF: no else block, returning None");
                             Ok(Value::None)
                         }
                     } else {
-                        debug_println!("🔍 IF: elif executed, returning None");
-                        Ok(Value::None)
+                        debug_println!("[DEBUG] IF: elif executed, returning None");
+                    Ok(Value::None)
                     }
                 }
             },
@@ -745,12 +761,39 @@ impl Interpreter {
             Statement::For(for_stmt) => {
                 match for_stmt {
                     ForStatement::ForEach { var_name, iterable, body, .. } => {
-                        let iter_val = self.interpret_expression(iterable)?;
+                        debug_println!("[DEBUG] FOR_LOOP: iterable expression = {:?}", iterable);
+                        // First, check if it's a Range expression and convert to vector
+                        let iter_val = if let Expression::Range { start, end, inclusive, .. } = iterable {
+                            debug_println!("[DEBUG] FOR_LOOP: Detected Range expression, start={:?}, end={:?}, inclusive={}", start, end, inclusive);
+                            let start_val = self.interpret_expression(start)?;
+                            let end_val = self.interpret_expression(end)?;
+                            
+                            if let (Value::Int(start_int), Value::Int(end_int)) = (start_val, end_val) {
+                                let vec: Vec<Value> = if *inclusive {
+                                    (start_int..=end_int).map(|i| Value::Int(i)).collect()
+                                } else {
+                                    (start_int..end_int).map(|i| Value::Int(i)).collect()
+                                };
+                                Value::Vec(vec)
+                            } else {
+                                return Err("Range bounds must be integers".to_string());
+                            }
+                        } else {
+                            debug_println!("[DEBUG] FOR_LOOP: NOT a Range expression, evaluating iterable");
+                            // Evaluate the iterable expression
+                            self.interpret_expression(iterable)?
+                        };
+                        
+                        debug_println!("[DEBUG] FOR_LOOP: iter_val = {:?}", iter_val);
+                        // Now iterate over the value
                         if let Value::Vec(vec) = iter_val {
+                            debug_println!("[DEBUG] FOR_LOOP: Iterating over vector with {} items", vec.len());
                             for item in vec {
                                 self.environment.define(var_name.clone(), item);
                                 self.interpret_block(body)?;
                             }
+                        } else {
+                            return Err(format!("Cannot iterate over value of type: {:?}", iter_val));
                         }
                     },
                     ForStatement::CStyle { .. } => {

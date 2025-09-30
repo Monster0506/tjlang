@@ -418,7 +418,7 @@ mod tests {
         use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
         
-        let source = "for ( x : int | 42 ) { pass }";
+        let source = "for ( x : int ; 42 $ 45 ) { pass }";
         let result = TJLangPestParser::parse(Rule::statement, source);
         
         match result {
@@ -1080,10 +1080,10 @@ mod tests {
 
         // Test the grammar rule directly first
         let range_test_cases = vec![
-            "0..10",     // Exclusive range
-            "0..=10",    // Inclusive range
-            "1..5",      // Simple range
-            "10..=20",   // Inclusive range with different numbers
+            "0 $ 10",     // Exclusive range
+            "0 $= 10",    // Inclusive range
+            "1 $ 5",      // Simple range
+            "10 $= 20",   // Inclusive range with different numbers
         ];
 
         for source in range_test_cases {
@@ -1104,9 +1104,9 @@ mod tests {
 
         // Test range expressions in valid contexts
         let context_test_cases = vec![
-            "for (x: int | 0..10) { pass }",     // Range in for loop
-            "for (i: int | 1..5) { pass }",      // Simple range in for loop
-            "for (j: int | 0..=10) { pass }",    // Inclusive range in for loop
+            "for (x: int ; 0 $ 10) { pass }",     // Range in for loop
+            "for (i: int ; 1  $ 5) { pass }",      // Simple range in for loop
+            "for (j: int ; 0$=10) { pass }",    // Inclusive range in for loop
         ];
 
         for source in context_test_cases {
@@ -2875,19 +2875,40 @@ mod tests {
         // Test range expressions with method calls and complex expressions
         let test_cases = vec![
             // Basic range with method call
-            "0..x.length()",
+            "0$x.length()",
             // Range with method call and inclusive end
-            "0..=x.length()",
+            "0$=x.length()",
             // Range with complex expression
-            "start..(end + 1)",
+            "start$(end + 1)",
             // Range with member access
-            "0..arr.size",
+            "0$arr.size",
             // Range with function call
-            "0..get_max()",
+            "0$get_max()",
             // Range with binary expression
-            "0..(x * 2)",
+            "0$(x * 2)",
             // Range with nested calls
-            "0..obj.get_size().value",
+            "0$obj.get_size().value",
+        ];
+
+        for source in test_cases {
+            let mut parser = PestParser::new();
+            let file_id = create_test_file_id();
+            let result = parser.parse(source, file_id);
+            assert!(result.is_ok(), "Failed to parse range expression: {}", source);
+        }
+
+        println!("✓ All range expression with method calls tests passed");
+    }
+
+
+}
+
+            // Range with function call
+            "0$get_max()",
+            // Range with binary expression
+            "0$(x * 2)",
+            // Range with nested calls
+            "0$obj.get_size().value",
         ];
 
         for source in test_cases {

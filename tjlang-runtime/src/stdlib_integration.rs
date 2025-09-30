@@ -691,7 +691,7 @@ impl StdlibRegistry {
         
         // Queue creation functions
         self.functions.insert("COLLECTIONS::queue_new".to_string(), |_interpreter, _args| {
-            debug_println!("🔍 DEBUG: COLLECTIONS::queue_new called");
+            debug_println!("[DEBUG] DEBUG: COLLECTIONS::queue_new called");
             Ok(Value::Struct {
                 name: "Queue".to_string(),
                 fields: std::collections::HashMap::new(),
@@ -878,5 +878,3 @@ impl Default for StdlibRegistry {
         Self::new()
     }
 }
-
-
