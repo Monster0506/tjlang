@@ -49,12 +49,12 @@ match_arm = { pattern ~ ("if" ~ expression)? ~ ":" ~ block }
 // Patterns
 pattern = { 
     literal |
+    "_" |
     identifier ~ ":" ~ type_ |
     identifier ~ ":" ~ "implements" ~ "[" ~ identifier ~ "]" |
     struct_pattern |
     constructor_pattern |
-    "(" ~ pattern ~ ("," ~ pattern)* ~ ")" |
-    "_"
+    "(" ~ pattern ~ ("," ~ pattern)* ~ ")"
 }
 
 constructor_pattern = { identifier ~ ("(" ~ pattern_fields? ~ ")")? }
@@ -152,6 +152,10 @@ power = { unary ~ ("**" ~ power)? }
 unary = { ("-" | "!" | "~" | "not")? ~ postfix_expr }
 postfix_expr = { primary ~ (call_suffix | index_suffix | member_suffix)* }
 primary = { spawn_expr | range_expr | literal | identifier | collection_literal | lambda_expr | "(" ~ expression ~ ")" }
+
+// Non-recursive variants used to parse range bounds without embedding another range
+postfix_expr_no_range = { primary_no_range ~ (call_suffix | index_suffix | member_suffix)* }
+primary_no_range = { spawn_expr | literal | identifier | collection_literal | lambda_expr | "(" ~ expression ~ ")" }
 spawn_expr = { "spawn" ~ expression }
 
 // Literals
@@ -198,8 +202,15 @@ member_suffix = { "." ~ identifier }
 // Lambda expressions
 lambda_expr = { "(" ~ param_list? ~ ")" ~ "->" ~ expression }
 
-// Range expressions
-range_expr = { integer_literal ~ ".." ~ ("=" ~ integer_literal | integer_literal)? }
+// Range expressions (support arbitrary evaluatable postfix expressions without nesting ranges)
+range_expr = {
+    postfix_expr_no_range
+    ~ ".."
+    ~ (
+        "=" ~ postfix_expr_no_range
+      | postfix_expr_no_range
+    )?
+}
 
 // Argument lists
 argument_list = { expression ~ ("," ~ expression)* }
