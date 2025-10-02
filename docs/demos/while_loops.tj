@@ -1,0 +1,61 @@
+def main() -> int {
+    i: int = 0
+    
+    # standard while loops
+    while i<10{
+        IO.println("i = " + i.to_string())
+
+        i= i+1
+
+    }
+
+    # false conditions
+    k: int = 25
+    while k<10 {
+        IO.println("THIS SHOULD NOT HAPPEN...")
+        k = k+1
+
+    }
+
+    IO.println()
+
+    # Do while loops
+    m: int = 0
+    do {
+        IO.println("m = "+m.to_string())
+        m = m+1
+    } while m < 3
+
+    IO.println()
+    # Will always run at least once
+    
+    j: int = 25
+    do {
+        IO.println("j = " + j.to_string())
+        j = j + 1
+    } while j<10
+
+    IO.println()
+
+    # nesting
+    x: int = 0
+    while x < 2 {
+        IO.println("outer x = " + x.to_string())
+        y: int = 0
+        do  {
+            IO.println("  inner y = " + y.to_string())
+            y = y + 1
+        } while y < 4
+        x = x + 1
+    }
+
+a: int = -10
+b: int = 14
+while a < 5 or b > 5 {
+    IO.println("a = " + a.to_string() + ", b = " + b.to_string())
+    a = a + 1
+    b = b - 1
+}
+ 
+}
+main()
