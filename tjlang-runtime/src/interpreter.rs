@@ -151,6 +151,11 @@ impl Interpreter {
                     result = self.interpret_expression(expr)?;
                     debug_println!("    [DEBUG] Expression result: {:?}", result);
                 },
+                ProgramUnit::Statement(stmt) => {
+                    debug_println!("    [DEBUG] Interpreting statement: {:?}", std::mem::discriminant(stmt));
+                    result = self.interpret_statement(stmt)?;
+                    debug_println!("    [DEBUG] Statement result: {:?}", result);
+                },
                 _ => {
                     debug_println!("    ⏭️ Skipping unknown unit type");
                 }
@@ -767,6 +772,16 @@ impl Interpreter {
                         break;
                     }
                     self.interpret_block(&while_stmt.body)?;
+                }
+                Ok(Value::None)
+            },
+            Statement::DoWhile(do_while_stmt) => {
+                loop {
+                    self.interpret_block(&do_while_stmt.body)?;
+                    let condition_val = self.interpret_expression(&do_while_stmt.condition)?;
+                    if !self.is_truthy(&condition_val) {
+                        break;
+                    }
                 }
                 Ok(Value::None)
             },
