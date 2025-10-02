@@ -1,0 +1,102 @@
+# We have 2 types of for loops, for-of, and c-style for loops, 
+
+def main() -> int{
+    
+
+    # ranges are `start $ end` for non inclusive of end
+    for (i: int; 0 $ 5){
+        IO.println("i = "+i.to_string())
+    }
+
+    for (_: int; 0 $ 2) {
+        IO.println()
+    }
+
+    # `start $= end` to include end in the range
+    for (i: int; 0 $= 5){
+        IO.println("i = "+i.to_string())
+    }
+
+    for (_: int; 0 $ 2) {
+        IO.println()
+    }
+
+
+    # Accessing elements of array by index
+    arr: [int] = [10, 20, 30, 40, 50]
+    for (i: int; 0 $arr.length()) {
+        IO.println("arr["+i.to_string()+"] = " + arr.get(i).to_string())
+    }
+
+    for (_: int; 0 $ 2) {
+        IO.println()
+    }
+
+    # or by item (as ranges are technically immutable arrays of ints
+    for (item: int; arr) {
+        IO.println("item = " + item.to_string())
+    }
+
+    for (_: int; 0 $ 2) {
+        IO.println()
+    }
+
+    # and also c-style stuff
+    for (i: int = 0; i<10; i = i+1) { # we don't have a unary operator yet, my bad
+        IO.println("i = "+i.to_string())
+    }
+
+    for (_: int; 0 $ 2) {
+        IO.println()
+    }
+
+    for (i: int = 5; i>=0; i=i-1) {
+        IO.println("i = "+i.to_string())
+    }
+
+    for (_: int; 0 $ 2) {
+        IO.println()
+    }
+
+    # item accessing, like normal in for loops)
+    for (i: int = 0; i<arr.length(); i = i+1) {
+        IO.println("arr["+i.to_string()+"] = " + arr.get(i).to_string())
+    }
+
+    for (_: int; 0 $ 2) {
+        IO.println()
+    }
+
+    # stuff that should be obvious, you can use variables
+    start: int = 0
+    end: int = 3
+    for (i: int ; start $= end){
+        IO.println("i = "+i.to_string())
+    }
+
+    for (_: int; 0 $ 2) {
+        IO.println()
+    }
+
+    for (i:int = 0; i<=return_2(); i = i+1){
+        IO.println("i = "+i.to_string())
+    }
+
+    IO.println()
+
+    # and nested loops
+    for (i: int; 0 $ 2) {
+        IO.println()
+        IO.println("i="+i.to_string())
+        IO.println()
+        for (j: int; 0 $ 2) {
+            IO.println("j="+j.to_string())
+        }
+    }
+
+}
+
+def return_2() -> int{
+    return 2
+}
+main()
