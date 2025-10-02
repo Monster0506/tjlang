@@ -178,8 +178,8 @@ literal = {
 }
 
 // Basic literals
-integer_literal = { "-"? ~ ASCII_DIGIT+ }
-float_literal = { "-"? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+integer_literal = @{ "-"? ~ ASCII_DIGIT+ }
+float_literal = @{ "-"? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 string_literal = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 fstring_literal = { "f\"" ~ fstring_content* ~ "\"" }
 fstring_content = { fstring_text | fstring_expression }
