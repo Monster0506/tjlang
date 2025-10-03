@@ -194,10 +194,10 @@ impl TestSuiteResult {
         for result in &self.results {
             match result {
                 TestResult::Passed { name, duration } => {
-                    println!("  ✓ {} ({:.2}ms)", name, duration.as_secs_f64() * 1000.0);
+                    println!("   {} ({:.2}ms)", name, duration.as_secs_f64() * 1000.0);
                 },
                 TestResult::Failed { name, error, duration } => {
-                    println!("  ✗ {} ({:.2}ms) - {}", name, duration.as_secs_f64() * 1000.0, error);
+                    println!("   {} ({:.2}ms) - {}", name, duration.as_secs_f64() * 1000.0, error);
                 },
             }
         }

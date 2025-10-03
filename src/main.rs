@@ -63,19 +63,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Run a TJLang program
 fn run_program(file: &PathBuf, debug: bool, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 Running TJLang program: {}", file.display());
+    println!(" Running TJLang program: {}", file.display());
     
     if verbose {
-        println!("📁 File: {}", file.display());
-        println!("🐛 Debug mode: {}", debug);
-        println!("📊 Verbose mode: {}", verbose);
+        println!(" File: {}", file.display());
+        println!(" Debug mode: {}", debug);
+        println!(" Verbose mode: {}", verbose);
     }
     
     // Read the source file
     let source = std::fs::read_to_string(file)?;
     
     if verbose {
-        println!("📝 Source code ({} bytes):", source.len());
+        println!(" Source code ({} bytes):", source.len());
         println!("{}", source);
         println!("---");
     }
@@ -87,7 +87,7 @@ fn run_program(file: &PathBuf, debug: bool, verbose: bool) -> Result<(), Box<dyn
 
 /// Start an interactive REPL
 fn start_repl(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
-    println!("🎯 TJLang Interactive REPL");
+    println!(" TJLang Interactive REPL");
     println!("Type 'help' for commands, 'exit' to quit");
     println!("---");
     
@@ -107,7 +107,7 @@ fn start_repl(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
         
         match input {
             "exit" | "quit" => {
-                println!("👋 Goodbye!");
+                println!(" Goodbye!");
                 break;
             },
             "help" => {
@@ -131,16 +131,16 @@ fn start_repl(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
 
 /// Show interpreter information
 fn show_info() {
-    println!("🎯 TJLang Advanced Interpreter v1.0.0");
+    println!(" TJLang Advanced Interpreter v1.0.0");
     println!("=====================================");
     println!("");
-    println!("🚀 Features:");
-    println!("  • Virtual Machine with bytecode");
-    println!("  • Advanced Garbage Collection");
-    println!("  • Concurrency Runtime (green threads, channels)");
-    println!("  • Pattern Matching Engine");
-    println!("  • Type System with inference");
-    println!("  • Module System");
+    println!(" Features:");
+    println!("   Virtual Machine with bytecode");
+    println!("   Advanced Garbage Collection");
+    println!("   Concurrency Runtime (green threads, channels)");
+    println!("   Pattern Matching Engine");
+    println!("   Type System with inference");
+    println!("   Module System");
     println!("");
     println!("📚 Commands:");
     println!("  tjlang run <file>     - Run a TJLang program");
@@ -151,7 +151,7 @@ fn show_info() {
 
 /// Run the advanced interpreter demo
 fn run_demo() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 TJLang Advanced Interpreter Demo");
+    println!(" TJLang Advanced Interpreter Demo");
     println!("====================================");
     
     println!("\n[DEBUG] Demo completed successfully!");

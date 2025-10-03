@@ -80,19 +80,19 @@ fn run_program(
     debug: bool,
     verbose: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    debug_println!("🚀 Running TJLang program: {}", file.display());
+    debug_println!(" Running TJLang program: {}", file.display());
 
     if verbose {
-        debug_println!("📁 File: {}", file.display());
-        debug_println!("🐛 Debug mode: {}", debug);
-        debug_println!("📊 Verbose mode: {}", verbose);
+        debug_println!(" File: {}", file.display());
+        debug_println!(" Debug mode: {}", debug);
+        debug_println!(" Verbose mode: {}", verbose);
     }
 
     // Read the source file
     let source = std::fs::read_to_string(file)?;
 
     if verbose {
-        debug_println!("📝 Source code ({} bytes):", source.len());
+        debug_println!(" Source code ({} bytes):", source.len());
         debug_println!("{}", source);
         debug_println!("---");
     }
@@ -104,12 +104,12 @@ fn run_program(
 
     // Lex the source
     if verbose {
-        debug_println!("🔤 Lexing source...");
+        debug_println!(" Lexing source...");
     }
     let (tokens, diagnostics) = lex(&source, file_id);
 
     if debug {
-        debug_println!("🔤 Tokens:");
+        debug_println!(" Tokens:");
         for token in &tokens {
             debug_println!("  {:?}", token);
         }
@@ -117,7 +117,7 @@ fn run_program(
 
     // Parse the source
     if verbose {
-        debug_println!("🌳 Parsing tokens...");
+        debug_println!(" Parsing tokens...");
     }
     let (ast, parse_diagnostics) = match parse(&source, file_id) {
         Ok((ast, diagnostics)) => {
@@ -128,11 +128,11 @@ fn run_program(
             (ast, diagnostics)
         }
         Err(diagnostics) => {
-            debug_println!("❌ Parse failed with {} diagnostics", diagnostics.len());
+            debug_println!(" Parse failed with {} diagnostics", diagnostics.len());
 
             // Display diagnostics using codespan-reporting
             if !diagnostics.is_empty() {
-                println!("❌ Parse Errors:");
+                println!(" Parse Errors:");
                 display_diagnostics(&files, &diagnostics)?;
             }
             return Err("Parse failed".into());
@@ -140,7 +140,7 @@ fn run_program(
     };
 
     if debug {
-        debug_println!("🌳 AST:");
+        debug_println!(" AST:");
         debug_println!("{:#?}", ast);
     }
 
@@ -151,7 +151,7 @@ fn run_program(
 
     // Interpret the program
     if verbose {
-        debug_println!("🏃 Running interpreter...");
+        debug_println!(" Running interpreter...");
     }
     debug_println!("[DEBUG] Creating interpreter...");
     let mut interpreter = Interpreter::new();
@@ -167,12 +167,12 @@ fn run_program(
     let result = match interpreter.interpret_program(&ast) {
         Ok(result) => {
             debug_println!("[DEBUG] Program completed successfully!");
-            debug_println!("📤 Result type: {:?}", std::mem::discriminant(&result));
-            debug_println!("📤 Result: {}", result.to_string());
+            debug_println!(" Result type: {:?}", std::mem::discriminant(&result));
+            debug_println!(" Result: {}", result.to_string());
             result
         }
         Err(e) => {
-            debug_println!("❌ Program execution failed: {}", e);
+            debug_println!(" Program execution failed: {}", e);
             return Err(e.into());
         }
     };
@@ -204,7 +204,7 @@ fn start_repl(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
 
         match input {
             "exit" | "quit" => {
-                debug_println!("👋 Goodbye!");
+                debug_println!(" Goodbye!");
                 break;
             }
             "help" => {
@@ -233,7 +233,7 @@ fn start_repl(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
             }
             _ => {
                 // Simulate TJLang code execution
-                debug_println!("📤 Result: {}", input);
+                debug_println!(" Result: {}", input);
                 if debug {
                     debug_println!("Tokenized: {}", input);
                     debug_println!("Parsed: Expression");
@@ -298,13 +298,13 @@ fn run_demo() -> Result<(), Box<dyn std::error::Error>> {
     debug_println!("\n[DEBUG] All demos completed successfully!");
     debug_println!("");
     debug_println!("[DEBUG] This demonstrates the TJLang interpreter:");
-    debug_println!("  • Real AST interpretation");
-    debug_println!("  • Variable storage and lookup");
-    debug_println!("  • Expression evaluation");
-    debug_println!("  • Control flow (if, while, for)");
-    debug_println!("  • Function calls and closures");
-    debug_println!("  • Pattern matching");
-    debug_println!("  • Type system integration");
+    debug_println!("   Real AST interpretation");
+    debug_println!("   Variable storage and lookup");
+    debug_println!("   Expression evaluation");
+    debug_println!("   Control flow (if, while, for)");
+    debug_println!("   Function calls and closures");
+    debug_println!("   Pattern matching");
+    debug_println!("   Type system integration");
 
     Ok(())
 }

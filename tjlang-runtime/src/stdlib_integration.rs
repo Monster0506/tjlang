@@ -20,13 +20,13 @@ pub type NativeFunction = fn(&mut Interpreter, &[Value]) -> Result<Value, String
 
 impl StdlibRegistry {
     pub fn new() -> Self {
-        debug_println!("🔧 Creating stdlib registry...");
+        debug_println!(" Creating stdlib registry...");
         let mut registry = Self {
             functions: HashMap::new(),
             structs: HashMap::new(),
         };
         registry.register_stdlib_functions();
-        debug_println!("🔧 Stdlib registry created (functions enabled)");
+        debug_println!(" Stdlib registry created (functions enabled)");
         registry
     }
     
@@ -226,9 +226,9 @@ impl StdlibRegistry {
         });
 
         // Terminal control functions
-        debug_println!("🔧 Registering IO::clear_screen");
+        debug_println!(" Registering IO::clear_screen");
         self.functions.insert("IO::clear_screen".to_string(), |_interpreter, _args| {
-            debug_println!("🔧 IO::clear_screen called");
+            debug_println!(" IO::clear_screen called");
             crate::stdlib::io::IO::clear_screen()
                 .map(|_| Value::None)
                 .map_err(|e| e.to_string())
