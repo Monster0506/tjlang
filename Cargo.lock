@@ -1012,21 +1012,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tjlang"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "codespan",
- "codespan-reporting",
- "logos",
- "miette",
- "serde",
- "serde_json",
- "thiserror 2.0.16",
-]
-
-[[package]]
 name = "tjlang-analyzer"
 version = "0.1.0"
 dependencies = [

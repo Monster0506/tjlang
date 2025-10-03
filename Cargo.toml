@@ -1,11 +1,3 @@
-[package]
-name = "tjlang"
-version = "0.1.0"
-edition = "2021"
-authors = ["TJ"]
-description = "A statically typed, compiled language with algebraic data types and pattern matching"
-license = "MIT"
-
 [workspace]
 members = [
     "tjlang-lexer",
@@ -18,13 +10,20 @@ members = [
     "tjlang-diagnostics",
     "tjlang-cli",
 ]
+resolver = "2"
+default-members = ["tjlang-cli"]
 
-[dependencies]
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["TJ"]
+license = "MIT"
+
+[workspace.dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.48", features = ["derive"] }
 codespan = "0.12.0"
 codespan-reporting = "0.12.0"
-# inkwell = { version = "0.6.0", features = ["llvm18-1"] }
 logos = "0.15.1"
 miette = "7.6.0"
 serde = "1.0.226"
