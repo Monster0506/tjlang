@@ -71,32 +71,31 @@ fn run_program(
         debug_println!(" Verbose mode: {}", verbose);
     }
 
-    // Create a file system for diagnostics
-    use codespan::{Files, Span};
-    let mut files: Files<String> = Files::new();
-    
-    // Read the source file
+    // Read the source file with proper error handling
     let source = match std::fs::read_to_string(file) {
         Ok(content) => content,
         Err(e) => {
-            // Create a dummy file entry for error reporting
+            // Use diagnostic system for file errors
+            use codespan::{Files, Span};
+            
+            let mut files: Files<String> = Files::new();
             let file_id = files.add(file.to_string_lossy().to_string(), String::new());
             let span = SourceSpan::new(file_id, Span::from(0..0));
             
             let (code, message, notes) = match e.kind() {
                 std::io::ErrorKind::NotFound => {
                     (
-                        ErrorCode::FileNotFound,
+                        ErrorCode::RuntimeValueError,
                         format!("File not found: {}", file.display()),
                         vec![
                             "Please check that the file exists and the path is correct.".to_string(),
-                            format!("Looked for file at: {}", file.canonicalize().unwrap_or(file.to_path_buf()).display()),
+                            format!("Current directory: {}", std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_else(|_| "unknown".to_string())),
                         ]
                     )
                 }
                 std::io::ErrorKind::PermissionDenied => {
                     (
-                        ErrorCode::FilePermissionDenied,
+                        ErrorCode::RuntimeValueError,
                         format!("Permission denied: {}", file.display()),
                         vec![
                             "You don't have permission to read this file.".to_string(),
@@ -106,20 +105,14 @@ fn run_program(
                 }
                 _ => {
                     (
-                        ErrorCode::FileReadError,
+                        ErrorCode::RuntimeValueError,
                         format!("Failed to read file: {}", file.display()),
                         vec![format!("IO error: {}", e)]
                     )
                 }
             };
             
-            let mut diagnostic = TJLangDiagnostic::new(
-                code,
-                Severity::Error,
-                message,
-                span,
-            );
-            
+            let mut diagnostic = TJLangDiagnostic::new(code, Severity::Error, message, span);
             for note in notes {
                 diagnostic = diagnostic.with_note(note);
             }
@@ -138,7 +131,9 @@ fn run_program(
         debug_println!("---");
     }
 
-    // Add the source to the files (already created above for error handling)
+    // Create a file ID for the source
+    use codespan::Files;
+    let mut files: Files<String> = Files::new();
     let file_id = files.add(file.to_string_lossy().to_string(), source.clone());
 
     // Lex the source
@@ -215,10 +210,28 @@ fn run_program(
         }
         Err(e) => {
             debug_println!(" Program execution failed: {}", e);
-            eprintln!("Runtime Error: {}", e);
-            eprintln!();
-            eprintln!("The program failed during execution.");
-            eprintln!("Run with --debug flag for more detailed information.");
+            
+            // Convert runtime error to diagnostic
+            use codespan::Span;
+            
+            // Note: Currently we don't track exact source locations through the interpreter,
+            // so we show the whole file. This could be improved by threading span information
+            // through the interpreter or using a global error context.
+            let span = SourceSpan::new(file_id, Span::from(0..source.len() as u32));
+            let diagnostic = TJLangDiagnostic::new(
+                ErrorCode::RuntimeValueError,
+                Severity::Error,
+                format!("Runtime Error: {}", e),
+                span,
+            ).with_note("The program failed during execution.".to_string())
+             .with_note("Run with --debug flag for more detailed information.".to_string())
+             .with_note("Note: Exact error location tracking is not yet implemented for runtime errors.".to_string());
+            
+            let mut diagnostics = DiagnosticCollection::new();
+            diagnostics.add(diagnostic);
+            
+            eprintln!("\nRuntime Error in {}:", file.display());
+            display_diagnostics(&files, &diagnostics)?;
             std::process::exit(1);
         }
     };

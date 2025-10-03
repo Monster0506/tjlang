@@ -326,7 +326,7 @@ fn get_vec_method(target: &Value, method: &str) -> Result<Value, String> {
             },
             
             // Methods that require arguments - these will be handled by the interpreter
-            "push" | "pop" | "insert" | "remove" | "get" | "get_mut" | "set" | 
+            "push" | "pop" | "insert" | "remove" | "get" | "at" | "get_mut" | "set" | 
             "slice" | "append" | "extend" | "sort_by" | 
             "shuffle" | "unique" | "filter" | "map" | "reduce" | "fold" | 
             "any" | "all" | "find" | "find_index" | "contains" | "index_of" | 
@@ -354,9 +354,9 @@ fn execute_vec_method(vec: &Vec<Value>, method: &str, args: &[Value]) -> Result<
             new_vec.push(args[0].clone());
             Ok(Value::Vec(new_vec))
         },
-        "get" => {
+        "get" | "at" => {
             if args.len() != 1 {
-                return Err("get method requires exactly 1 argument".to_string());
+                return Err("get/at method requires exactly 1 argument".to_string());
             }
             if let Value::Int(index) = &args[0] {
                 if *index >= 0 && (*index as usize) < vec.len() {
@@ -365,7 +365,7 @@ fn execute_vec_method(vec: &Vec<Value>, method: &str, args: &[Value]) -> Result<
                     Err("Index out of bounds".to_string())
                 }
             } else {
-                Err("get method requires integer index".to_string())
+                Err("get/at method requires integer index".to_string())
             }
         },
         "set" => {
