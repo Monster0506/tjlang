@@ -30,6 +30,7 @@ pub enum ProgramUnit {
     Export(ExportDecl),
     Declaration(Declaration),
     Expression(Expression),
+    Statement(Statement),
 }
 
 /// Module declaration
