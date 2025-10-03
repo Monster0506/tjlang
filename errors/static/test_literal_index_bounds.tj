@@ -1,0 +1,5 @@
+# Test: Literal array index out of bounds
+# Expected: error[A2800] at line 4
+
+IO.println([1, 2, 3].at(5).to_string())
+

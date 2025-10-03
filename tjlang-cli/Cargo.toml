@@ -21,3 +21,4 @@ tjlang-lexer = { version = "0.1.0", path = "../tjlang-lexer" }
 tjlang-parser = { version = "0.1.0", path = "../tjlang-parser" }
 tjlang-runtime = { version = "0.1.0", path = "../tjlang-runtime" }
 tjlang-diagnostics = { version = "0.1.0", path = "../tjlang-diagnostics" }
+tjlang-analyzer = { version = "0.1.0", path = "../tjlang-analyzer" }

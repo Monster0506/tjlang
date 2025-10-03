@@ -133,6 +133,7 @@ impl Default for RuleConfig {
             "FormattingConventionRule",
             "LineLengthRule",
             "MagicNumberRule",
+            "LiteralIndexBoundsRule", // Prevents runtime crashes
         ];
         
         for rule in critical_rules {

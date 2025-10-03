@@ -175,6 +175,40 @@ fn run_program(
             std::process::exit(1);
         }
     };
+    
+    // Run static analysis
+    if verbose {
+        debug_println!(" Running static analysis...");
+    }
+    
+    use tjlang_analyzer::AnalysisPipeline;
+    let pipeline = AnalysisPipeline::new();
+    
+    let analysis_result = pipeline.analyze(&source, file_id);
+    
+    if debug {
+        debug_println!(" Analysis completed:");
+        debug_println!("  Rules executed: {}", analysis_result.rules_executed);
+        debug_println!("  Diagnostics found: {}", analysis_result.diagnostics_count);
+        debug_println!("  Execution time: {:?}", analysis_result.execution_time);
+    }
+    
+    // Display analysis diagnostics if any
+    if !analysis_result.diagnostics.is_empty() {
+        eprintln!("\nStatic Analysis Errors in {}:", file.display());
+        eprintln!();
+        display_diagnostics(&files, &analysis_result.diagnostics)?;
+        
+        // Count errors (not warnings)
+        let error_count = analysis_result.diagnostics.iter()
+            .filter(|d| matches!(d.severity, codespan_reporting::diagnostic::Severity::Error))
+            .count();
+        
+        if error_count > 0 {
+            eprintln!("\n {} error(s) found. Fix these before running.", error_count);
+            std::process::exit(1);
+        }
+    }
 
     if debug {
         debug_println!(" AST:");
