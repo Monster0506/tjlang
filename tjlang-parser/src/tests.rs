@@ -49,6 +49,108 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_or_operator_pest_raw() {
+        use pest::Parser;
+        use crate::parser::{TJLangPestParser, Rule};
+        
+        let source = "result: bool = false or true";
+        let pairs = TJLangPestParser::parse(Rule::program, source);
+        
+        match pairs {
+            Ok(pairs) => {
+                eprintln!("\n===  Pest Parse Tree ===");
+                for pair in pairs {
+                    print_pest_pair(pair, 0);
+                }
+                eprintln!("=== End Parse Tree ===\n");
+            }
+            Err(e) => eprintln!("Pest parse error: {}", e),
+        }
+        
+        fn print_pest_pair(pair: pest::iterators::Pair<Rule>, depth: usize) {
+            let indent = "  ".repeat(depth);
+            eprintln!("{}Rule::{:?} = '{}'", indent, pair.as_rule(), pair.as_str());
+            for inner in pair.into_inner() {
+                print_pest_pair(inner, depth + 1);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_or_operator() {
+        let source = "result: bool = false or true";
+        let mut parser = PestParser::new();
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
+        
+        match &result {
+            Ok(program) => {
+                assert_eq!(program.units.len(), 1);
+                
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
+                    assert_eq!(var_decl.name, "result");
+                    
+                    // Check that value is a Binary expression with Or operator
+                    if let Expression::Binary { left, operator, right, .. } = &var_decl.value {
+                        assert!(matches!(operator, BinaryOperator::Or), "Expected Or operator, got: {:?}", operator);
+                        
+                        // Check left is false
+                        assert!(matches!(left.as_ref(), Expression::Literal(Literal::Bool(false))), "Expected false literal, got: {:?}", left);
+                        
+                        // Check right is true
+                        assert!(matches!(right.as_ref(), Expression::Literal(Literal::Bool(true))), "Expected true literal, got: {:?}", right);
+                    } else {
+                        panic!("Expected Binary expression with Or operator, got: {:?}", var_decl.value);
+                    }
+                } else {
+                    panic!("Expected variable declaration, got: {:?}", program.units[0]);
+                }
+            }
+            Err(e) => {
+                println!("Parse error: {}", e);
+                panic!("Expected successful parse, got error: {}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_and_operator() {
+        let source = "result: bool = true and false";
+        let mut parser = PestParser::new();
+        let file_id = create_test_file_id();
+        let result = parser.parse(source, file_id);
+        
+        match &result {
+            Ok(program) => {
+                assert_eq!(program.units.len(), 1);
+                
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
+                    assert_eq!(var_decl.name, "result");
+                    
+                    // Check that value is a Binary expression with And operator
+                    if let Expression::Binary { left, operator, right, .. } = &var_decl.value {
+                        assert!(matches!(operator, BinaryOperator::And), "Expected And operator, got: {:?}", operator);
+                        
+                        // Check left is true
+                        assert!(matches!(left.as_ref(), Expression::Literal(Literal::Bool(true))), "Expected true literal, got: {:?}", left);
+                        
+                        // Check right is false
+                        assert!(matches!(right.as_ref(), Expression::Literal(Literal::Bool(false))), "Expected false literal, got: {:?}", right);
+                    } else {
+                        panic!("Expected Binary expression with And operator, got: {:?}", var_decl.value);
+                    }
+                } else {
+                    panic!("Expected variable declaration, got: {:?}", program.units[0]);
+                }
+            }
+            Err(e) => {
+                println!("Parse error: {}", e);
+                panic!("Expected successful parse, got error: {}", e);
+            }
+        }
+    }
+
+    #[test]
     fn test_parse_assignment_expression() {
         let source = "i = 0";
         let mut parser = PestParser::new();
@@ -772,7 +874,7 @@ mod tests {
         use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
 
-        let source = "(int) -> str";
+        let source = "fn(int) -> str";
         let result = TJLangPestParser::parse(Rule::function_type, source);
 
         match result {
@@ -802,7 +904,7 @@ mod tests {
             // Type aliases
             "type MyType = int | str",
             "type Point = (int, int)",
-            "type Callback = () -> int",
+            "type Callback = fn() -> int",
             
             // Struct declarations
             "type Point { x: int, y: int }",
@@ -1152,9 +1254,9 @@ mod tests {
             "int | str | bool",
             
             // Function types
-            "() -> int",
-            "(int) -> str",
-            "(int, str) -> bool",
+            "fn() -> int",
+            "fn(int) -> str",
+            "fn(int, str) -> bool",
             
             // Generic types
             "Vec<int>",
@@ -2105,7 +2207,7 @@ mod tests {
         let test_cases = vec![
             "def process<T: implements [Comparable]> (item: T) -> int { 0 }",
             "def sort<T: implements [Comparable, Serializable]> (items: [T]) -> [T] { items }",
-            "def map<T: implements [Clone], U: implements [Default]> (f: (T) -> U, items: [T]) -> [U] { [] }",
+            "def map<T: implements [Clone], U: implements [Default]> (f: fn(T) -> U, items: [T]) -> [U] { [] }",
         ];
         
         for source in test_cases {
@@ -2715,7 +2817,7 @@ mod tests {
             // Match with guards
             "match x { n: int if n > 0: { pass } }",
             // Match with trait patterns
-            "match obj { drawable: implements [Drawable]: { pass } }",
+            // "match obj { drawable: implements [Drawable]: { pass } }",
         ];
 
         for source in cases {

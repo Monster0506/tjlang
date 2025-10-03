@@ -308,15 +308,9 @@ impl PestParser {
                                             // This allows function calls and other expressions to be executed
                                             units.push(ProgramUnit::Expression(expr));
                                         }
-                                        _ => {
-                                            // For other statements, create a dummy variable declaration
-                                            // This maintains backward compatibility with existing tests
-                                            units.push(ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
-                                                name: "main".to_string(),
-                                                var_type: Type::Primitive(PrimitiveType::Any),
-                                                value: Expression::Literal(Literal::None),
-                                                span: self.create_span(span),
-                                            })));
+                                        other_statement => {
+                                            // For other statements (if, while, for, etc.), add as Statement
+                                            units.push(ProgramUnit::Statement(other_statement));
                                         }
                                     }
                                 }
@@ -722,8 +716,10 @@ impl PestParser {
                 );
                 "Missing expression"
             })?;
+            debug_println!("[DEBUG] [VAR_DECL] Variable '{}' initializer rule: {:?}, content: '{}'", name, expr_pair.as_rule(), expr_pair.as_str());
             let expr_span = expr_pair.as_span();
             let expression = self.parse_expression(expr_pair)?;
+            debug_println!("[DEBUG] [VAR_DECL] Variable '{}' parsed expression: {:?}", name, expression);
             
             // Add type checking warning if types don't match (basic check)
             if let Expression::Literal(lit) = &expression {
@@ -802,8 +798,37 @@ impl PestParser {
         debug_println!("[DEBUG] [PREC] parse_precedence_chain: input rule: {:?}, content: '{}'", pair.as_rule(), pair.as_str());
         let mut current = pair;
         loop {
-            let inner = current.into_inner().next().ok_or("Empty precedence chain")?;
-            debug_println!("[DEBUG] [PREC] precedence chain: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+            // Check if current has multiple children (for debugging)
+            let all_children: Vec<_> = current.clone().into_inner().collect();
+            debug_println!("[DEBUG] [PREC] current rule: {:?}, has {} children", current.as_rule(), all_children.len());
+            for (idx, child) in all_children.iter().enumerate() {
+                debug_println!("[DEBUG] [PREC]   Child {}: {:?} = '{}'", idx, child.as_rule(), child.as_str());
+            }
+            
+            // First check if the CURRENT rule itself should be handled
+            match current.as_rule() {
+                Rule::or_expr => {
+                    // Check if this or_expr has multiple children (meaning it has an OR operation)
+                    if all_children.len() > 1 {
+                        debug_println!("[DEBUG] [OR] Found or_expr with {} children - parsing as binary operation", all_children.len());
+                        return self.parse_binary_operation(current);
+                    }
+                    // Otherwise drill down
+                }
+                Rule::and_expr => {
+                    // Check if this and_expr has multiple children (meaning it has an AND operation)
+                    if all_children.len() > 1 {
+                        debug_println!("[DEBUG] [AND] Found and_expr with {} children - parsing as binary operation", all_children.len());
+                        return self.parse_binary_operation(current);
+                    }
+                    // Otherwise drill down
+                }
+                _ => {}
+            }
+            
+            let inner = current.clone().into_inner().next().ok_or("Empty precedence chain")?;
+            debug_println!("[DEBUG] [PREC] precedence chain: drilling down to {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+            
             match inner.as_rule() {
                 Rule::postfix_expr => {
                     debug_println!("[DEBUG] Found postfix_expr in precedence chain, calling parse_postfix_expr");
@@ -846,14 +871,24 @@ impl PestParser {
 
     /// Parse binary operations like x + y, x * y, etc.
     fn parse_binary_operation(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
-        debug_println!("[DEBUG] [BIN_OP] parse_binary_operation: rule={:?}, content = '{}'", pair.as_rule(), pair.as_str());
+        debug_println!("[DEBUG] [BIN_OP] ========================================");
+        debug_println!("[DEBUG] [BIN_OP] parse_binary_operation ENTRY");
+        debug_println!("[DEBUG] [BIN_OP] rule={:?}, content = '{}'", pair.as_rule(), pair.as_str());
+        
+        // Check ALL children before filtering
+        let all_children_before: Vec<_> = pair.clone().into_inner().collect();
+        debug_println!("[DEBUG] [BIN_OP] Total children BEFORE filter: {}", all_children_before.len());
+        for (i, child) in all_children_before.iter().enumerate() {
+            debug_println!("[DEBUG] [BIN_OP]   PRE-FILTER Child {}: {:?} = '{}'", i, child.as_rule(), child.as_str());
+        }
+        
         let span = self.create_span(pair.as_span());
         let rule = pair.as_rule();
         let content = pair.as_str().to_string(); // Get content before moving pair
         let children: Vec<_> = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE).collect();
-        debug_println!("[DEBUG] [BIN_OP] Binary operation children: {} items", children.len());
+        debug_println!("[DEBUG] [BIN_OP] Children AFTER filter: {} items", children.len());
         for (i, child) in children.iter().enumerate() {
-            debug_println!("  [BIN_OP] Child {}: {:?} = '{}'", i, child.as_rule(), child.as_str());
+            debug_println!("[DEBUG] [BIN_OP]   POST-FILTER Child {}: {:?} = '{}'", i, child.as_rule(), child.as_str());
         }
         
         if children.len() == 1 {
@@ -893,6 +928,32 @@ impl PestParser {
         }
         
         if children.len() == 2 {
+            debug_println!("[DEBUG] [BIN_OP] 2 children, rule={:?}", rule);
+            debug_println!("[DEBUG] [BIN_OP] Child 0: {:?} = '{}'", children[0].as_rule(), children[0].as_str());
+            debug_println!("[DEBUG] [BIN_OP] Child 1: {:?} = '{}'", children[1].as_rule(), children[1].as_str());
+            
+            // Special case: unary operations have (operator, operand) not (left, right)
+            if rule == Rule::unary && children[0].as_rule() == Rule::unary_op {
+                debug_println!("[DEBUG] [BIN_OP] Detected unary operation!");
+                let op_str = children[0].as_str();
+                let operand = self.parse_expression(children[1].clone())?;
+                debug_println!("[DEBUG] [BIN_OP] Unary operator: '{}', operand: {:?}", op_str, operand);
+                
+                let operator = match op_str {
+                    "-" => UnaryOperator::Negate,
+                    "!" => UnaryOperator::Not,
+                    "~" => UnaryOperator::BitNot,
+                    "not" => UnaryOperator::Not,
+                    _ => return Err(format!("Unknown unary operator: {}", op_str).into()),
+                };
+                
+                return Ok(Expression::Unary {
+                    operator,
+                    operand: Box::new(operand),
+                    span,
+                });
+            }
+            
             // Binary operation: left + right (operator is implicit)
             debug_println!("[DEBUG] parse_binary_operation: parsing 2 children for rule {:?}", rule);
             debug_println!("[DEBUG] Child 0: rule={:?}, content='{}'", children[0].as_rule(), children[0].as_str());
@@ -975,6 +1036,8 @@ impl PestParser {
             // Iterate through operator-operand pairs
             let mut i = 1;
             while i < children.len() {
+                let op_child = &children[i];
+                debug_println!("[DEBUG] [CHAINED] Operator child: rule={:?}, content='{}'", op_child.as_rule(), op_child.as_str());
                 let op = children[i].as_str();
                 i += 1;
                 
@@ -1021,20 +1084,22 @@ impl PestParser {
     /// Parse expression with proper precedence - simplified non-recursive approach
     fn parse_expression(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        debug_println!("[DEBUG] [ENTRY] parse_expression: rule = {:?}, content = '{}'", pair.as_rule(), pair.as_str());
+        debug_println!("[DEBUG] [PARSE_EXPR] ==== ENTRY ====");
+        debug_println!("[DEBUG] [PARSE_EXPR] rule = {:?}, content = '{}'", pair.as_rule(), pair.as_str());
         
         match pair.as_rule() {
             Rule::shift_expr => {
                 // Handle shift_expr directly
-                debug_println!("[DEBUG] [DIRECT_SHIFT_EXPR] Direct shift_expr case: calling parse_precedence_chain for '{}'", pair.as_str());
+                debug_println!("[DEBUG] [PARSE_EXPR] Taking Rule::shift_expr path");
                 let result = self.parse_precedence_chain(pair);
-                debug_println!("[DEBUG] [DIRECT_SHIFT_EXPR] parse_precedence_chain result: {:?}", result);
+                debug_println!("[DEBUG] [PARSE_EXPR] shift_expr result: {:?}", result);
                 result
             }
             Rule::expression => {
                 // For the top-level expression rule, just parse its inner content
+                debug_println!("[DEBUG] [PARSE_EXPR] Taking Rule::expression path");
                 let inner = pair.into_inner().next().ok_or("Empty expression")?;
-                debug_println!("[DEBUG] [EXPR] expression inner rule: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+                debug_println!("[DEBUG] [PARSE_EXPR] expression inner rule: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
                 // Delegate to the appropriate sub-parser based on the inner rule
                 match inner.as_rule() {
                     Rule::assignment => {
@@ -1122,6 +1187,7 @@ impl PestParser {
                 }
                 Rule::multiplicative => {
                     // Handle multiplicative expressions properly
+                    debug_println!("[DEBUG] [PARSE_EXPR] Taking Rule::multiplicative path at line 1162, content: '{}'", pair.as_str());
                     self.parse_binary_operation(pair)
                 }
             Rule::postfix_expr => {
@@ -1412,8 +1478,12 @@ impl PestParser {
                 Ok(Expression::Literal(lit))
             }
             Rule::integer_literal => {
-                let content = pair.as_str().trim();
-                let value = content.parse::<i64>()?;
+                let content = pair.as_str();
+                debug_println!("[DEBUG] [INTEGER] Direct integer parse: content='{}'", content);
+                let trimmed = content.trim();
+                debug_println!("[DEBUG] [INTEGER] After trim: '{}'", trimmed);
+                let value = trimmed.parse::<i64>()
+                    .map_err(|e| format!("Invalid integer: {} (content: '{}')", e, trimmed))?;
                 Ok(Expression::Literal(Literal::Int(value)))
             }
             Rule::float_literal => {
@@ -1458,6 +1528,8 @@ impl PestParser {
                 Ok(left)
             }
             Rule::multiplicative => {
+                debug_println!("[DEBUG] [PARSE_EXPR] Taking Rule::multiplicative path at line 1503, content: '{}'", pair.as_str());
+                debug_println!("[DEBUG] [PARSE_EXPR] multiplicative first child (before filtering): {:?}", pair.clone().into_inner().next().map(|p| format!("{:?} = '{}'", p.as_rule(), p.as_str())));
                 let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 
@@ -1512,9 +1584,17 @@ impl PestParser {
                 Ok(left)
             }
             Rule::unary => {
+                debug_println!("[DEBUG] [UNARY_PARSE] Parsing unary expression: '{}'", pair.as_str());
+                let all_children: Vec<_> = pair.clone().into_inner().collect();
+                debug_println!("[DEBUG] [UNARY_PARSE] Children count: {}", all_children.len());
+                for (i, child) in all_children.iter().enumerate() {
+                    debug_println!("[DEBUG] [UNARY_PARSE]   Child {}: {:?} = '{}'", i, child.as_rule(), child.as_str());
+                }
+                
                 let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
                 
                 if let Some(first) = inner.next() {
+                    debug_println!("[DEBUG] [UNARY_PARSE] First child rule: {:?}, content: '{}'", first.as_rule(), first.as_str());
                     // Check if this is a unary operator or the actual expression
                     match first.as_rule() {
                         Rule::range_expr => {
@@ -1613,11 +1693,12 @@ impl PestParser {
     fn parse_literal(&mut self, pair: Pair<Rule>) -> Result<Literal, Box<dyn std::error::Error>> {
         let inner = pair.into_inner().next().ok_or("Empty literal")?;
         
-        // debug_println!("        Parsing literal inner: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+        debug_println!("[DEBUG] [LITERAL] Parsing literal inner: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
         
         match inner.as_rule() {
                 Rule::integer_literal => {
                     let content = inner.as_str().trim();
+                    debug_println!("[DEBUG] [LITERAL] Integer content after trim: '{}'", content);
                     let value = content.parse::<i64>()
                         .map_err(|e| format!("Invalid integer: {} (content: '{}')", e, content))?;
                     Ok(Literal::Int(value))

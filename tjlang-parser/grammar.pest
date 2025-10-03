@@ -121,7 +121,7 @@ method_decl = { (identifier | operator_symbol) ~ "(" ~ param_list? ~ ")" ~ ARROW
 type_ = { union_type }
 union_type = { option_type ~ ("|" ~ option_type)* }
 option_type = { "?"? ~ function_type }
-function_type = { "(" ~ type_list? ~ ")" ~ "->" ~ (collection_type | primary_type) | collection_type | primary_type }
+function_type = { "fn" ~ "(" ~ type_list? ~ ")" ~ "->" ~ (collection_type | primary_type) | collection_type | primary_type }
 collection_type = { vec_type | set_type | map_type | tuple_type }
 vec_type = { "[" ~ type_ ~ "]" }
 set_type = { "{" ~ type_ ~ "}" }
@@ -138,8 +138,10 @@ primitive_type = { "int" | "float" | "bool" | "str" | "any" }
 expression = { assignment | or_expr }
 assignment = { or_expr ~ assign_op ~ expression }
 assign_op = { "=" }
-or_expr = { and_expr ~ ("or" ~ and_expr)* }
-and_expr = { bit_or_expr ~ ("and" ~ bit_or_expr)* }
+or_expr = { and_expr ~ (or_op ~ and_expr)* }
+or_op = @{ "or" ~ !(ASCII_ALPHANUMERIC | "_") }
+and_expr = { bit_or_expr ~ (and_op ~ bit_or_expr)* }
+and_op = @{ "and" ~ !(ASCII_ALPHANUMERIC | "_") }
 bit_or_expr = { bit_xor_expr ~ ("|" ~ bit_xor_expr)* }
 bit_xor_expr = { bit_and_expr ~ ("^" ~ bit_and_expr)* }
 bit_and_expr = { equality ~ ("&" ~ equality)* }
@@ -151,7 +153,8 @@ additive_op = { "+" | "-" }
 multiplicative = { power ~ ((multiplicative_op ~ power)*) }
 multiplicative_op = { "*" | "/" | "%" }
 power = { unary ~ ("**" ~ power)? }
-unary = { ("-" | "!" | "~" | "not")? ~ (range_expr | postfix_expr) }
+unary_op = { "-" | "!" | "~" | "not" }
+unary = { unary_op? ~ (range_expr | postfix_expr) }
 postfix_expr = { primary ~ (call_suffix | index_suffix | member_suffix)* }
 primary = { spawn_expr | literal | identifier | collection_literal | lambda_expr | "(" ~ expression ~ ")" }
 
@@ -178,8 +181,8 @@ literal = {
 }
 
 // Basic literals
-integer_literal = @{ "-"? ~ ASCII_DIGIT+ }
-float_literal = @{ "-"? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+integer_literal = @{ ASCII_DIGIT+ }
+float_literal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 string_literal = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 fstring_literal = { "f\"" ~ fstring_content* ~ "\"" }
 fstring_content = { fstring_text | fstring_expression }
@@ -233,7 +236,7 @@ field_init_list = { field_init ~ ("," ~ field_init)* }
 impl_kw = { "impl" }
 for_kw = { "for" }
 keyword = { impl_kw | for_kw | "module" | "import" | "from" | "export" | "as" | "do" | "spawn" | "def" | "type" | "enum" | "interface" | "if" | "elif" | "else" | "while" | "match" | "return" | "break" | "continue" | "pass" | "raise" | "implements" | "extends" | "true" | "false" | "None" | "not" | "to" }
-identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHA | ASCII_DIGIT | "_")* }
+identifier = @{ !(keyword ~ !(ASCII_ALPHANUMERIC | "_")) ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHA | ASCII_DIGIT | "_")* }
 
 // Qualified names (for modules/imports)
 qualified_name = { identifier ~ ("." ~ identifier)* }
