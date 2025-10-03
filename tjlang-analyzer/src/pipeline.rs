@@ -81,6 +81,11 @@ impl AnalysisPipeline {
         self.add_post_ast_rule(Box::new(UndefinedVariableRule));
         self.add_post_ast_rule(Box::new(CircularDependencyRule));
         
+        // Static semantic analysis rules (prevents runtime crashes)
+        eprintln!("[DEBUG] [PIPELINE] Adding LiteralIndexBoundsRule");
+        self.add_ast_rule(Box::new(LiteralIndexBoundsRule));
+        eprintln!("[DEBUG] [PIPELINE] Total AST rules: {}", self.ast_rules.len());
+        
         // High priority rules (Phase 2)
         self.add_post_ast_rule(Box::new(NamingConventionRule));
         self.add_post_ast_rule(Box::new(FunctionComplexityRule));
@@ -169,11 +174,16 @@ impl AnalysisPipeline {
         rule_results.extend(pre_ast_result.rule_results);
         
         // Phase 2: AST analysis (if parsing succeeds)
+        eprintln!("[DEBUG] [PIPELINE] Attempting to parse AST...");
         if let Some(ast) = self.parse_ast(source, file_id) {
+            eprintln!("[DEBUG] [PIPELINE] AST parsed successfully, running AST analysis");
             context = context.with_ast(ast);
             let ast_result = self.run_ast_analysis(&context);
+            eprintln!("[DEBUG] [PIPELINE] AST analysis complete: {} diagnostics", ast_result.diagnostics_count);
             all_diagnostics.merge(ast_result.diagnostics);
             rule_results.extend(ast_result.rule_results);
+        } else {
+            eprintln!("[DEBUG] [PIPELINE] AST parsing failed");
         }
         
         // Phase 3: Post-AST analysis (semantic analysis)
@@ -236,16 +246,20 @@ impl AnalysisPipeline {
     
     /// Run AST analysis (AST-based rules)
     fn run_ast_analysis(&self, context: &AnalysisContext) -> AnalysisResult {
+        eprintln!("[DEBUG] [PIPELINE] run_ast_analysis called with {} AST rules", self.ast_rules.len());
         let start_time = Instant::now();
         let mut diagnostics = DiagnosticCollection::new();
         let mut rule_results = Vec::new();
         
         // Run AST rules
         for rule in &self.ast_rules {
+            eprintln!("[DEBUG] [PIPELINE] Checking AST rule: {}, enabled={}", rule.name(), rule.is_enabled(&self.config));
             if rule.is_enabled(&self.config) {
+                eprintln!("[DEBUG] [PIPELINE] Running AST rule: {}", rule.name());
                 let rule_start = Instant::now();
                 let rule_diagnostics = rule.analyze(context);
                 let rule_time = rule_start.elapsed();
+                eprintln!("[DEBUG] [PIPELINE] AST rule {} found {} diagnostics", rule.name(), rule_diagnostics.count());
                 
                 diagnostics.merge(rule_diagnostics.clone());
                 

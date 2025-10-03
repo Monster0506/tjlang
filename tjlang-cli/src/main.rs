@@ -151,7 +151,7 @@ fn run_program(
     }
 
     // Create a file ID for the source
-    use codespan::{FileId, Files};
+    use codespan::Files;
     let mut files: Files<String> = Files::new();
     let file_id = files.add(file.to_string_lossy().to_string(), source.clone());
 
@@ -194,6 +194,40 @@ fn run_program(
             std::process::exit(1);
         }
     };
+    
+    // Run static analysis
+    if verbose {
+        debug_println!(" Running static analysis...");
+    }
+    
+    use tjlang_analyzer::AnalysisPipeline;
+    let pipeline = AnalysisPipeline::new();
+    
+    let analysis_result = pipeline.analyze(&source, file_id);
+    
+    if debug {
+        debug_println!(" Analysis completed:");
+        debug_println!("  Rules executed: {}", analysis_result.rules_executed);
+        debug_println!("  Diagnostics found: {}", analysis_result.diagnostics_count);
+        debug_println!("  Execution time: {:?}", analysis_result.execution_time);
+    }
+    
+    // Display analysis diagnostics if any
+    if !analysis_result.diagnostics.is_empty() {
+        eprintln!("\nStatic Analysis Errors in {}:", file.display());
+        eprintln!();
+        display_diagnostics(&files, &analysis_result.diagnostics)?;
+        
+        // Count errors (not warnings)
+        let error_count = analysis_result.diagnostics.iter()
+            .filter(|d| matches!(d.severity, codespan_reporting::diagnostic::Severity::Error))
+            .count();
+        
+        if error_count > 0 {
+            eprintln!("\n {} error(s) found. Fix these before running.", error_count);
+            std::process::exit(1);
+        }
+    }
 
     if debug {
         debug_println!(" AST:");
@@ -393,7 +427,7 @@ fn demo_simple_arithmetic() -> Result<(), Box<dyn std::error::Error>> {
     debug_println!("  Testing: 2 + 3 * 4");
 
     let source = "2 + 3 * 4";
-    use codespan::{FileId, Files};
+    use codespan::Files;
     let mut files = Files::new();
     let file_id = files.add("demo", source);
 
@@ -413,7 +447,7 @@ fn demo_variables_and_expressions() -> Result<(), Box<dyn std::error::Error>> {
     debug_println!("  Testing: x: int = 10; y: int = 20; x + y");
 
     let source = "x: int = 10\ny: int = 20\nx + y";
-    use codespan::{FileId, Files};
+    use codespan::Files;
     let mut files = Files::new();
     let file_id = files.add("demo", source);
 
@@ -433,7 +467,7 @@ fn demo_control_flow() -> Result<(), Box<dyn std::error::Error>> {
     debug_println!("  Testing: 5 > 3");
 
     let source = "5 > 3";
-    use codespan::{FileId, Files};
+    use codespan::Files;
     let mut files = Files::new();
     let file_id = files.add("demo", source);
 
@@ -453,7 +487,7 @@ fn demo_functions() -> Result<(), Box<dyn std::error::Error>> {
     debug_println!("  Testing: def add(x: int, y: int) -> int {{ return x + y }}; add(5, 3)");
 
     let source = "def add(x: int, y: int) -> int { return x + y }\nadd(5, 3)";
-    use codespan::{FileId, Files};
+    use codespan::Files;
     let mut files = Files::new();
     let file_id = files.add("demo", source);
 

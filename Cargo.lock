@@ -1047,6 +1047,7 @@ dependencies = [
  "codespan-reporting",
  "miette",
  "serde_json",
+ "tjlang-analyzer",
  "tjlang-diagnostics",
  "tjlang-lexer",
  "tjlang-parser",

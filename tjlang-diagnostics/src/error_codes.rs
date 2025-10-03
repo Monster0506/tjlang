@@ -104,6 +104,14 @@ pub enum ErrorCode {
     AnalyzerPatternMatching,
     AnalyzerGenericConstraint,
     
+    // Static Analysis - Semantic Errors (A2800-A2899)
+    AnalyzerIndexOutOfBoundsStatic,
+    AnalyzerDivisionByZeroStatic,
+    AnalyzerNullPointerStatic,
+    AnalyzerWrongArgumentCount,
+    AnalyzerMethodNotFoundStatic,
+    AnalyzerInvalidCastStatic,
+    
     // Codegen errors (C3000-C3999)
     CodegenInvalidType,
     CodegenInvalidExpression,
@@ -227,6 +235,14 @@ impl ErrorCode {
             ErrorCode::AnalyzerPatternMatching => "A2702",
             ErrorCode::AnalyzerGenericConstraint => "A2703",
             
+            // Static Analysis - Semantic Errors (A2800-A2899)
+            ErrorCode::AnalyzerIndexOutOfBoundsStatic => "A2800",
+            ErrorCode::AnalyzerDivisionByZeroStatic => "A2801",
+            ErrorCode::AnalyzerNullPointerStatic => "A2802",
+            ErrorCode::AnalyzerWrongArgumentCount => "A2803",
+            ErrorCode::AnalyzerMethodNotFoundStatic => "A2804",
+            ErrorCode::AnalyzerInvalidCastStatic => "A2805",
+            
             // Codegen errors
             ErrorCode::CodegenInvalidType => "C3000",
             ErrorCode::CodegenInvalidExpression => "C3001",
@@ -331,7 +347,13 @@ impl ErrorCode {
             | ErrorCode::AnalyzerAsyncAwait
             | ErrorCode::AnalyzerErrorHandling
             | ErrorCode::AnalyzerPatternMatching
-            | ErrorCode::AnalyzerGenericConstraint => "Analyzer",
+            | ErrorCode::AnalyzerGenericConstraint
+            | ErrorCode::AnalyzerIndexOutOfBoundsStatic
+            | ErrorCode::AnalyzerDivisionByZeroStatic
+            | ErrorCode::AnalyzerNullPointerStatic
+            | ErrorCode::AnalyzerWrongArgumentCount
+            | ErrorCode::AnalyzerMethodNotFoundStatic
+            | ErrorCode::AnalyzerInvalidCastStatic => "Analyzer",
             
             ErrorCode::CodegenInvalidType
             | ErrorCode::CodegenInvalidExpression

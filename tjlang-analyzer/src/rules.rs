@@ -945,11 +945,11 @@ impl PostASTRule for MagicNumberRule {
         // Get the AST - if it's not available, return empty diagnostics
         let ast = match &context.ast {
             Some(ast) => {
-                println!("DEBUG: MagicNumberRule - AST is available");
+                println!("[DEBUG]: MagicNumberRule - AST is available");
                 ast
             },
             None => {
-                println!("DEBUG: MagicNumberRule - No AST available");
+                println!("[DEBUG]: MagicNumberRule - No AST available");
                 return diagnostics;
             },
         };
@@ -1971,5 +1971,184 @@ impl PostASTRule for CohesionRule {
         // - Cohesion improvement suggestions
         
         diagnostics
+    }
+}
+
+// ============================================================================
+// STATIC SEMANTIC ANALYSIS RULES (A2800-A2899)
+// ============================================================================
+
+/// Rule to detect literal array index out of bounds at compile time
+pub struct LiteralIndexBoundsRule;
+
+impl AnalysisRule for LiteralIndexBoundsRule {
+    fn name(&self) -> &str { "LiteralIndexBoundsRule" }
+    fn description(&self) -> &str { "Detects array index out of bounds on literal arrays" }
+    fn category(&self) -> RuleCategory { RuleCategory::TypeSafety }
+    fn priority(&self) -> u32 { 10 } // High priority - prevents runtime crash
+}
+
+impl ASTRule for LiteralIndexBoundsRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        eprintln!("[DEBUG] [BOUNDS] LiteralIndexBoundsRule.analyze() called");
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        if let Some(ast) = &context.ast {
+            eprintln!("[DEBUG] [BOUNDS] AST is present with {} units", ast.units.len());
+            check_expressions_for_index_bounds(&ast.units, &mut diagnostics);
+        } else {
+            eprintln!("[DEBUG] [BOUNDS] No AST available");
+        }
+        
+        eprintln!("[DEBUG] [BOUNDS] Returning {} diagnostics", diagnostics.count());
+        diagnostics
+    }
+}
+
+/// Recursively check expressions for literal index bounds violations
+fn check_expressions_for_index_bounds(units: &[ProgramUnit], diagnostics: &mut DiagnosticCollection) {
+    use tjlang_diagnostics::ErrorCode;
+    
+    eprintln!("[DEBUG] [BOUNDS] check_expressions_for_index_bounds: {} units", units.len());
+    for (i, unit) in units.iter().enumerate() {
+        eprintln!("[DEBUG] [BOUNDS] Unit {}: {:?}", i, std::mem::discriminant(unit));
+        match unit {
+            ProgramUnit::Statement(stmt) => {
+                eprintln!("[DEBUG] [BOUNDS] Checking statement");
+                check_statement_for_index_bounds(stmt, diagnostics);
+            }
+            ProgramUnit::Declaration(decl) => {
+                eprintln!("[DEBUG] [BOUNDS] Checking declaration");
+                if let Declaration::Function(func) = decl {
+                    check_block_for_index_bounds(&func.body, diagnostics);
+                }
+            }
+            ProgramUnit::Expression(expr) => {
+                eprintln!("[DEBUG] [BOUNDS] Checking expression directly");
+                check_expr_for_index_bounds(expr, diagnostics);
+            }
+            _ => {
+                eprintln!("[DEBUG] [BOUNDS] Skipping unit type");
+            }
+        }
+    }
+}
+
+fn check_statement_for_index_bounds(stmt: &Statement, diagnostics: &mut DiagnosticCollection) {
+    match stmt {
+        Statement::Expression(expr) => check_expr_for_index_bounds(expr, diagnostics),
+        Statement::Variable(var_decl) => check_expr_for_index_bounds(&var_decl.value, diagnostics),
+        Statement::If(if_stmt) => {
+            check_expr_for_index_bounds(&if_stmt.condition, diagnostics);
+            check_block_for_index_bounds(&if_stmt.then_block, diagnostics);
+            if let Some(else_block) = &if_stmt.else_block {
+                check_block_for_index_bounds(else_block, diagnostics);
+            }
+        }
+        Statement::While(while_stmt) => {
+            check_expr_for_index_bounds(&while_stmt.condition, diagnostics);
+            check_block_for_index_bounds(&while_stmt.body, diagnostics);
+        }
+        Statement::DoWhile(do_while) => {
+            check_expr_for_index_bounds(&do_while.condition, diagnostics);
+            check_block_for_index_bounds(&do_while.body, diagnostics);
+        }
+        Statement::For(for_stmt) => {
+            match for_stmt {
+                ForStatement::ForEach { body, .. } => check_block_for_index_bounds(body, diagnostics),
+                ForStatement::CStyle { body, .. } => check_block_for_index_bounds(body, diagnostics),
+            }
+        }
+        Statement::Return(ret) => {
+            if let Some(expr) = &ret.value {
+                check_expr_for_index_bounds(expr, diagnostics);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn check_block_for_index_bounds(block: &Block, diagnostics: &mut DiagnosticCollection) {
+    for stmt in &block.statements {
+        check_statement_for_index_bounds(stmt, diagnostics);
+    }
+}
+
+fn check_expr_for_index_bounds(expr: &Expression, diagnostics: &mut DiagnosticCollection) {
+    use tjlang_diagnostics::ErrorCode;
+    
+    match expr {
+        // Check for method calls like [1,2,3].at(5) or [1,2,3].get(5)
+        Expression::Call { callee, args, span } => {
+            eprintln!("[DEBUG] [BOUNDS] Checking Call expression");
+            if let Expression::Member { target, member, .. } = callee.as_ref() {
+                eprintln!("[DEBUG] [BOUNDS] Call callee is Member: member={}, target={:?}", member, std::mem::discriminant(target.as_ref()));
+                if matches!(member.as_str(), "at" | "get") {
+                    eprintln!("[DEBUG] [BOUNDS] Method is 'at' or 'get'");
+                    // Check if target is a literal array
+                    if let Expression::VecLiteral { elements, .. } = target.as_ref() {
+                        eprintln!("[DEBUG] [BOUNDS] Target is VecLiteral with {} elements", elements.len());
+                        let array_len = elements.len();
+                        
+                        // Check if the index argument is a literal integer
+                        if !args.is_empty() {
+                            if let Expression::Literal(Literal::Int(index)) = &args[0] {
+                                if *index < 0 || *index as usize >= array_len {
+                                    let message = format!(
+                                        "Array index {} is out of bounds for array of length {}",
+                                        index, array_len
+                                    );
+                                    
+                                    // Convert AST SourceSpan to diagnostics SourceSpan
+                                    let diag_span = tjlang_diagnostics::SourceSpan::new(span.file_id, span.span);
+                                    
+                                    let diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                                        ErrorCode::AnalyzerIndexOutOfBoundsStatic,
+                                        codespan_reporting::diagnostic::Severity::Error,
+                                        message,
+                                        diag_span,
+                                    ).with_note(format!("Valid indices are 0 $= {}", array_len-1));
+                                    
+                                    diagnostics.add(diagnostic);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Recursively check nested expressions
+            check_expr_for_index_bounds(callee, diagnostics);
+            for arg in args {
+                check_expr_for_index_bounds(arg, diagnostics);
+            }
+        }
+        
+        // Recursively check other expression types
+        Expression::Binary { left, right, .. } => {
+            check_expr_for_index_bounds(left, diagnostics);
+            check_expr_for_index_bounds(right, diagnostics);
+        }
+        Expression::Unary { operand, .. } => {
+            check_expr_for_index_bounds(operand, diagnostics);
+        }
+        Expression::Member { target, .. } => {
+            check_expr_for_index_bounds(target, diagnostics);
+        }
+        Expression::Index { target, index, .. } => {
+            check_expr_for_index_bounds(target, diagnostics);
+            check_expr_for_index_bounds(index, diagnostics);
+        }
+        Expression::VecLiteral { elements, .. } => {
+            for elem in elements {
+                check_expr_for_index_bounds(elem, diagnostics);
+            }
+        }
+        Expression::If { condition, then_expr, else_expr, .. } => {
+            check_expr_for_index_bounds(condition, diagnostics);
+            check_expr_for_index_bounds(then_expr, diagnostics);
+            check_expr_for_index_bounds(else_expr, diagnostics);
+        }
+        _ => {}
     }
 }
