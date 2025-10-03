@@ -87,9 +87,62 @@ fn run_program(
         debug_println!(" Debug mode: {}", debug);
         debug_println!(" Verbose mode: {}", verbose);
     }
-
-    // Read the source file
-    let source = std::fs::read_to_string(file)?;
+ 
+    // Read the source file with proper error handling
+    let source = match std::fs::read_to_string(file) {
+        Ok(content) => content,
+        Err(e) => {
+            // Use diagnostic system for file errors
+            use codespan_reporting::diagnostic::Severity;
+            use tjlang_diagnostics::{TJLangDiagnostic, ErrorCode, SourceSpan, DiagnosticCollection};
+            use codespan::{Files, Span};
+            
+            let mut files: Files<String> = Files::new();
+            let file_id = files.add(file.to_string_lossy().to_string(), String::new());
+            let span = SourceSpan::new(file_id, Span::from(0..0));
+            
+            let (code, message, notes) = match e.kind() {
+                std::io::ErrorKind::NotFound => {
+                    (
+                        ErrorCode::RuntimeValueError, // Reusing since we don't have FileNotFound anymore
+                        format!("File not found: {}", file.display()),
+                        vec![
+                            "Please check that the file exists and the path is correct.".to_string(),
+                            format!("Current directory: {}", std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_else(|_| "unknown".to_string())),
+                        ]
+                    )
+                }
+                std::io::ErrorKind::PermissionDenied => {
+                    (
+                        ErrorCode::RuntimeValueError,
+                        format!("Permission denied: {}", file.display()),
+                        vec![
+                            "You don't have permission to read this file.".to_string(),
+                            "Check the file permissions and try again.".to_string(),
+                        ]
+                    )
+                }
+                _ => {
+                    (
+                        ErrorCode::RuntimeValueError,
+                        format!("Failed to read file: {}", file.display()),
+                        vec![format!("IO error: {}", e)]
+                    )
+                }
+            };
+            
+            let mut diagnostic = TJLangDiagnostic::new(code, Severity::Error, message, span);
+            for note in notes {
+                diagnostic = diagnostic.with_note(note);
+            }
+            
+            let mut diagnostics = DiagnosticCollection::new();
+            diagnostics.add(diagnostic);
+            
+            display_diagnostics(&files, &diagnostics).ok();
+            std::process::exit(1);
+        }
+    };
 
     if verbose {
         debug_println!(" Source code ({} bytes):", source.len());
@@ -99,8 +152,8 @@ fn run_program(
 
     // Create a file ID for the source
     use codespan::{FileId, Files};
-    let mut files = Files::new();
-    let file_id = files.add(file.to_string_lossy().to_string(), &source);
+    let mut files: Files<String> = Files::new();
+    let file_id = files.add(file.to_string_lossy().to_string(), source.clone());
 
     // Lex the source
     if verbose {
@@ -132,10 +185,13 @@ fn run_program(
 
             // Display diagnostics using codespan-reporting
             if !diagnostics.is_empty() {
-                println!(" Parse Errors:");
+                eprintln!("Parse Error: Failed to parse {}", file.display());
+                eprintln!();
                 display_diagnostics(&files, &diagnostics)?;
+            } else {
+                eprintln!("Parse Error: Failed to parse {} (no diagnostic information available)", file.display());
             }
-            return Err("Parse failed".into());
+            std::process::exit(1);
         }
     };
 
@@ -173,7 +229,31 @@ fn run_program(
         }
         Err(e) => {
             debug_println!(" Program execution failed: {}", e);
-            return Err(e.into());
+            
+            // Convert runtime error to diagnostic
+            use codespan_reporting::diagnostic::Severity;
+            use tjlang_diagnostics::{TJLangDiagnostic, ErrorCode, SourceSpan, DiagnosticCollection};
+            use codespan::Span;
+            
+            // Note: Currently we don't track exact source locations through the interpreter,
+            // so we show the whole file. This could be improved by threading span information
+            // through the interpreter or using a global error context.
+            let span = SourceSpan::new(file_id, Span::from(0..source.len() as u32));
+            let diagnostic = TJLangDiagnostic::new(
+                ErrorCode::RuntimeValueError,
+                Severity::Error,
+                format!("Runtime Error: {}", e),
+                span,
+            ).with_note("The program failed during execution.".to_string())
+             .with_note("Run with --debug flag for more detailed information.".to_string())
+             .with_note("Note: Exact error location tracking is not yet implemented for runtime errors.".to_string());
+            
+            let mut diagnostics = DiagnosticCollection::new();
+            diagnostics.add(diagnostic);
+            
+            eprintln!("\nRuntime Error in {}:", file.display());
+            display_diagnostics(&files, &diagnostics)?;
+            std::process::exit(1);
         }
     };
 
@@ -391,7 +471,7 @@ fn demo_functions() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Display diagnostics using codespan-reporting
 fn display_diagnostics(
-    files: &codespan::Files<&String>,
+    files: &codespan::Files<String>,
     diagnostics: &tjlang_diagnostics::DiagnosticCollection,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let writer = StandardStream::stderr(ColorChoice::Always);
