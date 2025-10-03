@@ -49,13 +49,15 @@ def main() -> int {
         x = x + 1
     }
 
-a: int = -10
-b: int = 14
+a: int = 0
+b: int = 10
 while a < 5 or b > 5 {
     IO.println("a = " + a.to_string() + ", b = " + b.to_string())
     a = a + 1
     b = b - 1
 }
- 
+IO.printf("a = {}, b = {}", a, b)
+IO.println()
+
 }
 main()
