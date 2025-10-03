@@ -121,6 +121,13 @@ pub enum ErrorCode {
     RuntimeMemoryError,
     RuntimeTypeError,
     RuntimeValueError,
+    
+    // File system errors (F5000-F5999)
+    FileNotFound,
+    FilePermissionDenied,
+    FileReadError,
+    FileWriteError,
+    FileInvalidPath,
 }
 
 impl ErrorCode {
@@ -244,6 +251,13 @@ impl ErrorCode {
             ErrorCode::RuntimeMemoryError => "R4002",
             ErrorCode::RuntimeTypeError => "R4003",
             ErrorCode::RuntimeValueError => "R4004",
+            
+            // File system errors
+            ErrorCode::FileNotFound => "F5000",
+            ErrorCode::FilePermissionDenied => "F5001",
+            ErrorCode::FileReadError => "F5002",
+            ErrorCode::FileWriteError => "F5003",
+            ErrorCode::FileInvalidPath => "F5004",
         }
     }
     
@@ -348,6 +362,12 @@ impl ErrorCode {
             | ErrorCode::RuntimeMemoryError
             | ErrorCode::RuntimeTypeError
             | ErrorCode::RuntimeValueError => "Runtime",
+            
+            ErrorCode::FileNotFound
+            | ErrorCode::FilePermissionDenied
+            | ErrorCode::FileReadError
+            | ErrorCode::FileWriteError
+            | ErrorCode::FileInvalidPath => "File System",
         }
     }
 }
