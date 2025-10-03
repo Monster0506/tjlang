@@ -238,9 +238,12 @@ impl Interpreter {
                 result
             },
             Expression::Unary { operator, operand, .. } => {
-                debug_println!("          🔢 Unary operation: {:?}", operator);
+                debug_println!("[DEBUG] [UNARY] Unary operation: {:?}", operator);
                 let operand_val = self.interpret_expression(operand)?;
-                self.interpret_unary_operation(operator, &operand_val)
+                debug_println!("[DEBUG] [UNARY] Operand value: {:?}", operand_val);
+                let result = self.interpret_unary_operation(operator, &operand_val);
+                debug_println!("[DEBUG] [UNARY] Result: {:?}", result);
+                result
             },
             Expression::Call { callee, args, .. } => {
                 debug_println!("          📞 Function call with {} args", args.len());
