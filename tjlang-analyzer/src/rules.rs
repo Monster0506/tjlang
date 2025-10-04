@@ -3216,7 +3216,7 @@ fn check_expr_for_undefined_vars(
                 // We'll use a placeholder span covering the entire file
                 // In a real implementation, we'd need to enhance the AST to include spans for all nodes
                 let diag_span = tjlang_diagnostics::SourceSpan::new(
-                    file_id,
+                        file_id,
                     codespan::Span::from(0..1)
                 );
                 
