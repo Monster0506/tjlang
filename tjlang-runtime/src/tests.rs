@@ -6,9 +6,9 @@
 #[cfg(test)]
 mod tests {
     use crate::{Interpreter, Value};
+    use codespan::Files;
     use tjlang_ast::*;
     use tjlang_parser::parse;
-    use codespan::Files;
 
     /// Helper function to create a test file ID
     fn create_test_file_id() -> codespan::FileId {
@@ -20,9 +20,11 @@ mod tests {
     fn interpret_code(source: &str) -> Result<Value, String> {
         let file_id = create_test_file_id();
         let (ast, _) = parse(source, file_id).map_err(|e| format!("Parse error: {:?}", e))?;
-        
+
         let mut interpreter = Interpreter::new();
-        interpreter.interpret_program(&ast).map_err(|e| format!("Runtime error: {}", e))
+        interpreter
+            .interpret_program(&ast)
+            .map_err(|e| format!("Runtime error: {}", e))
     }
 
     /// Helper function to test primitive method calls

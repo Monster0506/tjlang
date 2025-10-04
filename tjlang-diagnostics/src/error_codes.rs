@@ -1,6 +1,5 @@
 //! Error codes for different categories of errors
 
-
 /// Error codes for different categories of errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ErrorCode {
@@ -10,7 +9,7 @@ pub enum ErrorCode {
     LexerUnterminatedComment,
     LexerInvalidNumber,
     LexerInvalidEscape,
-    
+
     // Parser errors (P1000-P1999)
     ParserUnexpectedToken,
     ParserExpectedToken,
@@ -26,7 +25,7 @@ pub enum ErrorCode {
     ParserInvalidModule,
     ParserInvalidImport,
     ParserInvalidExport,
-    
+
     // Analyzer errors (A2000-A2999)
     AnalyzerUndefinedVariable,
     AnalyzerUndefinedFunction,
@@ -43,7 +42,7 @@ pub enum ErrorCode {
     AnalyzerInvalidModule,
     AnalyzerInvalidImport,
     AnalyzerInvalidExport,
-    
+
     // Code Quality Rules (A2100-A2199)
     AnalyzerNamingConvention,
     AnalyzerFunctionComplexity,
@@ -55,7 +54,7 @@ pub enum ErrorCode {
     AnalyzerCommentCoverage,
     AnalyzerCommentStyle,
     AnalyzerImportOrder,
-    
+
     // Dead Code & Usage Rules (A2200-A2299)
     AnalyzerUnusedVariable,
     AnalyzerUnusedParameter,
@@ -63,7 +62,7 @@ pub enum ErrorCode {
     AnalyzerUnreachableCode,
     AnalyzerRecursionDepth,
     AnalyzerResourceLeak,
-    
+
     // Performance Rules (A2300-A2399)
     AnalyzerInefficientLoop,
     AnalyzerMemoryAllocation,
@@ -71,14 +70,14 @@ pub enum ErrorCode {
     AnalyzerCacheEfficiency,
     AnalyzerBranchPrediction,
     AnalyzerVectorization,
-    
+
     // Architecture Rules (A2400-A2499)
     AnalyzerLargeFile,
     AnalyzerTooManyImports,
     AnalyzerGlobalVariable,
     AnalyzerCoupling,
     AnalyzerCohesion,
-    
+
     // Style & Formatting Rules (A2500-A2599)
     AnalyzerFormattingConvention,
     AnalyzerIndentation,
@@ -86,7 +85,7 @@ pub enum ErrorCode {
     AnalyzerLineLength,
     AnalyzerSemicolon,
     AnalyzerBracketMatching,
-    
+
     // Security & Safety Rules (A2600-A2699)
     AnalyzerNullPointer,
     AnalyzerBufferOverflow,
@@ -97,13 +96,13 @@ pub enum ErrorCode {
     AnalyzerConcurrency,
     AnalyzerMemoryLeak,
     AnalyzerRaceCondition,
-    
+
     // Language-Specific Rules (A2700-A2799)
     AnalyzerAsyncAwait,
     AnalyzerErrorHandling,
     AnalyzerPatternMatching,
     AnalyzerGenericConstraint,
-    
+
     // Static Analysis - Semantic Errors (A2800-A2899)
     AnalyzerIndexOutOfBoundsStatic,
     AnalyzerDivisionByZeroStatic,
@@ -111,7 +110,7 @@ pub enum ErrorCode {
     AnalyzerWrongArgumentCount,
     AnalyzerMethodNotFoundStatic,
     AnalyzerInvalidCastStatic,
-    
+
     // Codegen errors (C3000-C3999)
     CodegenInvalidType,
     CodegenInvalidExpression,
@@ -122,14 +121,14 @@ pub enum ErrorCode {
     CodegenInvalidModule,
     CodegenInvalidImport,
     CodegenInvalidExport,
-    
+
     // Runtime errors (R4000-R4999)
     RuntimePanic,
     RuntimeTaskError,
     RuntimeMemoryError,
     RuntimeTypeError,
     RuntimeValueError,
-    
+
     // File system errors (F5000-F5999)
     FileNotFound,
     FilePermissionDenied,
@@ -148,7 +147,7 @@ impl ErrorCode {
             ErrorCode::LexerUnterminatedComment => "L0003",
             ErrorCode::LexerInvalidNumber => "L0004",
             ErrorCode::LexerInvalidEscape => "L0005",
-            
+
             // Parser errors
             ErrorCode::ParserUnexpectedToken => "P1000",
             ErrorCode::ParserExpectedToken => "P1001",
@@ -164,7 +163,7 @@ impl ErrorCode {
             ErrorCode::ParserInvalidModule => "P1011",
             ErrorCode::ParserInvalidImport => "P1012",
             ErrorCode::ParserInvalidExport => "P1013",
-            
+
             // Analyzer errors
             ErrorCode::AnalyzerUndefinedVariable => "A2000",
             ErrorCode::AnalyzerUndefinedFunction => "A2001",
@@ -181,7 +180,7 @@ impl ErrorCode {
             ErrorCode::AnalyzerInvalidModule => "A2012",
             ErrorCode::AnalyzerInvalidImport => "A2013",
             ErrorCode::AnalyzerInvalidExport => "A2014",
-            
+
             // Code Quality Rules (A2100-A2199)
             ErrorCode::AnalyzerNamingConvention => "A2100",
             ErrorCode::AnalyzerFunctionComplexity => "A2101",
@@ -193,7 +192,7 @@ impl ErrorCode {
             ErrorCode::AnalyzerCommentCoverage => "A2107",
             ErrorCode::AnalyzerCommentStyle => "A2108",
             ErrorCode::AnalyzerImportOrder => "A2109",
-            
+
             // Dead Code & Usage Rules (A2200-A2299)
             ErrorCode::AnalyzerUnusedVariable => "A2200",
             ErrorCode::AnalyzerUnusedParameter => "A2201",
@@ -201,7 +200,7 @@ impl ErrorCode {
             ErrorCode::AnalyzerUnreachableCode => "A2203",
             ErrorCode::AnalyzerRecursionDepth => "A2204",
             ErrorCode::AnalyzerResourceLeak => "A2205",
-            
+
             // Performance Rules (A2300-A2399)
             ErrorCode::AnalyzerInefficientLoop => "A2300",
             ErrorCode::AnalyzerMemoryAllocation => "A2301",
@@ -209,14 +208,14 @@ impl ErrorCode {
             ErrorCode::AnalyzerCacheEfficiency => "A2303",
             ErrorCode::AnalyzerBranchPrediction => "A2304",
             ErrorCode::AnalyzerVectorization => "A2305",
-            
+
             // Architecture Rules (A2400-A2499)
             ErrorCode::AnalyzerLargeFile => "A2400",
             ErrorCode::AnalyzerTooManyImports => "A2401",
             ErrorCode::AnalyzerGlobalVariable => "A2402",
             ErrorCode::AnalyzerCoupling => "A2403",
             ErrorCode::AnalyzerCohesion => "A2404",
-            
+
             // Style & Formatting Rules (A2500-A2599)
             ErrorCode::AnalyzerFormattingConvention => "A2500",
             ErrorCode::AnalyzerIndentation => "A2501",
@@ -224,7 +223,7 @@ impl ErrorCode {
             ErrorCode::AnalyzerLineLength => "A2503",
             ErrorCode::AnalyzerSemicolon => "A2504",
             ErrorCode::AnalyzerBracketMatching => "A2505",
-            
+
             // Security & Safety Rules (A2600-A2699)
             ErrorCode::AnalyzerNullPointer => "A2600",
             ErrorCode::AnalyzerBufferOverflow => "A2601",
@@ -235,13 +234,13 @@ impl ErrorCode {
             ErrorCode::AnalyzerConcurrency => "A2606",
             ErrorCode::AnalyzerMemoryLeak => "A2607",
             ErrorCode::AnalyzerRaceCondition => "A2608",
-            
+
             // Language-Specific Rules (A2700-A2799)
             ErrorCode::AnalyzerAsyncAwait => "A2700",
             ErrorCode::AnalyzerErrorHandling => "A2701",
             ErrorCode::AnalyzerPatternMatching => "A2702",
             ErrorCode::AnalyzerGenericConstraint => "A2703",
-            
+
             // Static Analysis - Semantic Errors (A2800-A2899)
             ErrorCode::AnalyzerIndexOutOfBoundsStatic => "A2800",
             ErrorCode::AnalyzerDivisionByZeroStatic => "A2801",
@@ -249,7 +248,7 @@ impl ErrorCode {
             ErrorCode::AnalyzerWrongArgumentCount => "A2803",
             ErrorCode::AnalyzerMethodNotFoundStatic => "A2804",
             ErrorCode::AnalyzerInvalidCastStatic => "A2805",
-            
+
             // Codegen errors
             ErrorCode::CodegenInvalidType => "C3000",
             ErrorCode::CodegenInvalidExpression => "C3001",
@@ -260,14 +259,14 @@ impl ErrorCode {
             ErrorCode::CodegenInvalidModule => "C3006",
             ErrorCode::CodegenInvalidImport => "C3007",
             ErrorCode::CodegenInvalidExport => "C3008",
-            
+
             // Runtime errors
             ErrorCode::RuntimePanic => "R4000",
             ErrorCode::RuntimeTaskError => "R4001",
             ErrorCode::RuntimeMemoryError => "R4002",
             ErrorCode::RuntimeTypeError => "R4003",
             ErrorCode::RuntimeValueError => "R4004",
-            
+
             // File system errors
             ErrorCode::FileNotFound => "F5000",
             ErrorCode::FilePermissionDenied => "F5001",
@@ -276,7 +275,7 @@ impl ErrorCode {
             ErrorCode::FileInvalidPath => "F5004",
         }
     }
-    
+
     /// Get the error category
     pub fn category(&self) -> &'static str {
         match self {
@@ -285,7 +284,7 @@ impl ErrorCode {
             | ErrorCode::LexerUnterminatedComment
             | ErrorCode::LexerInvalidNumber
             | ErrorCode::LexerInvalidEscape => "Lexer",
-            
+
             ErrorCode::ParserUnexpectedToken
             | ErrorCode::ParserExpectedToken
             | ErrorCode::ParserUnexpectedEof
@@ -300,7 +299,7 @@ impl ErrorCode {
             | ErrorCode::ParserInvalidModule
             | ErrorCode::ParserInvalidImport
             | ErrorCode::ParserInvalidExport => "Parser",
-            
+
             ErrorCode::AnalyzerUndefinedVariable
             | ErrorCode::AnalyzerUndefinedFunction
             | ErrorCode::AnalyzerUndefinedType
@@ -368,7 +367,7 @@ impl ErrorCode {
             | ErrorCode::AnalyzerWrongArgumentCount
             | ErrorCode::AnalyzerMethodNotFoundStatic
             | ErrorCode::AnalyzerInvalidCastStatic => "Analyzer",
-            
+
             ErrorCode::CodegenInvalidType
             | ErrorCode::CodegenInvalidExpression
             | ErrorCode::CodegenInvalidFunction
@@ -378,13 +377,13 @@ impl ErrorCode {
             | ErrorCode::CodegenInvalidModule
             | ErrorCode::CodegenInvalidImport
             | ErrorCode::CodegenInvalidExport => "Codegen",
-            
+
             ErrorCode::RuntimePanic
             | ErrorCode::RuntimeTaskError
             | ErrorCode::RuntimeMemoryError
             | ErrorCode::RuntimeTypeError
             | ErrorCode::RuntimeValueError => "Runtime",
-            
+
             ErrorCode::FileNotFound
             | ErrorCode::FilePermissionDenied
             | ErrorCode::FileReadError

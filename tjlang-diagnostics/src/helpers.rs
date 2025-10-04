@@ -9,12 +9,8 @@ use crate::source_span::SourceSpan;
 /// Helper functions for creating common diagnostics
 pub mod helpers {
     use super::*;
-    
-    pub fn type_mismatch(
-        expected: &str,
-        found: &str,
-        span: SourceSpan,
-    ) -> TJLangDiagnostic {
+
+    pub fn type_mismatch(expected: &str, found: &str, span: SourceSpan) -> TJLangDiagnostic {
         TJLangDiagnostic::new(
             ErrorCode::AnalyzerTypeMismatch,
             Severity::Error,
@@ -22,11 +18,8 @@ pub mod helpers {
             span,
         )
     }
-    
-    pub fn undefined_variable(
-        name: &str,
-        span: SourceSpan,
-    ) -> TJLangDiagnostic {
+
+    pub fn undefined_variable(name: &str, span: SourceSpan) -> TJLangDiagnostic {
         TJLangDiagnostic::new(
             ErrorCode::AnalyzerUndefinedVariable,
             Severity::Error,
@@ -34,11 +27,8 @@ pub mod helpers {
             span,
         )
     }
-    
-    pub fn undefined_function(
-        name: &str,
-        span: SourceSpan,
-    ) -> TJLangDiagnostic {
+
+    pub fn undefined_function(name: &str, span: SourceSpan) -> TJLangDiagnostic {
         TJLangDiagnostic::new(
             ErrorCode::AnalyzerUndefinedFunction,
             Severity::Error,
@@ -46,7 +36,7 @@ pub mod helpers {
             span,
         )
     }
-    
+
     pub fn non_exhaustive_match(
         missing_patterns: Vec<String>,
         span: SourceSpan,
@@ -54,16 +44,15 @@ pub mod helpers {
         TJLangDiagnostic::new(
             ErrorCode::AnalyzerNonExhaustiveMatch,
             Severity::Error,
-            format!("non-exhaustive match: missing patterns: {}", missing_patterns.join(", ")),
+            format!(
+                "non-exhaustive match: missing patterns: {}",
+                missing_patterns.join(", ")
+            ),
             span,
         )
     }
-    
-    pub fn unexpected_token(
-        expected: &str,
-        found: &str,
-        span: SourceSpan,
-    ) -> TJLangDiagnostic {
+
+    pub fn unexpected_token(expected: &str, found: &str, span: SourceSpan) -> TJLangDiagnostic {
         TJLangDiagnostic::new(
             ErrorCode::ParserUnexpectedToken,
             Severity::Error,
@@ -71,7 +60,7 @@ pub mod helpers {
             span,
         )
     }
-    
+
     pub fn unterminated_string(span: SourceSpan) -> TJLangDiagnostic {
         TJLangDiagnostic::new(
             ErrorCode::LexerUnterminatedString,

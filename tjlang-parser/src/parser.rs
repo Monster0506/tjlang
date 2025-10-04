@@ -1,12 +1,12 @@
 //! Pest-based parser for TJLang
 //! This replaces the recursive descent parser with a more robust pest-based solution
 
-use pest::Parser;
+use codespan::Files;
 use pest::iterators::Pair;
+use pest::Parser;
 use pest_derive::Parser;
 use tjlang_ast::*;
 use tjlang_diagnostics::{DiagnosticCollection, SourceSpan as DiagnosticSourceSpan};
-use codespan::Files;
 
 // Import the generated parser
 #[derive(Parser)]
@@ -43,7 +43,12 @@ impl PestParser {
     }
 
     /// Add a parse error with context
-    fn add_parse_error(&mut self, code: tjlang_diagnostics::ErrorCode, message: String, span: pest::Span) {
+    fn add_parse_error(
+        &mut self,
+        code: tjlang_diagnostics::ErrorCode,
+        message: String,
+        span: pest::Span,
+    ) {
         // Create a temporary Files instance to get a valid FileId
         let mut files = codespan::Files::new();
         let file_id = files.add("input", "");
@@ -52,7 +57,12 @@ impl PestParser {
     }
 
     /// Add a parse warning with context
-    fn add_parse_warning(&mut self, code: tjlang_diagnostics::ErrorCode, message: String, span: pest::Span) {
+    fn add_parse_warning(
+        &mut self,
+        code: tjlang_diagnostics::ErrorCode,
+        message: String,
+        span: pest::Span,
+    ) {
         // Create a temporary Files instance to get a valid FileId
         let mut files = codespan::Files::new();
         let file_id = files.add("input", "");
@@ -63,13 +73,21 @@ impl PestParser {
     /// Add an unexpected token error
     fn add_unexpected_token_error(&mut self, expected: &str, found: &str, span: pest::Span) {
         let message = format!("expected `{}`, found `{}`", expected, found);
-        self.add_parse_error(tjlang_diagnostics::ErrorCode::ParserUnexpectedToken, message, span);
+        self.add_parse_error(
+            tjlang_diagnostics::ErrorCode::ParserUnexpectedToken,
+            message,
+            span,
+        );
     }
 
     /// Add a missing token error
     fn add_missing_token_error(&mut self, expected: &str, span: pest::Span) {
         let message = format!("expected `{}`", expected);
-        self.add_parse_error(tjlang_diagnostics::ErrorCode::ParserExpectedToken, message, span);
+        self.add_parse_error(
+            tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+            message,
+            span,
+        );
     }
 
     /// Add an invalid expression error with suggestion
@@ -84,46 +102,51 @@ impl PestParser {
             message,
             self.create_diagnostic_span(span, file_id),
         );
-        
+
         // Add helpful suggestions based on context
         match context {
             "if condition" => {
-                diagnostic = diagnostic.with_note("if conditions must be boolean expressions".to_string());
-            },
+                diagnostic =
+                    diagnostic.with_note("if conditions must be boolean expressions".to_string());
+            }
             "while condition" => {
-                diagnostic = diagnostic.with_note("while conditions must be boolean expressions".to_string());
-            },
+                diagnostic = diagnostic
+                    .with_note("while conditions must be boolean expressions".to_string());
+            }
             "function argument" => {
-                diagnostic = diagnostic.with_note("function arguments must be valid expressions".to_string());
-            },
+                diagnostic = diagnostic
+                    .with_note("function arguments must be valid expressions".to_string());
+            }
             _ => {}
         }
-        
+
         self.diagnostics.add(diagnostic);
     }
 
     /// Create a diagnostic span from a pest span
-    fn create_diagnostic_span(&self, span: pest::Span, file_id: codespan::FileId) -> DiagnosticSourceSpan {
+    fn create_diagnostic_span(
+        &self,
+        span: pest::Span,
+        file_id: codespan::FileId,
+    ) -> DiagnosticSourceSpan {
         DiagnosticSourceSpan::new(
             file_id,
-            codespan::Span::new(
-                span.start() as u32,
-                span.end() as u32,
-            ),
+            codespan::Span::new(span.start() as u32, span.end() as u32),
         )
     }
 
-
-
     /// Parse TJLang source code
-    pub fn parse(&mut self, source: &str, file_id: codespan::FileId) -> Result<Program, Box<dyn std::error::Error>> {
+    pub fn parse(
+        &mut self,
+        source: &str,
+        file_id: codespan::FileId,
+    ) -> Result<Program, Box<dyn std::error::Error>> {
         // Parse using pest
-        let pairs = TJLangPestParser::parse(Rule::program, source)
-            .map_err(|e| {
-                // Convert pest errors to our diagnostic format with rich context
-                self.handle_pest_error(&e, source, file_id);
-                format!("Parse error: {}", e)
-            })?;
+        let pairs = TJLangPestParser::parse(Rule::program, source).map_err(|e| {
+            // Convert pest errors to our diagnostic format with rich context
+            self.handle_pest_error(&e, source, file_id);
+            format!("Parse error: {}", e)
+        })?;
 
         // Convert pest pairs to AST
         let program = self.parse_program(pairs, source)?;
@@ -131,39 +154,45 @@ impl PestParser {
     }
 
     /// Handle pest parsing errors with rich diagnostics
-    fn handle_pest_error(&mut self, error: &pest::error::Error<Rule>, source: &str, file_id: codespan::FileId) {
+    fn handle_pest_error(
+        &mut self,
+        error: &pest::error::Error<Rule>,
+        source: &str,
+        file_id: codespan::FileId,
+    ) {
         match error {
-                    pest::error::Error { location, .. } => {
-                        let pos = match location {
-                            pest::error::InputLocation::Pos(pos) => *pos,
-                            pest::error::InputLocation::Span((start, _)) => *start,
-                        };
-                
+            pest::error::Error { location, .. } => {
+                let pos = match location {
+                    pest::error::InputLocation::Pos(pos) => *pos,
+                    pest::error::InputLocation::Span((start, _)) => *start,
+                };
+
                 // Create a span for the error location
                 let span = pest::Span::new(source, pos, pos + 1)
                     .unwrap_or_else(|| pest::Span::new(source, 0, 1).unwrap());
-                
+
                 // Analyze the error context to provide better suggestions
                 let context = self.analyze_error_context(source, pos);
-                let (error_code, message, suggestions) = self.create_enhanced_error(&context, source, pos, file_id);
-                
+                let (error_code, message, suggestions) =
+                    self.create_enhanced_error(&context, source, pos, file_id);
+
                 let mut diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
                     error_code,
                     codespan_reporting::diagnostic::Severity::Error,
                     message,
                     self.create_diagnostic_span(span, file_id),
                 );
-                
+
                 // Add suggestions
                 for suggestion in suggestions {
                     diagnostic = diagnostic.with_suggestion(suggestion);
                 }
-                
+
                 // Add contextual notes
                 if let Some(note) = context.note {
                     diagnostic = diagnostic.with_note(note);
                 }
-                
+
                 self.diagnostics.add(diagnostic);
             }
         }
@@ -172,8 +201,12 @@ impl PestParser {
     /// Analyze the context around an error to provide better diagnostics
     fn analyze_error_context(&self, source: &str, pos: usize) -> ErrorContext {
         let before = if pos > 0 { &source[..pos] } else { "" };
-        let after = if pos < source.len() { &source[pos..] } else { "" };
-        
+        let after = if pos < source.len() {
+            &source[pos..]
+        } else {
+            ""
+        };
+
         // Look for common patterns that might help identify the issue
         let mut context = ErrorContext {
             before: before.to_string(),
@@ -181,10 +214,12 @@ impl PestParser {
             char_at_pos: source.chars().nth(pos).unwrap_or('\0'),
             note: None,
         };
-        
+
         // Analyze common error patterns
         if before.ends_with("def ") {
-            context.note = Some("function definition syntax: def name(params) -> return_type { body }".to_string());
+            context.note = Some(
+                "function definition syntax: def name(params) -> return_type { body }".to_string(),
+            );
         } else if before.ends_with("if ") {
             context.note = Some("if statement syntax: if condition { body }".to_string());
         } else if before.ends_with("while ") {
@@ -192,41 +227,60 @@ impl PestParser {
         } else if before.ends_with("for ") {
             context.note = Some("for loop syntax: for variable in iterable { body }".to_string());
         } else if before.ends_with("match ") {
-            context.note = Some("match expression syntax: match value { pattern => result }".to_string());
+            context.note =
+                Some("match expression syntax: match value { pattern => result }".to_string());
         } else if before.ends_with("struct ") {
-            context.note = Some("struct definition syntax: struct Name { field: type }".to_string());
+            context.note =
+                Some("struct definition syntax: struct Name { field: type }".to_string());
         } else if before.ends_with("enum ") {
-            context.note = Some("enum definition syntax: enum Name { Variant1, Variant2 }".to_string());
+            context.note =
+                Some("enum definition syntax: enum Name { Variant1, Variant2 }".to_string());
         }
-        
+
         context
     }
 
     /// Create enhanced error with suggestions based on context
-    fn create_enhanced_error(&self, context: &ErrorContext, source: &str, pos: usize, file_id: codespan::FileId) -> (tjlang_diagnostics::ErrorCode, String, Vec<tjlang_diagnostics::Suggestion>) {
+    fn create_enhanced_error(
+        &self,
+        context: &ErrorContext,
+        source: &str,
+        pos: usize,
+        file_id: codespan::FileId,
+    ) -> (
+        tjlang_diagnostics::ErrorCode,
+        String,
+        Vec<tjlang_diagnostics::Suggestion>,
+    ) {
         let char_at_pos = context.char_at_pos;
         let mut suggestions = Vec::new();
-        
+
         // Common character-based suggestions
         match char_at_pos {
             ';' => {
                 suggestions.push(tjlang_diagnostics::Suggestion::new(
                     "remove semicolon".to_string(),
                     "".to_string(),
-                    self.create_diagnostic_span(pest::Span::new(source, pos, pos + 1).unwrap(), file_id),
+                    self.create_diagnostic_span(
+                        pest::Span::new(source, pos, pos + 1).unwrap(),
+                        file_id,
+                    ),
                 ));
                 return (
                     tjlang_diagnostics::ErrorCode::ParserUnexpectedToken,
                     "unexpected semicolon".to_string(),
                     suggestions,
                 );
-            },
+            }
             '{' => {
                 if context.before.ends_with("def ") {
                     suggestions.push(tjlang_diagnostics::Suggestion::new(
                         "add function parameters".to_string(),
                         "()".to_string(),
-                        self.create_diagnostic_span(pest::Span::new(source, pos, pos + 1).unwrap(), file_id),
+                        self.create_diagnostic_span(
+                            pest::Span::new(source, pos, pos + 1).unwrap(),
+                            file_id,
+                        ),
                     ));
                 }
                 return (
@@ -234,19 +288,22 @@ impl PestParser {
                     "unexpected opening brace".to_string(),
                     suggestions,
                 );
-            },
+            }
             '}' => {
                 suggestions.push(tjlang_diagnostics::Suggestion::new(
                     "check for missing opening brace".to_string(),
                     "{".to_string(),
-                    self.create_diagnostic_span(pest::Span::new(source, pos, pos + 1).unwrap(), file_id),
+                    self.create_diagnostic_span(
+                        pest::Span::new(source, pos, pos + 1).unwrap(),
+                        file_id,
+                    ),
                 ));
                 return (
                     tjlang_diagnostics::ErrorCode::ParserUnexpectedToken,
                     "unexpected closing brace".to_string(),
                     suggestions,
                 );
-            },
+            }
             _ => {
                 // Generic error with context
                 let message = if context.before.trim().is_empty() {
@@ -256,7 +313,7 @@ impl PestParser {
                 } else {
                     format!("unexpected token `{}`", char_at_pos)
                 };
-                
+
                 return (
                     tjlang_diagnostics::ErrorCode::ParserUnexpectedToken,
                     message,
@@ -267,7 +324,11 @@ impl PestParser {
     }
 
     /// Parse program from pest pairs
-    fn parse_program(&mut self, mut pairs: pest::iterators::Pairs<Rule>, _source: &str) -> Result<Program, Box<dyn std::error::Error>> {
+    fn parse_program(
+        &mut self,
+        mut pairs: pest::iterators::Pairs<Rule>,
+        _source: &str,
+    ) -> Result<Program, Box<dyn std::error::Error>> {
         let program_pair = pairs.next().ok_or_else(|| {
             self.add_parse_error(
                 tjlang_diagnostics::ErrorCode::ParserUnexpectedEof,
@@ -277,10 +338,10 @@ impl PestParser {
             "No program found"
         })?;
         let span = program_pair.as_span();
-        
+
         let mut units = Vec::new();
         let mut parse_errors = Vec::new();
-        
+
         for pair in program_pair.into_inner() {
             match pair.as_rule() {
                 Rule::program_unit => {
@@ -293,7 +354,7 @@ impl PestParser {
                         );
                         "Empty program unit"
                     })?;
-                    
+
                     match inner.as_rule() {
                         Rule::statement => {
                             match self.parse_statement(inner) {
@@ -301,7 +362,9 @@ impl PestParser {
                                     // Convert statement to appropriate program unit
                                     match statement {
                                         Statement::Variable(var_decl) => {
-                                            units.push(ProgramUnit::Declaration(Declaration::Variable(var_decl)));
+                                            units.push(ProgramUnit::Declaration(
+                                                Declaration::Variable(var_decl),
+                                            ));
                                         }
                                         Statement::Expression(expr) => {
                                             // For expression statements, preserve them as executable expressions
@@ -327,76 +390,70 @@ impl PestParser {
                                 }
                             }
                         }
-                        Rule::function_decl => {
-                            match self.parse_function_decl(inner) {
-                                Ok(func_decl) => {
-                                    units.push(ProgramUnit::Declaration(Declaration::Function(func_decl)));
-                                }
-                                Err(e) => {
-                                    parse_errors.push(e);
-                                }
+                        Rule::function_decl => match self.parse_function_decl(inner) {
+                            Ok(func_decl) => {
+                                units.push(ProgramUnit::Declaration(Declaration::Function(
+                                    func_decl,
+                                )));
                             }
-                        }
-                        Rule::type_decl => {
-                            match self.parse_type_decl(inner) {
-                                Ok(type_decl) => {
-                                    units.push(ProgramUnit::Declaration(Declaration::Type(type_decl)));
-                                }
-                                Err(e) => {
-                                    parse_errors.push(e);
-                                }
+                            Err(e) => {
+                                parse_errors.push(e);
                             }
-                        }
-                        Rule::struct_decl => {
-                            match self.parse_struct_decl(inner) {
-                                Ok(struct_decl) => {
-                                    units.push(ProgramUnit::Declaration(Declaration::Struct(struct_decl)));
-                                }
-                                Err(e) => {
-                                    parse_errors.push(e);
-                                }
+                        },
+                        Rule::type_decl => match self.parse_type_decl(inner) {
+                            Ok(type_decl) => {
+                                units.push(ProgramUnit::Declaration(Declaration::Type(type_decl)));
                             }
-                        }
-                        Rule::enum_decl => {
-                            match self.parse_enum_decl(inner) {
-                                Ok(enum_decl) => {
-                                    units.push(ProgramUnit::Declaration(Declaration::Enum(enum_decl)));
-                                }
-                                Err(e) => {
-                                    parse_errors.push(e);
-                                }
+                            Err(e) => {
+                                parse_errors.push(e);
                             }
-                        }
-                        Rule::interface_decl => {
-                            match self.parse_interface_decl(inner) {
-                                Ok(interface_decl) => {
-                                    units.push(ProgramUnit::Declaration(Declaration::Interface(interface_decl)));
-                                }
-                                Err(e) => {
-                                    parse_errors.push(e);
-                                }
+                        },
+                        Rule::struct_decl => match self.parse_struct_decl(inner) {
+                            Ok(struct_decl) => {
+                                units.push(ProgramUnit::Declaration(Declaration::Struct(
+                                    struct_decl,
+                                )));
                             }
-                        }
-                        Rule::impl_block => {
-                            match self.parse_impl_block(inner) {
-                                Ok(impl_block) => {
-                                    units.push(ProgramUnit::Declaration(Declaration::Implementation(impl_block)));
-                                }
-                                Err(e) => {
-                                    parse_errors.push(e);
-                                }
+                            Err(e) => {
+                                parse_errors.push(e);
                             }
-                        }
-                        Rule::export_decl => {
-                            match self.parse_export_decl(inner) {
-                                Ok(export_decl) => {
-                                    units.push(ProgramUnit::Export(export_decl));
-                                }
-                                Err(e) => {
-                                    parse_errors.push(e);
-                                }
+                        },
+                        Rule::enum_decl => match self.parse_enum_decl(inner) {
+                            Ok(enum_decl) => {
+                                units.push(ProgramUnit::Declaration(Declaration::Enum(enum_decl)));
                             }
-                        }
+                            Err(e) => {
+                                parse_errors.push(e);
+                            }
+                        },
+                        Rule::interface_decl => match self.parse_interface_decl(inner) {
+                            Ok(interface_decl) => {
+                                units.push(ProgramUnit::Declaration(Declaration::Interface(
+                                    interface_decl,
+                                )));
+                            }
+                            Err(e) => {
+                                parse_errors.push(e);
+                            }
+                        },
+                        Rule::impl_block => match self.parse_impl_block(inner) {
+                            Ok(impl_block) => {
+                                units.push(ProgramUnit::Declaration(Declaration::Implementation(
+                                    impl_block,
+                                )));
+                            }
+                            Err(e) => {
+                                parse_errors.push(e);
+                            }
+                        },
+                        Rule::export_decl => match self.parse_export_decl(inner) {
+                            Ok(export_decl) => {
+                                units.push(ProgramUnit::Export(export_decl));
+                            }
+                            Err(e) => {
+                                parse_errors.push(e);
+                            }
+                        },
                         _ => {
                             self.add_parse_error(
                                 tjlang_diagnostics::ErrorCode::ParserInvalidStatement,
@@ -407,7 +464,7 @@ impl PestParser {
                     }
                 }
                 Rule::EOI => break, // End of input
-                _ => {} // Skip other rules
+                _ => {}             // Skip other rules
             }
         }
 
@@ -423,29 +480,42 @@ impl PestParser {
                 "empty program - no declarations found".to_string(),
                 span,
             );
-            units.push(ProgramUnit::Declaration(Declaration::Variable(VariableDecl {
-                name: "main".to_string(),
-                var_type: Type::Primitive(PrimitiveType::Any),
-                value: Expression::Literal(Literal::None),
-                span: self.create_span(span),
-            })));
+            units.push(ProgramUnit::Declaration(Declaration::Variable(
+                VariableDecl {
+                    name: "main".to_string(),
+                    var_type: Type::Primitive(PrimitiveType::Any),
+                    value: Expression::Literal(Literal::None),
+                    span: self.create_span(span),
+                },
+            )));
         }
 
         let program = Program {
             units,
             span: self.create_span(span),
         };
-        
+
         Ok(program)
     }
 
     /// Parse statement from pest pair
-    fn parse_statement(&mut self, pair: Pair<Rule>) -> Result<Option<Statement>, Box<dyn std::error::Error>> {
-        debug_println!("[DEBUG] parse_statement: rule={:?}, content='{}'", pair.as_rule(), pair.as_str());
+    fn parse_statement(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Option<Statement>, Box<dyn std::error::Error>> {
+        debug_println!(
+            "[DEBUG] parse_statement: rule={:?}, content='{}'",
+            pair.as_rule(),
+            pair.as_str()
+        );
         match pair.as_rule() {
             Rule::statement => {
                 let inner = pair.into_inner().next().ok_or("Empty statement")?;
-                debug_println!("  -> inner statement rule: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+                debug_println!(
+                    "  -> inner statement rule: {:?}, content: '{}'",
+                    inner.as_rule(),
+                    inner.as_str()
+                );
                 match inner.as_rule() {
                     Rule::variable_decl => {
                         let var_decl = self.parse_variable_decl(inner)?;
@@ -500,17 +570,22 @@ impl PestParser {
                         let raise_stmt = self.parse_raise_stmt(inner)?;
                         Ok(Some(Statement::Raise(raise_stmt)))
                     }
-                    _ => Ok(None)
+                    _ => Ok(None),
                 }
             }
-            _ => Ok(None)
+            _ => Ok(None),
         }
     }
 
     /// Parse match statement
-    fn parse_match_stmt(&mut self, pair: Pair<Rule>) -> Result<MatchStatement, Box<dyn std::error::Error>> {
+    fn parse_match_stmt(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<MatchStatement, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // First inner is the match expression
         let expr_pair = inner.next().ok_or("Missing expression in match")?;
@@ -524,12 +599,21 @@ impl PestParser {
             }
         }
 
-        Ok(MatchStatement { expression, arms, span: self.create_span(span) })
+        Ok(MatchStatement {
+            expression,
+            arms,
+            span: self.create_span(span),
+        })
     }
 
-    fn parse_match_arm(&mut self, pair: Pair<Rule>) -> Result<MatchArm, Box<dyn std::error::Error>> {
+    fn parse_match_arm(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<MatchArm, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // pattern
         let pat_pair = inner.next().ok_or("Missing pattern in match arm")?;
@@ -550,7 +634,12 @@ impl PestParser {
         let block_pair = inner.next().ok_or("Missing block in match arm")?;
         let body = self.parse_block(block_pair)?;
 
-        Ok(MatchArm { pattern, guard, body, span: self.create_span(span) })
+        Ok(MatchArm {
+            pattern,
+            guard,
+            body,
+            span: self.create_span(span),
+        })
     }
 
     fn parse_pattern(&mut self, pair: Pair<Rule>) -> Result<Pattern, Box<dyn std::error::Error>> {
@@ -563,35 +652,63 @@ impl PestParser {
                 }
 
                 // collect children for structural decisions
-                let children: Vec<_> = pair.clone().into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE).collect();
+                let children: Vec<_> = pair
+                    .clone()
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE)
+                    .collect();
 
                 // Tuple pattern if multiple inner pattern children and starts with '('
                 if text.starts_with('(') {
                     let mut patterns = Vec::new();
                     for ch in children.iter() {
-                        if ch.as_rule() == Rule::pattern { patterns.push(self.parse_pattern(ch.clone())?); }
+                        if ch.as_rule() == Rule::pattern {
+                            patterns.push(self.parse_pattern(ch.clone())?);
+                        }
                     }
                     if !patterns.is_empty() {
-                        return Ok(Pattern::Tuple { patterns, span: self.create_span(span) });
+                        return Ok(Pattern::Tuple {
+                            patterns,
+                            span: self.create_span(span),
+                        });
                     }
                 }
 
                 // Constructor / Struct pattern handled by explicit rule child
                 for ch in &children {
-                    if ch.as_rule() == Rule::constructor_pattern { return self.parse_constructor_pattern(ch.clone()); }
-                    if ch.as_rule() == Rule::struct_pattern { return self.parse_struct_pattern(ch.clone()); }
-                    if ch.as_rule() == Rule::literal { return Ok(Pattern::Literal(self.parse_literal(ch.clone())?)); }
+                    if ch.as_rule() == Rule::constructor_pattern {
+                        return self.parse_constructor_pattern(ch.clone());
+                    }
+                    if ch.as_rule() == Rule::struct_pattern {
+                        return self.parse_struct_pattern(ch.clone());
+                    }
+                    if ch.as_rule() == Rule::literal {
+                        return Ok(Pattern::Literal(self.parse_literal(ch.clone())?));
+                    }
                 }
 
                 // Trait check pattern
                 if text.contains(":") && text.contains("implements") {
-                    let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                    let name = inner.next().ok_or("Missing identifier in trait pattern")?.as_str().to_string();
+                    let mut inner = pair
+                        .into_inner()
+                        .filter(|p| p.as_rule() != Rule::WHITESPACE);
+                    let name = inner
+                        .next()
+                        .ok_or("Missing identifier in trait pattern")?
+                        .as_str()
+                        .to_string();
                     let mut trait_name = String::new();
                     for p in inner {
-                        if p.as_rule() == Rule::identifier { trait_name = p.as_str().to_string(); break; }
+                        if p.as_rule() == Rule::identifier {
+                            trait_name = p.as_str().to_string();
+                            break;
+                        }
                     }
-                    return Ok(Pattern::TraitCheck { name, trait_name, span: self.create_span(span) });
+                    return Ok(Pattern::TraitCheck {
+                        name,
+                        trait_name,
+                        span: self.create_span(span),
+                    });
                 }
 
                 // Typed bind pattern: identifier : type_
@@ -600,48 +717,86 @@ impl PestParser {
                     let mut ty: Option<Type> = None;
                     for ch in children {
                         match ch.as_rule() {
-                            Rule::identifier => { if id.is_none() { id = Some(ch.as_str().to_string()); } }
-                            Rule::type_ => { ty = Some(self.parse_type(ch)?); }
+                            Rule::identifier => {
+                                if id.is_none() {
+                                    id = Some(ch.as_str().to_string());
+                                }
+                            }
+                            Rule::type_ => {
+                                ty = Some(self.parse_type(ch)?);
+                            }
                             _ => {}
                         }
                     }
                     if let (Some(name), Some(pattern_type)) = (id, ty) {
-                        return Ok(Pattern::Variable { name, pattern_type, span: self.create_span(span) });
+                        return Ok(Pattern::Variable {
+                            name,
+                            pattern_type,
+                            span: self.create_span(span),
+                        });
                     }
                 }
 
                 Err("Unrecognized pattern".into())
             }
-            _ => Err("Expected pattern".into())
+            _ => Err("Expected pattern".into()),
         }
     }
 
-    fn parse_constructor_pattern(&mut self, pair: Pair<Rule>) -> Result<Pattern, Box<dyn std::error::Error>> {
+    fn parse_constructor_pattern(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Pattern, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        let name = inner.next().ok_or("Missing constructor name in pattern")?.as_str().to_string();
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let name = inner
+            .next()
+            .ok_or("Missing constructor name in pattern")?
+            .as_str()
+            .to_string();
         let mut fields: Vec<Pattern> = Vec::new();
         for p in inner {
             if p.as_rule() == Rule::pattern_fields {
                 for f in p.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE) {
-                    if f.as_rule() == Rule::pattern { fields.push(self.parse_pattern(f)?); }
+                    if f.as_rule() == Rule::pattern {
+                        fields.push(self.parse_pattern(f)?);
+                    }
                 }
             }
         }
-        Ok(Pattern::Constructor { name, fields, span: self.create_span(span) })
+        Ok(Pattern::Constructor {
+            name,
+            fields,
+            span: self.create_span(span),
+        })
     }
 
-    fn parse_struct_pattern(&mut self, pair: Pair<Rule>) -> Result<Pattern, Box<dyn std::error::Error>> {
+    fn parse_struct_pattern(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Pattern, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        let name = inner.next().ok_or("Missing struct name in pattern")?.as_str().to_string();
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let name = inner
+            .next()
+            .ok_or("Missing struct name in pattern")?
+            .as_str()
+            .to_string();
         let mut fields_kv: Vec<(String, Pattern)> = Vec::new();
         for p in inner {
             if p.as_rule() == Rule::struct_pattern_fields {
                 for f in p.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE) {
                     if f.as_rule() == Rule::struct_field_pattern {
                         let mut it = f.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                        let field_name = it.next().ok_or("Missing field name in struct pattern")?.as_str().to_string();
+                        let field_name = it
+                            .next()
+                            .ok_or("Missing field name in struct pattern")?
+                            .as_str()
+                            .to_string();
                         let pat_pair = it.next().ok_or("Missing field pattern")?;
                         let field_pat = self.parse_pattern(pat_pair)?;
                         fields_kv.push((field_name, field_pat));
@@ -649,106 +804,134 @@ impl PestParser {
                 }
             }
         }
-        Ok(Pattern::Struct { name, fields: fields_kv, span: self.create_span(span) })
+        Ok(Pattern::Struct {
+            name,
+            fields: fields_kv,
+            span: self.create_span(span),
+        })
     }
 
     /// Parse block
     fn parse_block(&mut self, pair: Pair<Rule>) -> Result<Block, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut statements = Vec::new();
-        
+
         for inner_pair in pair.into_inner() {
-            debug_println!("[DEBUG] parse_block: inner_pair rule={:?}, content='{}'", inner_pair.as_rule(), inner_pair.as_str());
+            debug_println!(
+                "[DEBUG] parse_block: inner_pair rule={:?}, content='{}'",
+                inner_pair.as_rule(),
+                inner_pair.as_str()
+            );
             if let Some(statement) = self.parse_statement(inner_pair)? {
                 statements.push(statement);
             }
         }
-        
+
         Ok(Block {
             statements,
             span: self.create_span(span),
         })
     }
 
-        /// Parse variable declaration
-        fn parse_variable_decl(&mut self, pair: Pair<Rule>) -> Result<VariableDecl, Box<dyn std::error::Error>> {
-            let span = pair.as_span();
-            let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-            
-            let name_pair = inner.next().ok_or_else(|| {
-                self.add_parse_error(
-                    tjlang_diagnostics::ErrorCode::ParserExpectedToken,
-                    "expected variable name".to_string(),
-                    span,
-                );
-                "Missing variable name"
-            })?;
-            let name = name_pair.as_str().to_string();
-            
-            // Validate variable name
-            if name.is_empty() {
-                self.add_parse_error(
-                    tjlang_diagnostics::ErrorCode::ParserExpectedToken,
-                    "variable name cannot be empty".to_string(),
-                    name_pair.as_span(),
-                );
-            }
-            
-            // Note: colon ":" is a literal in the grammar and not included in the parse tree
-            
-            let type_pair = inner.next().ok_or_else(|| {
-                self.add_parse_error(
-                    tjlang_diagnostics::ErrorCode::ParserExpectedToken,
-                    format!("expected type annotation for variable `{}`", name),
-                    span,
-                );
-                "Missing type"
-            })?;
-            let type_ = self.parse_type(type_pair)?;
-            
-            // Note: equals "=" is a literal in the grammar and not included in the parse tree
-            
-            let expr_pair = inner.next().ok_or_else(|| {
-                self.add_parse_error(
-                    tjlang_diagnostics::ErrorCode::ParserExpectedToken,
-                    format!("expected initializer expression for variable `{}`", name),
-                    span,
-                );
-                "Missing expression"
-            })?;
-            debug_println!("[DEBUG] [VAR_DECL] Variable '{}' initializer rule: {:?}, content: '{}'", name, expr_pair.as_rule(), expr_pair.as_str());
-            let expr_span = expr_pair.as_span();
-            let expression = self.parse_expression(expr_pair)?;
-            debug_println!("[DEBUG] [VAR_DECL] Variable '{}' parsed expression: {:?}", name, expression);
-            
-            // Add type checking warning if types don't match (basic check)
-            if let Expression::Literal(lit) = &expression {
-                match (&type_, lit) {
-                    (Type::Primitive(PrimitiveType::Int), Literal::String(_)) => {
-                        self.add_parse_warning(
-                            tjlang_diagnostics::ErrorCode::AnalyzerTypeMismatch,
-                            format!("variable `{}` declared as `int` but initialized with string literal", name),
-                            expr_span,
-                        );
-                    }
-                    (Type::Primitive(PrimitiveType::Str), Literal::Int(_)) => {
-                        self.add_parse_warning(
-                            tjlang_diagnostics::ErrorCode::AnalyzerTypeMismatch,
-                            format!("variable `{}` declared as `str` but initialized with integer literal", name),
-                            expr_span,
-                        );
-                    }
-                    _ => {} // Other combinations are fine or will be checked later
-                }
-            }
-            
-            Ok(VariableDecl {
-                name,
-                var_type: type_,
-                value: expression,
-                span: self.create_span(span),
-            })
+    /// Parse variable declaration
+    fn parse_variable_decl(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<VariableDecl, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        let name_pair = inner.next().ok_or_else(|| {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                "expected variable name".to_string(),
+                span,
+            );
+            "Missing variable name"
+        })?;
+        let name = name_pair.as_str().to_string();
+
+        // Validate variable name
+        if name.is_empty() {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                "variable name cannot be empty".to_string(),
+                name_pair.as_span(),
+            );
         }
+
+        // Note: colon ":" is a literal in the grammar and not included in the parse tree
+
+        let type_pair = inner.next().ok_or_else(|| {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                format!("expected type annotation for variable `{}`", name),
+                span,
+            );
+            "Missing type"
+        })?;
+        let type_ = self.parse_type(type_pair)?;
+
+        // Note: equals "=" is a literal in the grammar and not included in the parse tree
+
+        let expr_pair = inner.next().ok_or_else(|| {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                format!("expected initializer expression for variable `{}`", name),
+                span,
+            );
+            "Missing expression"
+        })?;
+        debug_println!(
+            "[DEBUG] [VAR_DECL] Variable '{}' initializer rule: {:?}, content: '{}'",
+            name,
+            expr_pair.as_rule(),
+            expr_pair.as_str()
+        );
+        let expr_span = expr_pair.as_span();
+        let expression = self.parse_expression(expr_pair)?;
+        debug_println!(
+            "[DEBUG] [VAR_DECL] Variable '{}' parsed expression: {:?}",
+            name,
+            expression
+        );
+
+        // Add type checking warning if types don't match (basic check)
+        if let Expression::Literal(lit) = &expression {
+            match (&type_, lit) {
+                (Type::Primitive(PrimitiveType::Int), Literal::String(_)) => {
+                    self.add_parse_warning(
+                        tjlang_diagnostics::ErrorCode::AnalyzerTypeMismatch,
+                        format!(
+                            "variable `{}` declared as `int` but initialized with string literal",
+                            name
+                        ),
+                        expr_span,
+                    );
+                }
+                (Type::Primitive(PrimitiveType::Str), Literal::Int(_)) => {
+                    self.add_parse_warning(
+                        tjlang_diagnostics::ErrorCode::AnalyzerTypeMismatch,
+                        format!(
+                            "variable `{}` declared as `str` but initialized with integer literal",
+                            name
+                        ),
+                        expr_span,
+                    );
+                }
+                _ => {} // Other combinations are fine or will be checked later
+            }
+        }
+
+        Ok(VariableDecl {
+            name,
+            var_type: type_,
+            value: expression,
+            span: self.create_span(span),
+        })
+    }
 
     /// Parse type
     fn parse_type(&mut self, pair: Pair<Rule>) -> Result<Type, Box<dyn std::error::Error>> {
@@ -758,21 +941,11 @@ impl PestParser {
                 let inner = pair.into_inner().next().ok_or("Empty type")?;
                 self.parse_type(inner)
             }
-            Rule::union_type => {
-                self.parse_union_type(pair)
-            }
-            Rule::option_type => {
-                self.parse_option_type(pair)
-            }
-            Rule::function_type => {
-                self.parse_function_type(pair)
-            }
-            Rule::collection_type => {
-                self.parse_collection_type(pair)
-            }
-            Rule::primary_type => {
-                self.parse_primary_type(pair)
-            }
+            Rule::union_type => self.parse_union_type(pair),
+            Rule::option_type => self.parse_option_type(pair),
+            Rule::function_type => self.parse_function_type(pair),
+            Rule::collection_type => self.parse_collection_type(pair),
+            Rule::primary_type => self.parse_primary_type(pair),
             Rule::primitive_type => {
                 let type_str = pair.as_str();
                 let primitive_type = match type_str {
@@ -789,22 +962,38 @@ impl PestParser {
                 let name = pair.as_str().to_string();
                 Ok(Type::Identifier(name))
             }
-            _ => Err(format!("Expected type, got {:?}", pair.as_rule()).into())
+            _ => Err(format!("Expected type, got {:?}", pair.as_rule()).into()),
         }
     }
 
     /// Parse precedence chain to get to postfix_expr
-    fn parse_precedence_chain(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
-        debug_println!("[DEBUG] [PREC] parse_precedence_chain: input rule: {:?}, content: '{}'", pair.as_rule(), pair.as_str());
+    fn parse_precedence_chain(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
+        debug_println!(
+            "[DEBUG] [PREC] parse_precedence_chain: input rule: {:?}, content: '{}'",
+            pair.as_rule(),
+            pair.as_str()
+        );
         let mut current = pair;
         loop {
             // Check if current has multiple children (for debugging)
             let all_children: Vec<_> = current.clone().into_inner().collect();
-            debug_println!("[DEBUG] [PREC] current rule: {:?}, has {} children", current.as_rule(), all_children.len());
+            debug_println!(
+                "[DEBUG] [PREC] current rule: {:?}, has {} children",
+                current.as_rule(),
+                all_children.len()
+            );
             for (idx, child) in all_children.iter().enumerate() {
-                debug_println!("[DEBUG] [PREC]   Child {}: {:?} = '{}'", idx, child.as_rule(), child.as_str());
+                debug_println!(
+                    "[DEBUG] [PREC]   Child {}: {:?} = '{}'",
+                    idx,
+                    child.as_rule(),
+                    child.as_str()
+                );
             }
-            
+
             // First check if the CURRENT rule itself should be handled
             match current.as_rule() {
                 Rule::or_expr => {
@@ -825,20 +1014,28 @@ impl PestParser {
                 }
                 _ => {}
             }
-            
-            let inner = current.clone().into_inner().next().ok_or("Empty precedence chain")?;
-            debug_println!("[DEBUG] [PREC] precedence chain: drilling down to {:?}, content: '{}'", inner.as_rule(), inner.as_str());
-            
+
+            let inner = current
+                .clone()
+                .into_inner()
+                .next()
+                .ok_or("Empty precedence chain")?;
+            debug_println!(
+                "[DEBUG] [PREC] precedence chain: drilling down to {:?}, content: '{}'",
+                inner.as_rule(),
+                inner.as_str()
+            );
+
             match inner.as_rule() {
                 Rule::postfix_expr => {
                     debug_println!("[DEBUG] Found postfix_expr in precedence chain, calling parse_postfix_expr");
                     return self.parse_postfix_expr(inner);
                 }
-            Rule::relational => {
-                // Handle comparison operations like x > y, x < y, etc.
-                debug_println!("[DEBUG] Found relational rule, parsing binary operation");
-                debug_println!("[DEBUG] Relational content: '{}'", inner.as_str());
-                return self.parse_binary_operation(inner);
+                Rule::relational => {
+                    // Handle comparison operations like x > y, x < y, etc.
+                    debug_println!("[DEBUG] Found relational rule, parsing binary operation");
+                    debug_println!("[DEBUG] Relational content: '{}'", inner.as_str());
+                    return self.parse_binary_operation(inner);
                 }
                 Rule::additive => {
                     // Handle binary operations like x + y
@@ -870,32 +1067,62 @@ impl PestParser {
     }
 
     /// Parse binary operations like x + y, x * y, etc.
-    fn parse_binary_operation(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_binary_operation(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         debug_println!("[DEBUG] [BIN_OP] ========================================");
         debug_println!("[DEBUG] [BIN_OP] parse_binary_operation ENTRY");
-        debug_println!("[DEBUG] [BIN_OP] rule={:?}, content = '{}'", pair.as_rule(), pair.as_str());
-        
+        debug_println!(
+            "[DEBUG] [BIN_OP] rule={:?}, content = '{}'",
+            pair.as_rule(),
+            pair.as_str()
+        );
+
         // Check ALL children before filtering
         let all_children_before: Vec<_> = pair.clone().into_inner().collect();
-        debug_println!("[DEBUG] [BIN_OP] Total children BEFORE filter: {}", all_children_before.len());
+        debug_println!(
+            "[DEBUG] [BIN_OP] Total children BEFORE filter: {}",
+            all_children_before.len()
+        );
         for (i, child) in all_children_before.iter().enumerate() {
-            debug_println!("[DEBUG] [BIN_OP]   PRE-FILTER Child {}: {:?} = '{}'", i, child.as_rule(), child.as_str());
+            debug_println!(
+                "[DEBUG] [BIN_OP]   PRE-FILTER Child {}: {:?} = '{}'",
+                i,
+                child.as_rule(),
+                child.as_str()
+            );
         }
-        
+
         let span = self.create_span(pair.as_span());
         let rule = pair.as_rule();
         let content = pair.as_str().to_string(); // Get content before moving pair
-        let children: Vec<_> = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE).collect();
-        debug_println!("[DEBUG] [BIN_OP] Children AFTER filter: {} items", children.len());
+        let children: Vec<_> = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE)
+            .collect();
+        debug_println!(
+            "[DEBUG] [BIN_OP] Children AFTER filter: {} items",
+            children.len()
+        );
         for (i, child) in children.iter().enumerate() {
-            debug_println!("[DEBUG] [BIN_OP]   POST-FILTER Child {}: {:?} = '{}'", i, child.as_rule(), child.as_str());
+            debug_println!(
+                "[DEBUG] [BIN_OP]   POST-FILTER Child {}: {:?} = '{}'",
+                i,
+                child.as_rule(),
+                child.as_str()
+            );
         }
-        
+
         if children.len() == 1 {
             // Single operand, no operator - parse it directly
             let child = &children[0];
-            debug_println!("[DEBUG] Single operand: {:?} = '{}'", child.as_rule(), child.as_str());
-            
+            debug_println!(
+                "[DEBUG] Single operand: {:?} = '{}'",
+                child.as_rule(),
+                child.as_str()
+            );
+
             match child.as_rule() {
                 Rule::power => {
                     // Handle power expressions like x ** y
@@ -912,10 +1139,24 @@ impl PestParser {
                 }
                 Rule::shift_expr | Rule::additive | Rule::multiplicative => {
                     // Handle these rules by parsing their single operand as an expression
-                    debug_println!("[DEBUG] Found {:?} with single operand '{}', parsing as expression", child.as_rule(), child.as_str());
-                    debug_println!("[DEBUG] Calling parse_expression for single operand '{}'", child.as_str());
-                    debug_println!("[DEBUG] Child rule: {:?}, content: '{}'", child.as_rule(), child.as_str());
-                    debug_println!("[DEBUG] About to call parse_expression with rule: {:?}", child.as_rule());
+                    debug_println!(
+                        "[DEBUG] Found {:?} with single operand '{}', parsing as expression",
+                        child.as_rule(),
+                        child.as_str()
+                    );
+                    debug_println!(
+                        "[DEBUG] Calling parse_expression for single operand '{}'",
+                        child.as_str()
+                    );
+                    debug_println!(
+                        "[DEBUG] Child rule: {:?}, content: '{}'",
+                        child.as_rule(),
+                        child.as_str()
+                    );
+                    debug_println!(
+                        "[DEBUG] About to call parse_expression with rule: {:?}",
+                        child.as_rule()
+                    );
                     let result = self.parse_expression(child.clone());
                     debug_println!("[DEBUG] Single operand result: {:?}", result);
                     return result;
@@ -926,19 +1167,31 @@ impl PestParser {
                 }
             }
         }
-        
+
         if children.len() == 2 {
             debug_println!("[DEBUG] [BIN_OP] 2 children, rule={:?}", rule);
-            debug_println!("[DEBUG] [BIN_OP] Child 0: {:?} = '{}'", children[0].as_rule(), children[0].as_str());
-            debug_println!("[DEBUG] [BIN_OP] Child 1: {:?} = '{}'", children[1].as_rule(), children[1].as_str());
-            
+            debug_println!(
+                "[DEBUG] [BIN_OP] Child 0: {:?} = '{}'",
+                children[0].as_rule(),
+                children[0].as_str()
+            );
+            debug_println!(
+                "[DEBUG] [BIN_OP] Child 1: {:?} = '{}'",
+                children[1].as_rule(),
+                children[1].as_str()
+            );
+
             // Special case: unary operations have (operator, operand) not (left, right)
             if rule == Rule::unary && children[0].as_rule() == Rule::unary_op {
                 debug_println!("[DEBUG] [BIN_OP] Detected unary operation!");
                 let op_str = children[0].as_str();
                 let operand = self.parse_expression(children[1].clone())?;
-                debug_println!("[DEBUG] [BIN_OP] Unary operator: '{}', operand: {:?}", op_str, operand);
-                
+                debug_println!(
+                    "[DEBUG] [BIN_OP] Unary operator: '{}', operand: {:?}",
+                    op_str,
+                    operand
+                );
+
                 let operator = match op_str {
                     "-" => UnaryOperator::Negate,
                     "!" => UnaryOperator::Not,
@@ -946,23 +1199,34 @@ impl PestParser {
                     "not" => UnaryOperator::Not,
                     _ => return Err(format!("Unknown unary operator: {}", op_str).into()),
                 };
-                
+
                 return Ok(Expression::Unary {
                     operator,
                     operand: Box::new(operand),
                     span,
                 });
             }
-            
+
             // Binary operation: left + right (operator is implicit)
-            debug_println!("[DEBUG] parse_binary_operation: parsing 2 children for rule {:?}", rule);
-            debug_println!("[DEBUG] Child 0: rule={:?}, content='{}'", children[0].as_rule(), children[0].as_str());
-            debug_println!("[DEBUG] Child 1: rule={:?}, content='{}'", children[1].as_rule(), children[1].as_str());
+            debug_println!(
+                "[DEBUG] parse_binary_operation: parsing 2 children for rule {:?}",
+                rule
+            );
+            debug_println!(
+                "[DEBUG] Child 0: rule={:?}, content='{}'",
+                children[0].as_rule(),
+                children[0].as_str()
+            );
+            debug_println!(
+                "[DEBUG] Child 1: rule={:?}, content='{}'",
+                children[1].as_rule(),
+                children[1].as_str()
+            );
             let left = self.parse_expression(children[0].clone())?;
             debug_println!("[DEBUG] Left parsed as: {:?}", left);
             let right = self.parse_expression(children[1].clone())?;
             debug_println!("[DEBUG] Right parsed as: {:?}", right);
-            
+
             // Determine operator based on the rule context
             let operator = match rule {
                 Rule::additive => BinaryOperator::Add, // Default to + for additive
@@ -980,10 +1244,10 @@ impl PestParser {
                     } else {
                         BinaryOperator::Add // Fallback
                     }
-                },
+                }
                 _ => BinaryOperator::Add, // Default fallback
             };
-            
+
             let result = Expression::Binary {
                 left: Box::new(left),
                 operator,
@@ -993,13 +1257,13 @@ impl PestParser {
             debug_println!("[DEBUG] Created binary operation: {:?}", result);
             return Ok(result);
         }
-        
+
         if children.len() == 3 {
             // Binary operation: left op right
             let left = self.parse_expression(children[0].clone())?;
             let op = children[1].as_str();
             let right = self.parse_expression(children[2].clone())?;
-            
+
             let operator = match op {
                 "+" => BinaryOperator::Add,
                 "-" => BinaryOperator::Subtract,
@@ -1016,7 +1280,7 @@ impl PestParser {
                 "or" => BinaryOperator::Or,
                 _ => return Err(format!("Unknown binary operator: {}", op).into()),
             };
-            
+
             return Ok(Expression::Binary {
                 left: Box::new(left),
                 operator,
@@ -1024,30 +1288,37 @@ impl PestParser {
                 span,
             });
         }
-        
+
         // Handle chained operations like "a" + b + "c" + d (more than 3 children)
         // Format: operand, operator, operand, operator, operand, ...
         if children.len() > 3 && children.len() % 2 == 1 {
-            debug_println!("[DEBUG] [BIN_OP] Chained operation with {} children", children.len());
-            
+            debug_println!(
+                "[DEBUG] [BIN_OP] Chained operation with {} children",
+                children.len()
+            );
+
             // Parse first operand
             let mut left = self.parse_expression(children[0].clone())?;
-            
+
             // Iterate through operator-operand pairs
             let mut i = 1;
             while i < children.len() {
                 let op_child = &children[i];
-                debug_println!("[DEBUG] [CHAINED] Operator child: rule={:?}, content='{}'", op_child.as_rule(), op_child.as_str());
+                debug_println!(
+                    "[DEBUG] [CHAINED] Operator child: rule={:?}, content='{}'",
+                    op_child.as_rule(),
+                    op_child.as_str()
+                );
                 let op = children[i].as_str();
                 i += 1;
-                
+
                 if i >= children.len() {
                     return Err("Missing right operand after operator".into());
                 }
-                
+
                 let right = self.parse_expression(children[i].clone())?;
                 i += 1;
-                
+
                 let operator = match op {
                     "+" => BinaryOperator::Add,
                     "-" => BinaryOperator::Subtract,
@@ -1064,7 +1335,7 @@ impl PestParser {
                     "or" => BinaryOperator::Or,
                     _ => return Err(format!("Unknown binary operator: {}", op).into()),
                 };
-                
+
                 // Build left-associative tree
                 left = Expression::Binary {
                     left: Box::new(left),
@@ -1073,20 +1344,31 @@ impl PestParser {
                     span: span.clone(),
                 };
             }
-            
+
             return Ok(left);
         }
-        
+
         // Fallback for unexpected structures
-        Err(format!("Unexpected binary operation structure with {} children", children.len()).into())
+        Err(format!(
+            "Unexpected binary operation structure with {} children",
+            children.len()
+        )
+        .into())
     }
 
     /// Parse expression with proper precedence - simplified non-recursive approach
-    fn parse_expression(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_expression(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         debug_println!("[DEBUG] [PARSE_EXPR] ==== ENTRY ====");
-        debug_println!("[DEBUG] [PARSE_EXPR] rule = {:?}, content = '{}'", pair.as_rule(), pair.as_str());
-        
+        debug_println!(
+            "[DEBUG] [PARSE_EXPR] rule = {:?}, content = '{}'",
+            pair.as_rule(),
+            pair.as_str()
+        );
+
         match pair.as_rule() {
             Rule::shift_expr => {
                 // Handle shift_expr directly
@@ -1099,35 +1381,60 @@ impl PestParser {
                 // For the top-level expression rule, just parse its inner content
                 debug_println!("[DEBUG] [PARSE_EXPR] Taking Rule::expression path");
                 let inner = pair.into_inner().next().ok_or("Empty expression")?;
-                debug_println!("[DEBUG] [PARSE_EXPR] expression inner rule: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
+                debug_println!(
+                    "[DEBUG] [PARSE_EXPR] expression inner rule: {:?}, content: '{}'",
+                    inner.as_rule(),
+                    inner.as_str()
+                );
                 // Delegate to the appropriate sub-parser based on the inner rule
                 match inner.as_rule() {
                     Rule::assignment => {
                         // Handle assignment expressions
                         debug_println!("[DEBUG] assignment tokens:");
                         for (i, token) in inner.clone().into_inner().enumerate() {
-                            debug_println!("  Token {}: '{}' (rule: {:?})", i, token.as_str(), token.as_rule());
+                            debug_println!(
+                                "  Token {}: '{}' (rule: {:?})",
+                                i,
+                                token.as_str(),
+                                token.as_rule()
+                            );
                         }
-                        
-                        let mut assignment_iter = inner.clone().into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+                        let mut assignment_iter = inner
+                            .clone()
+                            .into_inner()
+                            .filter(|p| p.as_rule() != Rule::WHITESPACE);
                         let left = assignment_iter.next().ok_or("Missing left operand")?;
                         debug_println!("[DEBUG] assignment left: '{}'", left.as_str());
-                        
+
                         // Check if there's an assignment operator
                         if let Some(assign_op) = assignment_iter.next() {
-                            debug_println!("[DEBUG] assignment operator: '{}' (rule: {:?})", assign_op.as_str(), assign_op.as_rule());
+                            debug_println!(
+                                "[DEBUG] assignment operator: '{}' (rule: {:?})",
+                                assign_op.as_str(),
+                                assign_op.as_rule()
+                            );
                             if assign_op.as_str() == "=" {
                                 // This is a real assignment - parse left and right sides
-                                let right = assignment_iter.next().ok_or("Missing right operand")?;
-                                
-                                debug_println!("[DEBUG] [LEFT] About to parse left side: '{}' (rule: {:?})", left.as_str(), left.as_rule());
+                                let right =
+                                    assignment_iter.next().ok_or("Missing right operand")?;
+
+                                debug_println!(
+                                    "[DEBUG] [LEFT] About to parse left side: '{}' (rule: {:?})",
+                                    left.as_str(),
+                                    left.as_rule()
+                                );
                                 let left_expr = self.parse_expression(left)?;
-                                debug_println!("[DEBUG] [RIGHT] About to parse right side: '{}' (rule: {:?})", right.as_str(), right.as_rule());
+                                debug_println!(
+                                    "[DEBUG] [RIGHT] About to parse right side: '{}' (rule: {:?})",
+                                    right.as_str(),
+                                    right.as_rule()
+                                );
                                 let right_expr = self.parse_expression(right)?;
-                                
+
                                 debug_println!("[DEBUG] assignment left_expr: {:?}", left_expr);
                                 debug_println!("[DEBUG] assignment right_expr: {:?}", right_expr);
-                                
+
                                 Ok(Expression::Binary {
                                     left: Box::new(left_expr),
                                     operator: BinaryOperator::Assign,
@@ -1137,13 +1444,21 @@ impl PestParser {
                             } else {
                                 // This is not an assignment, treat the left side as the expression
                                 // Avoid recursion by delegating to the appropriate sub-parser
-                                debug_println!("[DEBUG] assignment left side rule: {:?}, content: '{}'", left.as_rule(), left.as_str());
+                                debug_println!(
+                                    "[DEBUG] assignment left side rule: {:?}, content: '{}'",
+                                    left.as_rule(),
+                                    left.as_str()
+                                );
                                 // Delegate to parse_expression to handle all expression types
                                 self.parse_expression(left)
                             }
                         } else {
                             // No assignment operator, treat the left side as the expression
-                            debug_println!("[DEBUG] [NO_ASSIGN] left side rule: {:?}, content: '{}'", left.as_rule(), left.as_str());
+                            debug_println!(
+                                "[DEBUG] [NO_ASSIGN] left side rule: {:?}, content: '{}'",
+                                left.as_rule(),
+                                left.as_str()
+                            );
                             // Delegate to parse_expression to handle all expression types
                             self.parse_expression(left)
                         }
@@ -1166,7 +1481,7 @@ impl PestParser {
                             Rule::identifier => {
                                 Ok(Expression::Variable(primary_inner.as_str().to_string()))
                             }
-                            _ => Ok(Expression::Literal(Literal::Int(0)))
+                            _ => Ok(Expression::Literal(Literal::Int(0))),
                         }
                     }
                     _ => {
@@ -1179,20 +1494,25 @@ impl PestParser {
                     }
                 }
             }
-                Rule::assignment | Rule::and_expr | Rule::bit_or_expr |
-                Rule::bit_xor_expr | Rule::bit_and_expr | Rule::equality | Rule::relational |
-                Rule::shift_expr | Rule::additive | Rule::power => {
-                    // For complex expressions, delegate to precedence chain
-                    self.parse_precedence_chain(pair)
-                }
-                Rule::multiplicative => {
-                    // Handle multiplicative expressions properly
-                    debug_println!("[DEBUG] [PARSE_EXPR] Taking Rule::multiplicative path at line 1162, content: '{}'", pair.as_str());
-                    self.parse_binary_operation(pair)
-                }
-            Rule::postfix_expr => {
-                self.parse_postfix_expr(pair)
+            Rule::assignment
+            | Rule::and_expr
+            | Rule::bit_or_expr
+            | Rule::bit_xor_expr
+            | Rule::bit_and_expr
+            | Rule::equality
+            | Rule::relational
+            | Rule::shift_expr
+            | Rule::additive
+            | Rule::power => {
+                // For complex expressions, delegate to precedence chain
+                self.parse_precedence_chain(pair)
             }
+            Rule::multiplicative => {
+                // Handle multiplicative expressions properly
+                debug_println!("[DEBUG] [PARSE_EXPR] Taking Rule::multiplicative path at line 1162, content: '{}'", pair.as_str());
+                self.parse_binary_operation(pair)
+            }
+            Rule::postfix_expr => self.parse_postfix_expr(pair),
             Rule::primary => {
                 let inner = pair.into_inner().next().ok_or("Empty primary expression")?;
                 match inner.as_rule() {
@@ -1223,38 +1543,68 @@ impl PestParser {
                 // Handle shift_expr directly
                 debug_println!("[DEBUG] [DIRECT_SHIFT_EXPR] Direct shift_expr case: calling parse_precedence_chain for '{}'", pair.as_str());
                 let result = self.parse_precedence_chain(pair);
-                debug_println!("[DEBUG] [DIRECT_SHIFT_EXPR] parse_precedence_chain result: {:?}", result);
+                debug_println!(
+                    "[DEBUG] [DIRECT_SHIFT_EXPR] parse_precedence_chain result: {:?}",
+                    result
+                );
                 result
             }
-            Rule::and_expr | Rule::bit_or_expr | Rule::bit_xor_expr | Rule::bit_and_expr | 
-            Rule::equality | Rule::relational | Rule::shift_expr | Rule::additive | 
-            Rule::multiplicative | Rule::power | Rule::unary | Rule::postfix_expr => {
+            Rule::and_expr
+            | Rule::bit_or_expr
+            | Rule::bit_xor_expr
+            | Rule::bit_and_expr
+            | Rule::equality
+            | Rule::relational
+            | Rule::shift_expr
+            | Rule::additive
+            | Rule::multiplicative
+            | Rule::power
+            | Rule::unary
+            | Rule::postfix_expr => {
                 // Handle all expression rules by delegating to precedence chain
-                debug_println!("[DEBUG] [EXPR_RULE] Found {:?} rule, calling parse_precedence_chain for '{}'", pair.as_rule(), pair.as_str());
+                debug_println!(
+                    "[DEBUG] [EXPR_RULE] Found {:?} rule, calling parse_precedence_chain for '{}'",
+                    pair.as_rule(),
+                    pair.as_str()
+                );
                 let result = self.parse_precedence_chain(pair);
-                debug_println!("[DEBUG] [EXPR_RULE] parse_precedence_chain result: {:?}", result);
+                debug_println!(
+                    "[DEBUG] [EXPR_RULE] parse_precedence_chain result: {:?}",
+                    result
+                );
                 result
             }
-            Rule::range_expr => {
-                self.parse_range_expr(pair)
-            }
+            Rule::range_expr => self.parse_range_expr(pair),
             _ => {
                 // Default case - return simple placeholder
-                debug_println!("[DEBUG] [DEFAULT] Unhandled rule {:?} for '{}', returning Literal(Int(0))", pair.as_rule(), pair.as_str());
+                debug_println!(
+                    "[DEBUG] [DEFAULT] Unhandled rule {:?} for '{}', returning Literal(Int(0))",
+                    pair.as_rule(),
+                    pair.as_str()
+                );
                 Ok(Expression::Literal(Literal::Int(0)))
             }
         }
     }
 
     /// Parse expression with recursion depth tracking
-    fn parse_expression_with_depth(&mut self, pair: Pair<Rule>, depth: usize) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_expression_with_depth(
+        &mut self,
+        pair: Pair<Rule>,
+        depth: usize,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         if depth > 50 {
             return Err("Expression parsing recursion depth exceeded".into());
         }
-        
+
         let span = pair.as_span();
-        debug_println!("[DEBUG] parse_expression: depth={}, rule={:?}, content='{}'", depth, pair.as_rule(), pair.as_str());
-        
+        debug_println!(
+            "[DEBUG] parse_expression: depth={}, rule={:?}, content='{}'",
+            depth,
+            pair.as_rule(),
+            pair.as_str()
+        );
+
         match pair.as_rule() {
             Rule::expression => {
                 // For the top-level expression rule, just parse its inner content
@@ -1262,12 +1612,20 @@ impl PestParser {
                 self.parse_expression_with_depth(inner, depth + 1)
             }
             Rule::assignment => {
-                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                let left = self.parse_expression_with_depth(inner.next().ok_or("Missing left operand")?, depth)?;
-                
+                let mut inner = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let left = self.parse_expression_with_depth(
+                    inner.next().ok_or("Missing left operand")?,
+                    depth,
+                )?;
+
                 if let Some(assign_pair) = inner.next() {
                     if assign_pair.as_str() == "=" {
-                        let right = self.parse_expression_with_depth(inner.next().ok_or("Missing right operand")?, depth)?;
+                        let right = self.parse_expression_with_depth(
+                            inner.next().ok_or("Missing right operand")?,
+                            depth,
+                        )?;
                         // For now, just return the right side since we don't have assignment expressions in AST yet
                         Ok(right)
                     } else {
@@ -1278,12 +1636,20 @@ impl PestParser {
                 }
             }
             Rule::or_expr => {
-                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                let mut left = self.parse_expression_with_depth(inner.next().ok_or("Missing left operand")?, depth)?;
-                
+                let mut inner = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left = self.parse_expression_with_depth(
+                    inner.next().ok_or("Missing left operand")?,
+                    depth,
+                )?;
+
                 while let Some(op_pair) = inner.next() {
                     if op_pair.as_str() == "or" {
-                        let right = self.parse_expression_with_depth(inner.next().ok_or("Missing right operand")?, depth)?;
+                        let right = self.parse_expression_with_depth(
+                            inner.next().ok_or("Missing right operand")?,
+                            depth,
+                        )?;
                         left = Expression::Binary {
                             left: Box::new(left),
                             operator: BinaryOperator::Or,
@@ -1298,12 +1664,20 @@ impl PestParser {
                 Ok(left)
             }
             Rule::and_expr => {
-                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                let mut left = self.parse_expression_with_depth(inner.next().ok_or("Missing left operand")?, depth)?;
-                
+                let mut inner = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left = self.parse_expression_with_depth(
+                    inner.next().ok_or("Missing left operand")?,
+                    depth,
+                )?;
+
                 while let Some(op_pair) = inner.next() {
                     if op_pair.as_str() == "and" {
-                        let right = self.parse_expression_with_depth(inner.next().ok_or("Missing right operand")?, depth)?;
+                        let right = self.parse_expression_with_depth(
+                            inner.next().ok_or("Missing right operand")?,
+                            depth,
+                        )?;
                         left = Expression::Binary {
                             left: Box::new(left),
                             operator: BinaryOperator::And,
@@ -1317,12 +1691,21 @@ impl PestParser {
                 Ok(left)
             }
             Rule::bit_or_expr => {
-                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                let mut inner = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left =
+                    self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 while let Some(op_pair) = inner.next() {
                     if op_pair.as_str() == "|" {
-                        let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
-                        left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::BitOr, right: Box::new(right), span: self.create_span(span) };
+                        let right =
+                            self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                        left = Expression::Binary {
+                            left: Box::new(left),
+                            operator: BinaryOperator::BitOr,
+                            right: Box::new(right),
+                            span: self.create_span(span),
+                        };
                     } else {
                         left = self.parse_expression(op_pair)?;
                     }
@@ -1330,12 +1713,21 @@ impl PestParser {
                 Ok(left)
             }
             Rule::bit_xor_expr => {
-                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                let mut inner = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left =
+                    self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 while let Some(op_pair) = inner.next() {
                     if op_pair.as_str() == "^" {
-                        let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
-                        left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::BitXor, right: Box::new(right), span: self.create_span(span) };
+                        let right =
+                            self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                        left = Expression::Binary {
+                            left: Box::new(left),
+                            operator: BinaryOperator::BitXor,
+                            right: Box::new(right),
+                            span: self.create_span(span),
+                        };
                     } else {
                         left = self.parse_expression(op_pair)?;
                     }
@@ -1343,12 +1735,21 @@ impl PestParser {
                 Ok(left)
             }
             Rule::bit_and_expr => {
-                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                let mut inner = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left =
+                    self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 while let Some(op_pair) = inner.next() {
                     if op_pair.as_str() == "&" {
-                        let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
-                        left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::BitAnd, right: Box::new(right), span: self.create_span(span) };
+                        let right =
+                            self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                        left = Expression::Binary {
+                            left: Box::new(left),
+                            operator: BinaryOperator::BitAnd,
+                            right: Box::new(right),
+                            span: self.create_span(span),
+                        };
                     } else {
                         left = self.parse_expression(op_pair)?;
                     }
@@ -1356,13 +1757,17 @@ impl PestParser {
                 Ok(left)
             }
             Rule::equality => {
-                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
-                
+                let mut inner = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left =
+                    self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+
                 while let Some(op_pair) = inner.next() {
                     match op_pair.as_str() {
                         "==" => {
-                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            let right = self
+                                .parse_expression(inner.next().ok_or("Missing right operand")?)?;
                             left = Expression::Binary {
                                 left: Box::new(left),
                                 operator: BinaryOperator::Equal,
@@ -1371,7 +1776,8 @@ impl PestParser {
                             };
                         }
                         "!=" => {
-                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            let right = self
+                                .parse_expression(inner.next().ok_or("Missing right operand")?)?;
                             left = Expression::Binary {
                                 left: Box::new(left),
                                 operator: BinaryOperator::NotEqual,
@@ -1387,16 +1793,26 @@ impl PestParser {
                 Ok(left)
             }
             Rule::relational => {
-                debug_println!("[DEBUG] PARSER: relational rule, content: '{}'", pair.as_str());
-                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                debug_println!(
+                    "[DEBUG] PARSER: relational rule, content: '{}'",
+                    pair.as_str()
+                );
+                let mut inner = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left =
+                    self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 debug_println!("[DEBUG] PARSER: relational left: {:?}", left);
-                
+
                 while let Some(op_pair) = inner.next() {
-                    debug_println!("[DEBUG] PARSER: relational operator: '{}'", op_pair.as_str());
+                    debug_println!(
+                        "[DEBUG] PARSER: relational operator: '{}'",
+                        op_pair.as_str()
+                    );
                     match op_pair.as_str() {
                         "<" => {
-                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            let right = self
+                                .parse_expression(inner.next().ok_or("Missing right operand")?)?;
                             debug_println!("[DEBUG] PARSER: relational right: {:?}", right);
                             left = Expression::Binary {
                                 left: Box::new(left),
@@ -1407,7 +1823,8 @@ impl PestParser {
                             debug_println!("[DEBUG] PARSER: relational result: {:?}", left);
                         }
                         ">" => {
-                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            let right = self
+                                .parse_expression(inner.next().ok_or("Missing right operand")?)?;
                             debug_println!("[DEBUG] PARSER: relational right: {:?}", right);
                             left = Expression::Binary {
                                 left: Box::new(left),
@@ -1417,7 +1834,8 @@ impl PestParser {
                             };
                         }
                         "<=" => {
-                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            let right = self
+                                .parse_expression(inner.next().ok_or("Missing right operand")?)?;
                             left = Expression::Binary {
                                 left: Box::new(left),
                                 operator: BinaryOperator::LessThanEqual,
@@ -1426,7 +1844,8 @@ impl PestParser {
                             };
                         }
                         ">=" => {
-                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            let right = self
+                                .parse_expression(inner.next().ok_or("Missing right operand")?)?;
                             left = Expression::Binary {
                                 left: Box::new(left),
                                 operator: BinaryOperator::GreaterThanEqual,
@@ -1443,12 +1862,16 @@ impl PestParser {
             }
             // NEW: handle additive level
             Rule::additive => {
-                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                let mut inner = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left =
+                    self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 while let Some(op_pair) = inner.next() {
                     match op_pair.as_str() {
                         "+" => {
-                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            let right = self
+                                .parse_expression(inner.next().ok_or("Missing right operand")?)?;
                             left = Expression::Binary {
                                 left: Box::new(left),
                                 operator: BinaryOperator::Add,
@@ -1457,7 +1880,8 @@ impl PestParser {
                             };
                         }
                         "-" => {
-                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            let right = self
+                                .parse_expression(inner.next().ok_or("Missing right operand")?)?;
                             left = Expression::Binary {
                                 left: Box::new(left),
                                 operator: BinaryOperator::Subtract,
@@ -1479,10 +1903,14 @@ impl PestParser {
             }
             Rule::integer_literal => {
                 let content = pair.as_str();
-                debug_println!("[DEBUG] [INTEGER] Direct integer parse: content='{}'", content);
+                debug_println!(
+                    "[DEBUG] [INTEGER] Direct integer parse: content='{}'",
+                    content
+                );
                 let trimmed = content.trim();
                 debug_println!("[DEBUG] [INTEGER] After trim: '{}'", trimmed);
-                let value = trimmed.parse::<i64>()
+                let value = trimmed
+                    .parse::<i64>()
                     .map_err(|e| format!("Invalid integer: {} (content: '{}')", e, trimmed))?;
                 Ok(Expression::Literal(Literal::Int(value)))
             }
@@ -1500,26 +1928,42 @@ impl PestParser {
                 Ok(Expression::Literal(Literal::FStringInterpolation(parts)))
             }
             Rule::boolean_literal => {
-                let val = match pair.as_str() { "true" => true, _ => false };
+                let val = match pair.as_str() {
+                    "true" => true,
+                    _ => false,
+                };
                 Ok(Expression::Literal(Literal::Bool(val)))
             }
-            Rule::none_literal => {
-                Ok(Expression::Literal(Literal::None))
-            }
+            Rule::none_literal => Ok(Expression::Literal(Literal::None)),
             Rule::shift_expr => {
-                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+                let mut inner = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left =
+                    self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 while let Some(op_pair) = inner.next() {
                     match op_pair.as_str() {
                         "<<" => {
-                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
-                            left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::ShiftLeft, right: Box::new(right), span: self.create_span(span) };
+                            let right = self
+                                .parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary {
+                                left: Box::new(left),
+                                operator: BinaryOperator::ShiftLeft,
+                                right: Box::new(right),
+                                span: self.create_span(span),
+                            };
                         }
                         ">>" => {
-                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
-                            left = Expression::Binary { left: Box::new(left), operator: BinaryOperator::ShiftRight, right: Box::new(right), span: self.create_span(span) };
+                            let right = self
+                                .parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            left = Expression::Binary {
+                                left: Box::new(left),
+                                operator: BinaryOperator::ShiftRight,
+                                right: Box::new(right),
+                                span: self.create_span(span),
+                            };
                         }
-                        _ => { 
+                        _ => {
                             // This should not happen for shift operations, but if it does, just return the left operand
                             break;
                         }
@@ -1529,14 +1973,25 @@ impl PestParser {
             }
             Rule::multiplicative => {
                 debug_println!("[DEBUG] [PARSE_EXPR] Taking Rule::multiplicative path at line 1503, content: '{}'", pair.as_str());
-                debug_println!("[DEBUG] [PARSE_EXPR] multiplicative first child (before filtering): {:?}", pair.clone().into_inner().next().map(|p| format!("{:?} = '{}'", p.as_rule(), p.as_str())));
-                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                let mut left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
-                
+                debug_println!(
+                    "[DEBUG] [PARSE_EXPR] multiplicative first child (before filtering): {:?}",
+                    pair.clone().into_inner().next().map(|p| format!(
+                        "{:?} = '{}'",
+                        p.as_rule(),
+                        p.as_str()
+                    ))
+                );
+                let mut inner = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut left =
+                    self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
+
                 while let Some(op_pair) = inner.next() {
                     match op_pair.as_str() {
                         "*" => {
-                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            let right = self
+                                .parse_expression(inner.next().ok_or("Missing right operand")?)?;
                             left = Expression::Binary {
                                 left: Box::new(left),
                                 operator: BinaryOperator::Multiply,
@@ -1545,7 +2000,8 @@ impl PestParser {
                             };
                         }
                         "/" => {
-                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            let right = self
+                                .parse_expression(inner.next().ok_or("Missing right operand")?)?;
                             left = Expression::Binary {
                                 left: Box::new(left),
                                 operator: BinaryOperator::Divide,
@@ -1554,7 +2010,8 @@ impl PestParser {
                             };
                         }
                         "%" => {
-                            let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                            let right = self
+                                .parse_expression(inner.next().ok_or("Missing right operand")?)?;
                             left = Expression::Binary {
                                 left: Box::new(left),
                                 operator: BinaryOperator::Modulo,
@@ -1571,12 +2028,20 @@ impl PestParser {
             }
             Rule::power => {
                 // right-associative **
-                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut inner = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let left = self.parse_expression(inner.next().ok_or("Missing left operand")?)?;
                 if let Some(op_pair) = inner.next() {
                     if op_pair.as_str() == "**" {
-                        let right = self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
-                        return Ok(Expression::Binary { left: Box::new(left), operator: BinaryOperator::Power, right: Box::new(right), span: self.create_span(span) });
+                        let right =
+                            self.parse_expression(inner.next().ok_or("Missing right operand")?)?;
+                        return Ok(Expression::Binary {
+                            left: Box::new(left),
+                            operator: BinaryOperator::Power,
+                            right: Box::new(right),
+                            span: self.create_span(span),
+                        });
                     } else {
                         return self.parse_expression(op_pair);
                     }
@@ -1584,17 +2049,34 @@ impl PestParser {
                 Ok(left)
             }
             Rule::unary => {
-                debug_println!("[DEBUG] [UNARY_PARSE] Parsing unary expression: '{}'", pair.as_str());
+                debug_println!(
+                    "[DEBUG] [UNARY_PARSE] Parsing unary expression: '{}'",
+                    pair.as_str()
+                );
                 let all_children: Vec<_> = pair.clone().into_inner().collect();
-                debug_println!("[DEBUG] [UNARY_PARSE] Children count: {}", all_children.len());
+                debug_println!(
+                    "[DEBUG] [UNARY_PARSE] Children count: {}",
+                    all_children.len()
+                );
                 for (i, child) in all_children.iter().enumerate() {
-                    debug_println!("[DEBUG] [UNARY_PARSE]   Child {}: {:?} = '{}'", i, child.as_rule(), child.as_str());
+                    debug_println!(
+                        "[DEBUG] [UNARY_PARSE]   Child {}: {:?} = '{}'",
+                        i,
+                        child.as_rule(),
+                        child.as_str()
+                    );
                 }
-                
-                let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                
+
+                let mut inner = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
                 if let Some(first) = inner.next() {
-                    debug_println!("[DEBUG] [UNARY_PARSE] First child rule: {:?}, content: '{}'", first.as_rule(), first.as_str());
+                    debug_println!(
+                        "[DEBUG] [UNARY_PARSE] First child rule: {:?}, content: '{}'",
+                        first.as_rule(),
+                        first.as_str()
+                    );
                     // Check if this is a unary operator or the actual expression
                     match first.as_rule() {
                         Rule::range_expr => {
@@ -1609,7 +2091,8 @@ impl PestParser {
                             // This should be a unary operator
                             match first.as_str() {
                                 "-" => {
-                                    let operand = self.parse_expression(inner.next().ok_or("Missing operand")?)?;
+                                    let operand = self
+                                        .parse_expression(inner.next().ok_or("Missing operand")?)?;
                                     Ok(Expression::Unary {
                                         operator: UnaryOperator::Negate,
                                         operand: Box::new(operand),
@@ -1617,20 +2100,27 @@ impl PestParser {
                                     })
                                 }
                                 "!" => {
-                                    let operand = self.parse_expression(inner.next().ok_or("Missing operand")?)?;
+                                    let operand = self
+                                        .parse_expression(inner.next().ok_or("Missing operand")?)?;
                                     Ok(Expression::Unary {
-                                operator: UnaryOperator::Not,
-                                operand: Box::new(operand),
-                                span: self.create_span(span),
-                            })
-                        }
+                                        operator: UnaryOperator::Not,
+                                        operand: Box::new(operand),
+                                        span: self.create_span(span),
+                                    })
+                                }
                                 "~" => {
-                                    let operand = self.parse_expression(inner.next().ok_or("Missing operand")?)?;
-                                    Ok(Expression::Unary { operator: UnaryOperator::BitNot, operand: Box::new(operand), span: self.create_span(span) })
+                                    let operand = self
+                                        .parse_expression(inner.next().ok_or("Missing operand")?)?;
+                                    Ok(Expression::Unary {
+                                        operator: UnaryOperator::BitNot,
+                                        operand: Box::new(operand),
+                                        span: self.create_span(span),
+                                    })
                                 }
                                 _ => {
                                     // Unknown operator
-                                    Err(format!("Unknown unary operator: {}", first.as_str()).into())
+                                    Err(format!("Unknown unary operator: {}", first.as_str())
+                                        .into())
                                 }
                             }
                         }
@@ -1639,9 +2129,7 @@ impl PestParser {
                     Err("Missing unary expression".into())
                 }
             }
-            Rule::postfix_expr => {
-                self.parse_postfix_expr(pair)
-            }
+            Rule::postfix_expr => self.parse_postfix_expr(pair),
             Rule::primary => {
                 let inner = pair.into_inner().next().ok_or("Empty primary expression")?;
                 match inner.as_rule() {
@@ -1653,23 +2141,22 @@ impl PestParser {
                         let name = inner.as_str().to_string();
                         Ok(Expression::Variable(name))
                     }
-                    Rule::collection_literal => {
-                        self.parse_collection_literal(inner)
-                    }
-                    Rule::lambda_expr => {
-                        self.parse_lambda_expr(inner)
-                    }
-                    Rule::range_expr => {
-                        self.parse_range_expr(inner)
-                    }
+                    Rule::collection_literal => self.parse_collection_literal(inner),
+                    Rule::lambda_expr => self.parse_lambda_expr(inner),
+                    Rule::range_expr => self.parse_range_expr(inner),
                     Rule::expression => {
                         // This is for parenthesized expressions - parse the inner expression
-                        let inner_expr = inner.into_inner().next().ok_or("Empty parenthesized expression")?;
+                        let inner_expr = inner
+                            .into_inner()
+                            .next()
+                            .ok_or("Empty parenthesized expression")?;
                         self.parse_expression(inner_expr)
                     }
                     Rule::spawn_expr => {
                         let span = inner.as_span();
-                        let mut it = inner.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                        let mut it = inner
+                            .into_inner()
+                            .filter(|p| p.as_rule() != Rule::WHITESPACE);
                         let expr_pair = it.next().ok_or("Missing expression to spawn")?;
                         let expression = self.parse_expression(expr_pair)?;
                         Ok(Expression::Spawn {
@@ -1677,7 +2164,9 @@ impl PestParser {
                             span: self.create_span(span),
                         })
                     }
-                    _ => Err(format!("Expected primary expression, got {:?}", inner.as_rule()).into())
+                    _ => Err(
+                        format!("Expected primary expression, got {:?}", inner.as_rule()).into(),
+                    ),
                 }
             }
             Rule::WHITESPACE => {
@@ -1685,33 +2174,46 @@ impl PestParser {
                 // This shouldn't happen, but if it does, just skip it
                 Err("Unexpected whitespace in expression".into())
             }
-            _ => Err(format!("Expected expression, got {:?}", pair.as_rule()).into())
+            _ => Err(format!("Expected expression, got {:?}", pair.as_rule()).into()),
         }
     }
 
     /// Parse literal
     fn parse_literal(&mut self, pair: Pair<Rule>) -> Result<Literal, Box<dyn std::error::Error>> {
         let inner = pair.into_inner().next().ok_or("Empty literal")?;
-        
-        debug_println!("[DEBUG] [LITERAL] Parsing literal inner: {:?}, content: '{}'", inner.as_rule(), inner.as_str());
-        
+
+        debug_println!(
+            "[DEBUG] [LITERAL] Parsing literal inner: {:?}, content: '{}'",
+            inner.as_rule(),
+            inner.as_str()
+        );
+
         match inner.as_rule() {
-                Rule::integer_literal => {
-                    let content = inner.as_str().trim();
-                    debug_println!("[DEBUG] [LITERAL] Integer content after trim: '{}'", content);
-                    let value = content.parse::<i64>()
-                        .map_err(|e| format!("Invalid integer: {} (content: '{}')", e, content))?;
-                    Ok(Literal::Int(value))
-                }
+            Rule::integer_literal => {
+                let content = inner.as_str().trim();
+                debug_println!(
+                    "[DEBUG] [LITERAL] Integer content after trim: '{}'",
+                    content
+                );
+                let value = content
+                    .parse::<i64>()
+                    .map_err(|e| format!("Invalid integer: {} (content: '{}')", e, content))?;
+                Ok(Literal::Int(value))
+            }
             Rule::float_literal => {
-                let value = inner.as_str().parse::<f64>()
+                let value = inner
+                    .as_str()
+                    .parse::<f64>()
                     .map_err(|e| format!("Invalid float: {}", e))?;
                 Ok(Literal::Float(value))
             }
             Rule::string_literal => {
                 let value = inner.as_str().to_string();
                 // Remove quotes
-                let value = value.trim_start_matches('"').trim_end_matches('"').to_string();
+                let value = value
+                    .trim_start_matches('"')
+                    .trim_end_matches('"')
+                    .to_string();
                 Ok(Literal::String(value))
             }
             Rule::fstring_literal => {
@@ -1722,30 +2224,36 @@ impl PestParser {
                 let value = inner.as_str() == "true";
                 Ok(Literal::Bool(value))
             }
-            Rule::none_literal => {
-                Ok(Literal::None)
-            }
+            Rule::none_literal => Ok(Literal::None),
             Rule::collection_literal => {
                 // Collection literals should be handled as expressions, not basic literals
                 Err("Collection literals should be parsed as expressions".into())
             }
-            _ => Err(format!("Expected literal, got {:?}", inner.as_rule()).into())
+            _ => Err(format!("Expected literal, got {:?}", inner.as_rule()).into()),
         }
     }
 
     /// Parse if statement
-    fn parse_if_stmt(&mut self, pair: Pair<Rule>) -> Result<IfStatement, Box<dyn std::error::Error>> {
+    fn parse_if_stmt(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<IfStatement, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         debug_println!("[DEBUG] parse_if_stmt: content='{}'", pair.as_str());
         let mut inner = pair.into_inner();
-        
+
         // Debug: print all tokens
         let tokens: Vec<_> = inner.clone().collect();
         debug_println!("[DEBUG] parse_if_stmt tokens: {}", tokens.len());
         for (i, token) in tokens.iter().enumerate() {
-            debug_println!("[DEBUG]   Token {}: rule={:?}, content='{}'", i, token.as_rule(), token.as_str());
+            debug_println!(
+                "[DEBUG]   Token {}: rule={:?}, content='{}'",
+                i,
+                token.as_rule(),
+                token.as_str()
+            );
         }
-        
+
         // The "if" keyword is consumed by the grammar, so the first inner pair is the expression
         let condition_pair = inner.next().ok_or_else(|| {
             self.add_parse_error(
@@ -1757,7 +2265,7 @@ impl PestParser {
         })?;
         let condition_span = condition_pair.as_span();
         let condition = self.parse_expression(condition_pair)?;
-        
+
         // Add warning if condition is not a boolean expression (basic check)
         if let Expression::Literal(Literal::Int(_)) = &condition {
             self.add_parse_warning(
@@ -1766,7 +2274,7 @@ impl PestParser {
                 condition_span,
             );
         }
-        
+
         let block_pair = inner.next().ok_or_else(|| {
             self.add_parse_error(
                 tjlang_diagnostics::ErrorCode::ParserExpectedToken,
@@ -1776,7 +2284,7 @@ impl PestParser {
             "Missing then block"
         })?;
         let then_block = self.parse_block(block_pair)?;
-        
+
         // Parse elif branches
         let mut elif_branches = Vec::new();
         // Capture a non-elif token (most likely the else_branch) without losing it
@@ -1785,7 +2293,7 @@ impl PestParser {
             if branch_pair.as_rule() == Rule::elif_branch {
                 let branch_span = branch_pair.as_span();
                 let mut branch_inner = branch_pair.into_inner();
-                
+
                 // The "elif" keyword is consumed by the grammar, so the first inner pair is the condition
                 let elif_condition_pair = branch_inner.next().ok_or_else(|| {
                     self.add_parse_error(
@@ -1797,16 +2305,17 @@ impl PestParser {
                 })?;
                 let elif_condition_span = elif_condition_pair.as_span();
                 let branch_condition = self.parse_expression(elif_condition_pair)?;
-                
+
                 // Add warning if elif condition is not a boolean expression
                 if let Expression::Literal(Literal::Int(_)) = &branch_condition {
                     self.add_parse_warning(
                         tjlang_diagnostics::ErrorCode::AnalyzerTypeMismatch,
-                        "elif condition is an integer - consider using a boolean expression".to_string(),
+                        "elif condition is an integer - consider using a boolean expression"
+                            .to_string(),
                         elif_condition_span,
                     );
                 }
-                
+
                 let elif_block_pair = branch_inner.next().ok_or_else(|| {
                     self.add_parse_error(
                         tjlang_diagnostics::ErrorCode::ParserExpectedToken,
@@ -1816,7 +2325,7 @@ impl PestParser {
                     "Missing elif block"
                 })?;
                 let branch_block = self.parse_block(elif_block_pair)?;
-                
+
                 elif_branches.push(ElifBranch {
                     condition: branch_condition,
                     block: branch_block,
@@ -1828,15 +2337,19 @@ impl PestParser {
                 break;
             }
         }
-        
+
         // Parse else branch if present
         let else_block = if let Some(else_pair) = pending_else_pair.or_else(|| inner.next()) {
-            debug_println!("[DEBUG] Found else_pair: rule={:?}, content='{}'", else_pair.as_rule(), else_pair.as_str());
+            debug_println!(
+                "[DEBUG] Found else_pair: rule={:?}, content='{}'",
+                else_pair.as_rule(),
+                else_pair.as_str()
+            );
             if else_pair.as_rule() == Rule::else_branch {
                 debug_println!("[DEBUG] Parsing else_branch");
                 let else_span = else_pair.as_span();
                 let mut else_inner = else_pair.into_inner();
-                
+
                 // The "else" keyword is consumed by the grammar, so the first inner pair is the block
                 let else_block_pair = else_inner.next().ok_or_else(|| {
                     self.add_parse_error(
@@ -1849,14 +2362,17 @@ impl PestParser {
                 debug_println!("[DEBUG] Parsing else block");
                 Some(self.parse_block(else_block_pair)?)
             } else {
-                debug_println!("[DEBUG] else_pair is not else_branch, rule={:?}", else_pair.as_rule());
+                debug_println!(
+                    "[DEBUG] else_pair is not else_branch, rule={:?}",
+                    else_pair.as_rule()
+                );
                 None
             }
         } else {
             debug_println!("[DEBUG] No else_pair found");
             None
         };
-        
+
         // Add helpful warning if if statement has no else branch
         if else_block.is_none() && elif_branches.is_empty() {
             self.add_parse_warning(
@@ -1865,7 +2381,7 @@ impl PestParser {
                 span,
             );
         }
-        
+
         Ok(IfStatement {
             condition,
             then_block,
@@ -1876,14 +2392,17 @@ impl PestParser {
     }
 
     /// Parse while statement
-    fn parse_while_stmt(&mut self, pair: Pair<Rule>) -> Result<WhileStatement, Box<dyn std::error::Error>> {
+    fn parse_while_stmt(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<WhileStatement, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut inner = pair.into_inner();
-        
+
         // The "while" keyword is consumed by the grammar, so the first inner pair is the condition
         let condition = self.parse_expression(inner.next().ok_or("Missing condition")?)?;
         let body = self.parse_block(inner.next().ok_or("Missing body")?)?;
-        
+
         Ok(WhileStatement {
             condition,
             body,
@@ -1892,9 +2411,14 @@ impl PestParser {
     }
 
     /// Parse do-while statement
-    fn parse_do_while_stmt(&mut self, pair: Pair<Rule>) -> Result<DoWhileStatement, Box<dyn std::error::Error>> {
+    fn parse_do_while_stmt(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<DoWhileStatement, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
         // Grammar: "do" block "while" expression — literals consumed
         let body = self.parse_block(inner.next().ok_or("Missing do-while body block")?)?;
         let condition = self.parse_expression(inner.next().ok_or("Missing do-while condition")?)?;
@@ -1906,33 +2430,48 @@ impl PestParser {
     }
 
     /// Parse for statement
-    fn parse_for_stmt(&mut self, pair: Pair<Rule>) -> Result<ForStatement, Box<dyn std::error::Error>> {
+    fn parse_for_stmt(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<ForStatement, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
         // Get the clause (either for_each_clause or c_style_clause)
         let clause = inner.next().ok_or("Missing for clause")?;
         let body = self.parse_block(inner.next().ok_or("Missing body")?)?;
-        
+
         match clause.as_rule() {
             Rule::for_each_clause => {
-                let mut clause_inner = clause.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                let var_name = clause_inner.next().ok_or("Missing variable name")?.as_str().trim().to_string();
-                let var_type = self.parse_type(clause_inner.next().ok_or("Missing variable type")?)?;
+                let mut clause_inner = clause
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let var_name = clause_inner
+                    .next()
+                    .ok_or("Missing variable name")?
+                    .as_str()
+                    .trim()
+                    .to_string();
+                let var_type =
+                    self.parse_type(clause_inner.next().ok_or("Missing variable type")?)?;
                 let iterable_pair = clause_inner.next().ok_or("Missing iterable")?;
                 let iterable = self.parse_expression(iterable_pair)?;
-                
+
                 Ok(ForStatement::ForEach {
-            var_name,
-            var_type,
-            iterable,
-            body,
-            span: self.create_span(span),
-        })
+                    var_name,
+                    var_type,
+                    iterable,
+                    body,
+                    span: self.create_span(span),
+                })
             }
             Rule::c_style_clause => {
-                let mut clause_inner = clause.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                
+                let mut clause_inner = clause
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
                 // Parse initializer (optional statement)
                 let initializer = if let Some(init_pair) = clause_inner.next() {
                     if init_pair.as_rule() == Rule::statement {
@@ -1947,7 +2486,7 @@ impl PestParser {
                 } else {
                     None
                 };
-                
+
                 // Parse condition (optional expression)
                 let condition = if let Some(cond_pair) = clause_inner.next() {
                     if cond_pair.as_rule() == Rule::expression {
@@ -1958,7 +2497,7 @@ impl PestParser {
                 } else {
                     None
                 };
-                
+
                 // Parse increment (optional expression)
                 let increment = if let Some(inc_pair) = clause_inner.next() {
                     if inc_pair.as_rule() == Rule::expression {
@@ -1969,7 +2508,7 @@ impl PestParser {
                 } else {
                     None
                 };
-                
+
                 Ok(ForStatement::CStyle {
                     initializer,
                     condition,
@@ -1978,22 +2517,29 @@ impl PestParser {
                     span: self.create_span(span),
                 })
             }
-            _ => Err(format!("Expected for_each_clause or c_style_clause, got {:?}", clause.as_rule()).into()),
+            _ => Err(format!(
+                "Expected for_each_clause or c_style_clause, got {:?}",
+                clause.as_rule()
+            )
+            .into()),
         }
     }
 
     /// Parse return statement
-    fn parse_return_stmt(&mut self, pair: Pair<Rule>) -> Result<ReturnStatement, Box<dyn std::error::Error>> {
+    fn parse_return_stmt(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<ReturnStatement, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut inner = pair.into_inner();
-        
+
         // The "return" keyword is consumed by the grammar, so check if there's an expression
         let value = if let Some(expr_pair) = inner.next() {
             Some(self.parse_expression(expr_pair)?)
         } else {
             None
         };
-        
+
         Ok(ReturnStatement {
             value,
             span: self.create_span(span),
@@ -2001,7 +2547,10 @@ impl PestParser {
     }
 
     /// Parse break statement
-    fn parse_break_stmt(&mut self, pair: Pair<Rule>) -> Result<BreakStatement, Box<dyn std::error::Error>> {
+    fn parse_break_stmt(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<BreakStatement, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         Ok(BreakStatement {
             span: self.create_span(span),
@@ -2009,7 +2558,10 @@ impl PestParser {
     }
 
     /// Parse continue statement
-    fn parse_continue_stmt(&mut self, pair: Pair<Rule>) -> Result<ContinueStatement, Box<dyn std::error::Error>> {
+    fn parse_continue_stmt(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<ContinueStatement, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         Ok(ContinueStatement {
             span: self.create_span(span),
@@ -2017,7 +2569,10 @@ impl PestParser {
     }
 
     /// Parse pass statement
-    fn parse_pass_stmt(&mut self, pair: Pair<Rule>) -> Result<PassStatement, Box<dyn std::error::Error>> {
+    fn parse_pass_stmt(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<PassStatement, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         Ok(PassStatement {
             span: self.create_span(span),
@@ -2025,13 +2580,16 @@ impl PestParser {
     }
 
     /// Parse raise statement
-    fn parse_raise_stmt(&mut self, pair: Pair<Rule>) -> Result<RaiseStatement, Box<dyn std::error::Error>> {
+    fn parse_raise_stmt(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<RaiseStatement, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut inner = pair.into_inner();
-        
+
         // The "raise" keyword is consumed by the grammar, so the first inner pair is the expression
         let value = self.parse_expression(inner.next().ok_or("Missing expression")?)?;
-        
+
         Ok(RaiseStatement {
             value,
             span: self.create_span(span),
@@ -2039,10 +2597,15 @@ impl PestParser {
     }
 
     /// Parse function declaration
-    fn parse_function_decl(&mut self, pair: Pair<Rule>) -> Result<FunctionDecl, Box<dyn std::error::Error>> {
+    fn parse_function_decl(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<FunctionDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
         // Parse function name (first token after filtering whitespace)
         let name_pair = inner.next().ok_or_else(|| {
             self.add_parse_error(
@@ -2053,7 +2616,7 @@ impl PestParser {
             "Missing function name"
         })?;
         let name = name_pair.as_str().to_string();
-        
+
         // Validate function name
         if name.is_empty() {
             self.add_parse_error(
@@ -2062,7 +2625,7 @@ impl PestParser {
                 name_pair.as_span(),
             );
         }
-        
+
         // Parse generic parameters (optional)
         let mut generic_params = Vec::new();
         if let Some(next_token) = inner.clone().next() {
@@ -2079,7 +2642,7 @@ impl PestParser {
                 generic_params = self.parse_generic_params(generic_params_pair)?;
             }
         }
-        
+
         // Parse parameter list (optional)
         let params = if let Some(params_pair) = inner.clone().next() {
             if params_pair.as_rule() == Rule::param_list {
@@ -2093,7 +2656,7 @@ impl PestParser {
         } else {
             Vec::new()
         };
-        
+
         // Parse return type (required)
         let return_type_pair = inner.next().ok_or_else(|| {
             self.add_parse_error(
@@ -2113,7 +2676,7 @@ impl PestParser {
             );
             return Err(format!("Expected type_, got {:?}", return_type_pair.as_rule()).into());
         };
-        
+
         // Parse function body (required)
         let body_pair = inner.next().ok_or_else(|| {
             self.add_parse_error(
@@ -2133,47 +2696,60 @@ impl PestParser {
             );
             return Err(format!("Expected block, got {:?}", body_pair.as_rule()).into());
         };
-        
+
         // Add helpful warnings
         if params.is_empty() {
             self.add_parse_warning(
                 tjlang_diagnostics::ErrorCode::ParserInvalidFunction,
-                format!("function `{}` has no parameters - consider adding `()` for clarity", name),
+                format!(
+                    "function `{}` has no parameters - consider adding `()` for clarity",
+                    name
+                ),
                 span,
             );
         }
-        
+
         Ok(FunctionDecl {
-                        name,
-                        generic_params,
-                        params,
-                        return_type,
-                        body,
-                        span: self.create_span(span),
+            name,
+            generic_params,
+            params,
+            return_type,
+            body,
+            span: self.create_span(span),
         })
     }
-    
+
     /// Parse generic parameters
-    fn parse_generic_params(&mut self, pair: Pair<Rule>) -> Result<Vec<GenericParam>, Box<dyn std::error::Error>> {
+    fn parse_generic_params(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Vec<GenericParam>, Box<dyn std::error::Error>> {
         let mut params = Vec::new();
-        let inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+        let inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
         for param_pair in inner {
             if param_pair.as_rule() == Rule::generic_param {
                 let param = self.parse_generic_param(param_pair)?;
                 params.push(param);
             }
         }
-        
+
         Ok(params)
     }
-    
+
     /// Parse single generic parameter
-    fn parse_generic_param(&mut self, pair: Pair<Rule>) -> Result<GenericParam, Box<dyn std::error::Error>> {
+    fn parse_generic_param(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<GenericParam, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let pair_clone = pair.clone();
-        let mut inner = pair_clone.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+        let mut inner = pair_clone
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
         // First element should be the identifier (parameter name)
         let name_pair = inner.next().ok_or("Missing generic parameter name")?;
         let name = if name_pair.as_rule() == Rule::identifier {
@@ -2181,27 +2757,34 @@ impl PestParser {
         } else {
             return Err(format!("Expected identifier, got {:?}", name_pair.as_rule()).into());
         };
-        
+
         // Second element should be the identifier_list (bounds)
         let bounds_pair = inner.next().ok_or("Missing bounds")?;
         let bounds = if bounds_pair.as_rule() == Rule::identifier_list {
             self.parse_identifier_list(bounds_pair)?
         } else {
-            return Err(format!("Expected identifier_list, got {:?}", bounds_pair.as_rule()).into());
+            return Err(
+                format!("Expected identifier_list, got {:?}", bounds_pair.as_rule()).into(),
+            );
         };
-        
+
         Ok(GenericParam {
             name,
             bounds,
             span: self.create_span(span),
         })
     }
-    
+
     /// Parse parameter list
-    fn parse_param_list(&mut self, pair: Pair<Rule>) -> Result<Vec<Parameter>, Box<dyn std::error::Error>> {
+    fn parse_param_list(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Vec<Parameter>, Box<dyn std::error::Error>> {
         let mut params = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
         while let Some(param_pair) = inner.next() {
             if param_pair.as_rule() == Rule::param {
                 let param = self.parse_param(param_pair)?;
@@ -2211,19 +2794,25 @@ impl PestParser {
                 continue;
             }
         }
-        
+
         Ok(params)
     }
-    
+
     /// Parse single parameter
     fn parse_param(&mut self, pair: Pair<Rule>) -> Result<Parameter, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
-        let name = inner.next().ok_or("Missing parameter name")?.as_str().to_string();
-        
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
+        let name = inner
+            .next()
+            .ok_or("Missing parameter name")?
+            .as_str()
+            .to_string();
+
         let param_type = self.parse_type(inner.next().ok_or("Missing parameter type")?)?;
-        
+
         Ok(Parameter {
             name,
             param_type,
@@ -2232,7 +2821,10 @@ impl PestParser {
     }
 
     /// Parse collection literal
-    fn parse_collection_literal(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_collection_literal(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let inner = pair.into_inner().next().ok_or("Empty collection literal")?;
 
@@ -2242,15 +2834,20 @@ impl PestParser {
             Rule::map_literal => self.parse_map_literal(inner),
             Rule::tuple_literal => self.parse_tuple_literal(inner),
             Rule::struct_literal => self.parse_struct_literal(inner),
-            _ => Err("Unknown collection literal type".into())
+            _ => Err("Unknown collection literal type".into()),
         }
     }
 
     /// Parse vector literal
-    fn parse_vec_literal(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_vec_literal(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut elements = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         while let Some(element_pair) = inner.next() {
             if element_pair.as_rule() == Rule::expression {
@@ -2269,10 +2866,15 @@ impl PestParser {
     }
 
     /// Parse set literal
-    fn parse_set_literal(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_set_literal(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut elements = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         while let Some(element_pair) = inner.next() {
             if element_pair.as_rule() == Rule::expression {
@@ -2291,10 +2893,15 @@ impl PestParser {
     }
 
     /// Parse map literal
-    fn parse_map_literal(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_map_literal(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut entries = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         while let Some(entry_pair) = inner.next() {
             if entry_pair.as_rule() == Rule::map_entry {
@@ -2313,10 +2920,15 @@ impl PestParser {
     }
 
     /// Parse tuple literal
-    fn parse_tuple_literal(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_tuple_literal(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut elements = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         while let Some(element_pair) = inner.next() {
             if element_pair.as_rule() == Rule::expression {
@@ -2335,14 +2947,21 @@ impl PestParser {
     }
 
     /// Parse struct literal
-    fn parse_struct_literal(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_struct_literal(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
         // First element should be the struct name (identifier)
-        let name_pair = inner.next().ok_or("Missing struct name in struct literal")?;
+        let name_pair = inner
+            .next()
+            .ok_or("Missing struct name in struct literal")?;
         let name = name_pair.as_str().to_string();
-        
+
         // Parse field initializations
         let mut fields = Vec::new();
         while let Some(field_pair) = inner.next() {
@@ -2354,7 +2973,7 @@ impl PestParser {
                 continue;
             }
         }
-        
+
         Ok(Expression::StructLiteral {
             name,
             fields,
@@ -2363,25 +2982,34 @@ impl PestParser {
     }
 
     /// Parse field initialization
-    fn parse_field_init(&mut self, pair: Pair<Rule>) -> Result<FieldInit, Box<dyn std::error::Error>> {
+    fn parse_field_init(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<FieldInit, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
         // First element should be the field name (identifier)
-        let name_pair = inner.next().ok_or("Missing field name in field initialization")?;
+        let name_pair = inner
+            .next()
+            .ok_or("Missing field name in field initialization")?;
         let name = name_pair.as_str().to_string();
-        
+
         // Skip the colon
         if let Some(colon_pair) = inner.next() {
             if colon_pair.as_str() != ":" {
                 return Err("Expected ':' in field initialization".into());
             }
         }
-        
+
         // Parse the expression value
-        let value_pair = inner.next().ok_or("Missing field value in field initialization")?;
+        let value_pair = inner
+            .next()
+            .ok_or("Missing field value in field initialization")?;
         let value = self.parse_expression(value_pair)?;
-        
+
         Ok(FieldInit {
             name,
             value,
@@ -2390,9 +3018,14 @@ impl PestParser {
     }
 
     /// Parse map entry
-    fn parse_map_entry(&mut self, pair: Pair<Rule>) -> Result<MapEntry, Box<dyn std::error::Error>> {
+    fn parse_map_entry(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<MapEntry, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         let key = inner.next().ok_or("Missing map key")?;
         let key_expr = self.parse_expression(key)?;
@@ -2408,61 +3041,67 @@ impl PestParser {
     }
 
     /// Parse primary content (handles the inner content of a primary rule)
-    fn parse_primary_content(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_primary_content(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         match pair.as_rule() {
             Rule::spawn_expr => {
                 // Handle spawn expressions - placeholder to avoid recursion
-                Ok(Expression::Spawn { 
-                    expression: Box::new(Expression::Literal(Literal::None)), 
-                    span: self.create_span(pair.as_span()) 
+                Ok(Expression::Spawn {
+                    expression: Box::new(Expression::Literal(Literal::None)),
+                    span: self.create_span(pair.as_span()),
                 })
             }
-            Rule::range_expr => {
-                self.parse_range_expr(pair)
-            }
+            Rule::range_expr => self.parse_range_expr(pair),
             Rule::literal => {
                 let literal = self.parse_literal(pair)?;
                 Ok(Expression::Literal(literal))
             }
-            Rule::identifier => {
-                Ok(Expression::Variable(pair.as_str().to_string()))
-            }
-            Rule::collection_literal => {
-                self.parse_collection_literal(pair)
-            }
-            Rule::lambda_expr => {
-                self.parse_lambda_expr(pair)
-            }
+            Rule::identifier => Ok(Expression::Variable(pair.as_str().to_string())),
+            Rule::collection_literal => self.parse_collection_literal(pair),
+            Rule::lambda_expr => self.parse_lambda_expr(pair),
             Rule::expression => {
                 // Handle parenthesized expressions: "(" ~ expression ~ ")"
                 // For now, return a simple placeholder to avoid recursion
                 Ok(Expression::Literal(Literal::None))
             }
-            _ => {
-                Err(format!("Unexpected primary content: {:?}", pair.as_rule()).into())
-            }
+            _ => Err(format!("Unexpected primary content: {:?}", pair.as_rule()).into()),
         }
     }
 
     /// Parse postfix expression
-    fn parse_postfix_expr(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
-        debug_println!("[DEBUG] parse_postfix_expr called with: '{}'", pair.as_str());
+    fn parse_postfix_expr(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
+        debug_println!(
+            "[DEBUG] parse_postfix_expr called with: '{}'",
+            pair.as_str()
+        );
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
         // Parse the primary expression
         let primary_pair = inner.next().ok_or("Missing primary expression")?;
         let mut expr = match primary_pair.as_rule() {
             Rule::primary => {
                 // Extract the inner content of the primary rule
-                let primary_inner = primary_pair.into_inner().next().ok_or("Empty primary rule")?;
+                let primary_inner = primary_pair
+                    .into_inner()
+                    .next()
+                    .ok_or("Empty primary rule")?;
                 self.parse_primary_content(primary_inner)?
             }
             _ => {
-                return Err(format!("Expected primary rule, got {:?}", primary_pair.as_rule()).into());
+                return Err(
+                    format!("Expected primary rule, got {:?}", primary_pair.as_rule()).into(),
+                );
             }
         };
-        
+
         // Apply postfix operations in order
         while let Some(suffix_pair) = inner.next() {
             match suffix_pair.as_rule() {
@@ -2476,20 +3115,28 @@ impl PestParser {
                     expr = self.parse_member_suffix(expr, suffix_pair)?;
                 }
                 _ => {
-                    return Err(format!("Unexpected postfix suffix: {:?}", suffix_pair.as_rule()).into());
+                    return Err(
+                        format!("Unexpected postfix suffix: {:?}", suffix_pair.as_rule()).into(),
+                    );
                 }
             }
         }
-        
+
         debug_println!("[DEBUG] parse_postfix_expr returning: {:?}", expr);
         Ok(expr)
     }
 
     /// Parse call suffix
-    fn parse_call_suffix(&mut self, callee: Expression, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_call_suffix(
+        &mut self,
+        callee: Expression,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut args = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // Parse arguments if present
         if let Some(arg_list_pair) = inner.next() {
@@ -2506,9 +3153,15 @@ impl PestParser {
     }
 
     /// Parse index suffix
-    fn parse_index_suffix(&mut self, target: Expression, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_index_suffix(
+        &mut self,
+        target: Expression,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // Parse index expression
         let index = self.parse_expression(inner.next().ok_or("Missing index expression")?)?;
@@ -2521,12 +3174,22 @@ impl PestParser {
     }
 
     /// Parse member suffix
-    fn parse_member_suffix(&mut self, target: Expression, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_member_suffix(
+        &mut self,
+        target: Expression,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // Parse member name
-        let member = inner.next().ok_or("Missing member name")?.as_str().to_string();
+        let member = inner
+            .next()
+            .ok_or("Missing member name")?
+            .as_str()
+            .to_string();
 
         Ok(Expression::Member {
             target: Box::new(target),
@@ -2536,9 +3199,14 @@ impl PestParser {
     }
 
     /// Parse lambda expression
-    fn parse_lambda_expr(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_lambda_expr(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // Parse parameters if present
         let mut params = Vec::new();
@@ -2567,15 +3235,25 @@ impl PestParser {
     }
 
     /// Parse postfix expression without range (used in range expressions to avoid infinite recursion)
-    fn parse_postfix_expr_no_range(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
-        debug_println!("[DEBUG] parse_postfix_expr_no_range called with: '{}'", pair.as_str());
-        
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+    fn parse_postfix_expr_no_range(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
+        debug_println!(
+            "[DEBUG] parse_postfix_expr_no_range called with: '{}'",
+            pair.as_str()
+        );
+
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
         // First item should be primary_no_range
-        let primary_pair = inner.next().ok_or("Missing primary in postfix_expr_no_range")?;
+        let primary_pair = inner
+            .next()
+            .ok_or("Missing primary in postfix_expr_no_range")?;
         let mut expr = self.parse_primary_no_range(primary_pair)?;
-        
+
         // Process any suffixes (call, index, member access)
         for suffix_pair in inner {
             match suffix_pair.as_rule() {
@@ -2589,65 +3267,71 @@ impl PestParser {
                     expr = self.parse_member_suffix(expr, suffix_pair)?;
                 }
                 _ => {
-                    return Err(format!("Unexpected suffix rule: {:?}", suffix_pair.as_rule()).into());
+                    return Err(
+                        format!("Unexpected suffix rule: {:?}", suffix_pair.as_rule()).into(),
+                    );
                 }
             }
         }
-        
+
         debug_println!("[DEBUG] parse_postfix_expr_no_range returning: {:?}", expr);
         Ok(expr)
     }
 
     /// Parse primary expression without range (avoids range expressions)
-    fn parse_primary_no_range(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+    fn parse_primary_no_range(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
         let first = inner.next().ok_or("Empty primary_no_range")?;
-        
+
         match first.as_rule() {
             Rule::spawn_expr => {
                 // Handle spawn expressions inline
                 let span = first.as_span();
-                let mut it = first.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut it = first
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
                 let expr_pair = it.next();
                 let expression = if let Some(p) = expr_pair {
                     Box::new(self.parse_expression(p)?)
                 } else {
                     Box::new(Expression::Literal(Literal::None))
                 };
-                Ok(Expression::Spawn { 
+                Ok(Expression::Spawn {
                     expression,
-                    span: self.create_span(span)
+                    span: self.create_span(span),
                 })
             }
             Rule::literal => {
                 let literal = self.parse_literal(first)?;
                 Ok(Expression::Literal(literal))
             }
-            Rule::identifier => {
-                Ok(Expression::Variable(first.as_str().to_string()))
-            }
-            Rule::collection_literal => {
-                self.parse_collection_literal(first)
-            }
+            Rule::identifier => Ok(Expression::Variable(first.as_str().to_string())),
+            Rule::collection_literal => self.parse_collection_literal(first),
             Rule::expression => {
                 // Parenthesized expression
                 self.parse_expression(first)
             }
-            Rule::lambda_expr => {
-                self.parse_lambda_expr(first)
-            }
-            _ => {
-                Err(format!("Unexpected rule in primary_no_range: {:?}", first.as_rule()).into())
-            }
+            Rule::lambda_expr => self.parse_lambda_expr(first),
+            _ => Err(format!("Unexpected rule in primary_no_range: {:?}", first.as_rule()).into()),
         }
     }
 
     /// Parse range expression
-    fn parse_range_expr(&mut self, pair: Pair<Rule>) -> Result<Expression, Box<dyn std::error::Error>> {
+    fn parse_range_expr(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Expression, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let text = pair.as_str();
         let inclusive = text.contains("$=");
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // Parse start value - should be postfix_expr_no_range
         let start_pair = inner.next().ok_or("Missing start value")?;
@@ -2656,7 +3340,7 @@ impl PestParser {
                 // Parse postfix_expr_no_range which uses primary_no_range
                 self.parse_postfix_expr_no_range(start_pair)?
             }
-            _ => self.parse_expression(start_pair)?
+            _ => self.parse_expression(start_pair)?,
         };
 
         // Skip range_op
@@ -2672,7 +3356,7 @@ impl PestParser {
                 // Parse postfix_expr_no_range which uses primary_no_range
                 self.parse_postfix_expr_no_range(end_pair)?
             }
-            _ => self.parse_expression(end_pair)?
+            _ => self.parse_expression(end_pair)?,
         };
 
         Ok(Expression::Range {
@@ -2684,9 +3368,14 @@ impl PestParser {
     }
 
     /// Parse argument list
-    fn parse_argument_list(&mut self, pair: Pair<Rule>) -> Result<Vec<Expression>, Box<dyn std::error::Error>> {
+    fn parse_argument_list(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Vec<Expression>, Box<dyn std::error::Error>> {
         let mut args = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         while let Some(arg_pair) = inner.next() {
             if arg_pair.as_rule() == Rule::expression {
@@ -2705,7 +3394,9 @@ impl PestParser {
     fn parse_union_type(&mut self, pair: Pair<Rule>) -> Result<Type, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let mut types = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         while let Some(type_pair) = inner.next() {
             if type_pair.as_rule() == Rule::option_type {
@@ -2730,7 +3421,9 @@ impl PestParser {
     /// Parse option type
     fn parse_option_type(&mut self, pair: Pair<Rule>) -> Result<Type, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // Check if this is an optional type
         let is_optional = if let Some(first) = inner.next() {
@@ -2746,7 +3439,8 @@ impl PestParser {
         };
 
         // Parse the function type
-        let function_type = self.parse_function_type(inner.next().ok_or("Missing function type")?)?;
+        let function_type =
+            self.parse_function_type(inner.next().ok_or("Missing function type")?)?;
 
         if is_optional {
             Ok(Type::Option {
@@ -2759,16 +3453,21 @@ impl PestParser {
     }
 
     /// Parse function type
-    fn parse_function_type(&mut self, pair: Pair<Rule>) -> Result<Type, Box<dyn std::error::Error>> {
+    fn parse_function_type(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Type, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // Check if this is a function type with parameters
         if let Some(first) = inner.next() {
             if first.as_rule() == Rule::type_list {
                 // This is a function type with parameters
                 let param_types = self.parse_type_list(first)?;
-                
+
                 // Skip whitespace
                 while let Some(next) = inner.next() {
                     if next.as_rule() != Rule::WHITESPACE {
@@ -2782,7 +3481,7 @@ impl PestParser {
                             }
                             _ => return Err(format!("Expected collection_type or primary_type for return type, got {:?}", next.as_rule()).into())
                         };
-                        
+
                         return Ok(Type::Function {
                             params: param_types,
                             return_type: Box::new(return_type),
@@ -2790,21 +3489,21 @@ impl PestParser {
                         });
                     }
                 }
-                
+
                 Err("Missing return type".into())
             } else if first.as_str() == "(" {
                 // This is a function type with no parameters
                 let param_types = Vec::new();
-                
+
                 // Skip closing parenthesis
                 inner.next().ok_or("Missing closing parenthesis")?;
-                
+
                 // Skip arrow
                 inner.next().ok_or("Missing arrow")?;
-                
+
                 // Parse return type
                 let return_type = self.parse_type(inner.next().ok_or("Missing return type")?)?;
-                
+
                 Ok(Type::Function {
                     params: param_types,
                     return_type: Box::new(return_type),
@@ -2831,20 +3530,33 @@ impl PestParser {
     }
 
     /// Parse collection type
-    fn parse_collection_type(&mut self, pair: Pair<Rule>) -> Result<Type, Box<dyn std::error::Error>> {
+    fn parse_collection_type(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Type, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let inner = pair.into_inner().next().ok_or("Empty collection type")?;
 
         match inner.as_rule() {
             Rule::vec_type => {
-                let element_type = self.parse_type(inner.into_inner().next().ok_or("Missing vec element type")?)?;
+                let element_type = self.parse_type(
+                    inner
+                        .into_inner()
+                        .next()
+                        .ok_or("Missing vec element type")?,
+                )?;
                 Ok(Type::Vec {
                     element_type: Box::new(element_type),
                     span: self.create_span(span),
                 })
             }
             Rule::set_type => {
-                let element_type = self.parse_type(inner.into_inner().next().ok_or("Missing set element type")?)?;
+                let element_type = self.parse_type(
+                    inner
+                        .into_inner()
+                        .next()
+                        .ok_or("Missing set element type")?,
+                )?;
                 Ok(Type::Set {
                     element_type: Box::new(element_type),
                     span: self.create_span(span),
@@ -2854,7 +3566,11 @@ impl PestParser {
                 let mut it = inner.into_inner();
                 let key_type = self.parse_type(it.next().ok_or("Missing map key type")?)?;
                 let value_type = self.parse_type(it.next().ok_or("Missing map value type")?)?;
-                Ok(Type::Map { key_type: Box::new(key_type), value_type: Box::new(value_type), span: self.create_span(span) })
+                Ok(Type::Map {
+                    key_type: Box::new(key_type),
+                    value_type: Box::new(value_type),
+                    span: self.create_span(span),
+                })
             }
             Rule::tuple_type => {
                 let mut types = Vec::new();
@@ -2862,9 +3578,12 @@ impl PestParser {
                     let ty = self.parse_type(type_pair)?;
                     types.push(ty);
                 }
-                Ok(Type::Tuple { types, span: self.create_span(span) })
+                Ok(Type::Tuple {
+                    types,
+                    span: self.create_span(span),
+                })
             }
-            _ => Err(format!("Expected collection type, got {:?}", inner.as_rule()).into())
+            _ => Err(format!("Expected collection type, got {:?}", inner.as_rule()).into()),
         }
     }
 
@@ -2892,7 +3611,7 @@ impl PestParser {
                 if let Some(type_params_pair) = inner.into_inner().next() {
                     if type_params_pair.as_rule() == Rule::type_params {
                         let type_params = self.parse_type_params(type_params_pair)?;
-                        
+
                         // Special handling for Map type
                         if name == "Map" && type_params.len() == 2 {
                             Ok(Type::Map {
@@ -2933,7 +3652,9 @@ impl PestParser {
                 }
             }
             Rule::result_type => {
-                let mut inner = inner.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut inner = inner
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
                 // Skip "Result"
                 inner.next().ok_or("Missing Result keyword")?;
                 // Skip "<"
@@ -2951,12 +3672,15 @@ impl PestParser {
                 })
             }
             Rule::option_wrapper => {
-                let mut inner = inner.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut inner = inner
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
                 // Skip "Option"
                 inner.next().ok_or("Missing Option keyword")?;
                 // Skip "<"
                 inner.next().ok_or("Missing opening angle bracket")?;
-                let inner_type = self.parse_type(inner.next().ok_or("Missing Option inner type")?)?;
+                let inner_type =
+                    self.parse_type(inner.next().ok_or("Missing Option inner type")?)?;
                 // Skip ">"
                 inner.next().ok_or("Missing closing angle bracket")?;
                 Ok(Type::Option {
@@ -2964,14 +3688,19 @@ impl PestParser {
                     span: self.create_span(span),
                 })
             }
-            _ => Err(format!("Expected primary type, got {:?}", inner.as_rule()).into())
+            _ => Err(format!("Expected primary type, got {:?}", inner.as_rule()).into()),
         }
     }
 
     /// Parse type list
-    fn parse_type_list(&mut self, pair: Pair<Rule>) -> Result<Vec<Type>, Box<dyn std::error::Error>> {
+    fn parse_type_list(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Vec<Type>, Box<dyn std::error::Error>> {
         let mut types = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         while let Some(type_pair) = inner.next() {
             if type_pair.as_rule() == Rule::type_ {
@@ -2987,9 +3716,14 @@ impl PestParser {
     }
 
     /// Parse type parameters
-    fn parse_type_params(&mut self, pair: Pair<Rule>) -> Result<Vec<Type>, Box<dyn std::error::Error>> {
+    fn parse_type_params(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Vec<Type>, Box<dyn std::error::Error>> {
         let mut types = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         while let Some(type_pair) = inner.next() {
             if type_pair.as_rule() == Rule::type_ {
@@ -3005,25 +3739,47 @@ impl PestParser {
     }
 
     /// Parse type declaration
-    fn parse_type_decl(&mut self, pair: Pair<Rule>) -> Result<TypeDecl, Box<dyn std::error::Error>> {
+    fn parse_type_decl(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<TypeDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // The grammar consumes literals; we expect: identifier, type_
-        let name = inner.next().ok_or("Missing type name")?.as_str().to_string();
+        let name = inner
+            .next()
+            .ok_or("Missing type name")?
+            .as_str()
+            .to_string();
         let type_pair = inner.next().ok_or("Missing type alias")?;
         let type_alias = self.parse_type(type_pair)?;
 
-        Ok(TypeDecl { name, type_alias, span: self.create_span(span) })
+        Ok(TypeDecl {
+            name,
+            type_alias,
+            span: self.create_span(span),
+        })
     }
 
     /// Parse struct declaration
-    fn parse_struct_decl(&mut self, pair: Pair<Rule>) -> Result<StructDecl, Box<dyn std::error::Error>> {
+    fn parse_struct_decl(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<StructDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // Expect: identifier, then zero or more field_decl entries (grammar enforces at least one)
-        let name = inner.next().ok_or("Missing struct name")?.as_str().to_string();
+        let name = inner
+            .next()
+            .ok_or("Missing struct name")?
+            .as_str()
+            .to_string();
         let mut fields = Vec::new();
         for p in inner {
             if p.as_rule() == Rule::field_decl {
@@ -3031,16 +3787,29 @@ impl PestParser {
             }
         }
 
-        Ok(StructDecl { name, fields, span: self.create_span(span) })
+        Ok(StructDecl {
+            name,
+            fields,
+            span: self.create_span(span),
+        })
     }
 
     /// Parse field declaration
-    fn parse_field_decl(&mut self, pair: Pair<Rule>) -> Result<FieldDecl, Box<dyn std::error::Error>> {
+    fn parse_field_decl(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<FieldDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // Expect: identifier then type_
-        let name = inner.next().ok_or("Missing field name")?.as_str().to_string();
+        let name = inner
+            .next()
+            .ok_or("Missing field name")?
+            .as_str()
+            .to_string();
         let ty_pair = inner.next().ok_or("Missing field type")?;
         let field_type = self.parse_type(ty_pair)?;
 
@@ -3052,21 +3821,32 @@ impl PestParser {
     }
 
     /// Parse enum declaration
-    fn parse_enum_decl(&mut self, pair: Pair<Rule>) -> Result<EnumDecl, Box<dyn std::error::Error>> {
+    fn parse_enum_decl(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<EnumDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // Skip "enum" keyword
         inner.next().ok_or("Missing enum keyword")?;
 
         // Parse enum name
-        let name = inner.next().ok_or("Missing enum name")?.as_str().to_string();
+        let name = inner
+            .next()
+            .ok_or("Missing enum name")?
+            .as_str()
+            .to_string();
 
         // Parse identifier generic param names if present
         let mut type_params = Vec::new();
         if let Some(next_pair) = inner.next() {
             if next_pair.as_rule() == Rule::type_param_list {
-                let mut names = next_pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+                let mut names = next_pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
                 while let Some(tok) = names.next() {
                     if tok.as_rule() == Rule::identifier {
                         type_params.push(tok.as_str().to_string());
@@ -3085,7 +3865,12 @@ impl PestParser {
                         variants.push(self.parse_enum_variant(variant_pair)?);
                     }
                 }
-                return Ok(EnumDecl { name, type_params, variants, span: self.create_span(span) });
+                return Ok(EnumDecl {
+                    name,
+                    type_params,
+                    variants,
+                    span: self.create_span(span),
+                });
             }
         }
 
@@ -3097,17 +3882,31 @@ impl PestParser {
             }
         }
 
-        Ok(EnumDecl { name, type_params, variants, span: self.create_span(span) })
+        Ok(EnumDecl {
+            name,
+            type_params,
+            variants,
+            span: self.create_span(span),
+        })
     }
 
     /// Parse enum variant
-    fn parse_enum_variant(&mut self, pair: Pair<Rule>) -> Result<EnumVariant, Box<dyn std::error::Error>> {
+    fn parse_enum_variant(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<EnumVariant, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
         // Parse variant name
-        let name = inner.next().ok_or("Missing variant name")?.as_str().to_string();
-        
+        let name = inner
+            .next()
+            .ok_or("Missing variant name")?
+            .as_str()
+            .to_string();
+
         // Parse fields if present
         let mut fields = Vec::new();
         if let Some(fields_pair) = inner.next() {
@@ -3115,7 +3914,7 @@ impl PestParser {
                 fields = self.parse_variant_fields(fields_pair)?;
             }
         }
-        
+
         Ok(EnumVariant {
             name,
             fields,
@@ -3124,10 +3923,15 @@ impl PestParser {
     }
 
     /// Parse variant fields
-    fn parse_variant_fields(&mut self, pair: Pair<Rule>) -> Result<Vec<Type>, Box<dyn std::error::Error>> {
+    fn parse_variant_fields(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Vec<Type>, Box<dyn std::error::Error>> {
         let mut fields = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
         while let Some(field_pair) = inner.next() {
             if field_pair.as_rule() == Rule::type_ {
                 let field_type = self.parse_type(field_pair)?;
@@ -3137,14 +3941,19 @@ impl PestParser {
                 continue;
             }
         }
-        
+
         Ok(fields)
     }
 
     /// Parse interface declaration
-    fn parse_interface_decl(&mut self, pair: Pair<Rule>) -> Result<InterfaceDecl, Box<dyn std::error::Error>> {
+    fn parse_interface_decl(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<InterfaceDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // Debug: print all inner pairs
         let inner_pairs: Vec<_> = inner.clone().collect();
@@ -3158,7 +3967,9 @@ impl PestParser {
         let name = if name_pair.as_rule() == Rule::interface_name {
             // Extract the identifier from interface_name
             let mut name_inner = name_pair.into_inner();
-            let identifier_pair = name_inner.next().ok_or("Missing identifier in interface_name")?;
+            let identifier_pair = name_inner
+                .next()
+                .ok_or("Missing identifier in interface_name")?;
             identifier_pair.as_str().to_string()
         } else {
             name_pair.as_str().to_string()
@@ -3179,8 +3990,10 @@ impl PestParser {
             if next_pair.as_rule() == Rule::interface_extends {
                 // Parse the interface_extends rule
                 let _ = inner.next(); // consume the interface_extends pair
-                let mut extends_inner = next_pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-                
+                let mut extends_inner = next_pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
                 // Skip the "extends" keyword and get the identifier_list
                 while let Some(extends_child) = extends_inner.next() {
                     if extends_child.as_rule() == Rule::identifier_list {
@@ -3193,20 +4006,40 @@ impl PestParser {
 
         // Methods
         let mut methods = Vec::new();
-        for p in inner { if p.as_rule() == Rule::method_sig { methods.push(self.build_method_sig(p)?); } }
+        for p in inner {
+            if p.as_rule() == Rule::method_sig {
+                methods.push(self.build_method_sig(p)?);
+            }
+        }
 
-        Ok(InterfaceDecl { name, extends, methods, span: self.create_span(span) })
+        Ok(InterfaceDecl {
+            name,
+            extends,
+            methods,
+            span: self.create_span(span),
+        })
     }
 
-    fn build_method_sig(&mut self, pair: Pair<Rule>) -> Result<MethodSig, Box<dyn std::error::Error>> {
+    fn build_method_sig(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<MethodSig, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
         // Parse method name (can be identifier or operator_symbol)
         let name_pair = inner.next().ok_or("Missing method name")?;
         let name = match name_pair.as_rule() {
             Rule::identifier | Rule::operator_symbol => name_pair.as_str().to_string(),
-            _ => return Err(format!("Expected identifier or operator_symbol, got {:?}", name_pair.as_rule()).into()),
+            _ => {
+                return Err(format!(
+                    "Expected identifier or operator_symbol, got {:?}",
+                    name_pair.as_rule()
+                )
+                .into())
+            }
         };
         let mut params = Vec::new();
 
@@ -3216,48 +4049,90 @@ impl PestParser {
             params = self.parse_param_list(next)?;
             // Expect ARROW next
             let arrow = inner.next().ok_or("Missing arrow in method signature")?;
-            if arrow.as_rule() != Rule::ARROW { return Err("Expected arrow in method signature".into()); }
-            inner.next().ok_or("Missing return type in method signature")?
+            if arrow.as_rule() != Rule::ARROW {
+                return Err("Expected arrow in method signature".into());
+            }
+            inner
+                .next()
+                .ok_or("Missing return type in method signature")?
         } else {
             // Must be ARROW directly
-            if next.as_rule() != Rule::ARROW { return Err("Expected arrow or param list in method signature".into()); }
-            inner.next().ok_or("Missing return type in method signature")?
+            if next.as_rule() != Rule::ARROW {
+                return Err("Expected arrow or param list in method signature".into());
+            }
+            inner
+                .next()
+                .ok_or("Missing return type in method signature")?
         };
 
         let return_type = self.parse_type(after_arrow_pair)?;
-        Ok(MethodSig { name, params, return_type, span: self.create_span(span) })
+        Ok(MethodSig {
+            name,
+            params,
+            return_type,
+            span: self.create_span(span),
+        })
     }
 
     /// Parse implementation block
-    fn parse_impl_block(&mut self, pair: Pair<Rule>) -> Result<ImplBlock, Box<dyn std::error::Error>> {
+    fn parse_impl_block(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<ImplBlock, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // The grammar yields: impl_trait_name, impl_type_name, then method_decl*
         // The "impl" keyword and ":" separator are consumed by the grammar but don't appear as separate pairs
-        let trait_name = inner.next().ok_or("Missing trait name")?.as_str().to_string();
-        let type_name = inner.next().ok_or("Missing type name")?.as_str().to_string();
+        let trait_name = inner
+            .next()
+            .ok_or("Missing trait name")?
+            .as_str()
+            .to_string();
+        let type_name = inner
+            .next()
+            .ok_or("Missing type name")?
+            .as_str()
+            .to_string();
 
         let mut methods = Vec::new();
         for p in inner {
-            if p.as_rule() == Rule::method_decl { 
-                methods.push(self.parse_method_decl(p)?); 
+            if p.as_rule() == Rule::method_decl {
+                methods.push(self.parse_method_decl(p)?);
             }
         }
 
-        Ok(ImplBlock { trait_name, type_name, methods, span: self.create_span(span) })
+        Ok(ImplBlock {
+            trait_name,
+            type_name,
+            methods,
+            span: self.create_span(span),
+        })
     }
 
     /// Parse method declaration
-    fn parse_method_decl(&mut self, pair: Pair<Rule>) -> Result<MethodDecl, Box<dyn std::error::Error>> {
+    fn parse_method_decl(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<MethodDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
 
         // Parse method name (can be identifier or operator_symbol)
         let name_pair = inner.next().ok_or("Missing method name")?;
         let name = match name_pair.as_rule() {
             Rule::identifier | Rule::operator_symbol => name_pair.as_str().to_string(),
-            _ => return Err(format!("Expected identifier or operator_symbol, got {:?}", name_pair.as_rule()).into()),
+            _ => {
+                return Err(format!(
+                    "Expected identifier or operator_symbol, got {:?}",
+                    name_pair.as_rule()
+                )
+                .into())
+            }
         };
 
         // Next can be param_list or ARROW
@@ -3267,11 +4142,19 @@ impl PestParser {
             params = self.parse_param_list(next)?;
             // Expect ARROW
             let arrow = inner.next().ok_or("Missing arrow in method declaration")?;
-            if arrow.as_rule() != Rule::ARROW { return Err("Expected arrow in method declaration".into()); }
-            inner.next().ok_or("Missing return type in method declaration")?
+            if arrow.as_rule() != Rule::ARROW {
+                return Err("Expected arrow in method declaration".into());
+            }
+            inner
+                .next()
+                .ok_or("Missing return type in method declaration")?
         } else {
-            if next.as_rule() != Rule::ARROW { return Err("Expected arrow or param list in method declaration".into()); }
-            inner.next().ok_or("Missing return type in method declaration")?
+            if next.as_rule() != Rule::ARROW {
+                return Err("Expected arrow or param list in method declaration".into());
+            }
+            inner
+                .next()
+                .ok_or("Missing return type in method declaration")?
         };
 
         // Parse return type
@@ -3290,10 +4173,15 @@ impl PestParser {
     }
 
     /// Parse identifier list
-    fn parse_identifier_list(&mut self, pair: Pair<Rule>) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    fn parse_identifier_list(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
         let mut identifiers = Vec::new();
-        let mut inner = pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE);
-        
+        let mut inner = pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE);
+
         while let Some(ident_pair) = inner.next() {
             if ident_pair.as_rule() == Rule::identifier {
                 identifiers.push(ident_pair.as_str().to_string());
@@ -3302,15 +4190,18 @@ impl PestParser {
                 continue;
             }
         }
-        
+
         Ok(identifiers)
     }
 
     /// Parse export declaration
-    fn parse_export_decl(&mut self, pair: Pair<Rule>) -> Result<ExportDecl, Box<dyn std::error::Error>> {
+    fn parse_export_decl(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<ExportDecl, Box<dyn std::error::Error>> {
         let span = pair.as_span();
         let inner = pair.into_inner().next().ok_or("Empty export declaration")?;
-        
+
         match inner.as_rule() {
             Rule::function_decl => {
                 let func_decl = self.parse_function_decl(inner)?;
@@ -3349,11 +4240,16 @@ impl PestParser {
         }
     }
 
-
-    fn parse_fstring_parts(&mut self, pair: Pair<Rule>) -> Result<Vec<tjlang_ast::FStringPart>, Box<dyn std::error::Error>> {
+    fn parse_fstring_parts(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<Vec<tjlang_ast::FStringPart>, Box<dyn std::error::Error>> {
         let mut parts = Vec::new();
-        
-        for inner in pair.into_inner().filter(|p| p.as_rule() != Rule::WHITESPACE) {
+
+        for inner in pair
+            .into_inner()
+            .filter(|p| p.as_rule() != Rule::WHITESPACE)
+        {
             match inner.as_rule() {
                 Rule::fstring_content => {
                     // fstring_content contains either fstring_text or fstring_expression
@@ -3367,17 +4263,30 @@ impl PestParser {
                         }
                         Rule::fstring_expression => {
                             // fstring_expression contains an expression rule
-                            let expr_inner = content_inner.into_inner().next().ok_or("Empty fstring_expression")?;
+                            let expr_inner = content_inner
+                                .into_inner()
+                                .next()
+                                .ok_or("Empty fstring_expression")?;
                             let expr = self.parse_expression(expr_inner)?;
                             parts.push(tjlang_ast::FStringPart::Expression(Box::new(expr)));
                         }
-                        _ => return Err(format!("Unexpected rule in fstring_content: {:?}", content_inner.as_rule()).into()),
+                        _ => {
+                            return Err(format!(
+                                "Unexpected rule in fstring_content: {:?}",
+                                content_inner.as_rule()
+                            )
+                            .into())
+                        }
                     }
                 }
-                _ => return Err(format!("Unexpected rule in f-string: {:?}", inner.as_rule()).into()),
+                _ => {
+                    return Err(
+                        format!("Unexpected rule in f-string: {:?}", inner.as_rule()).into(),
+                    )
+                }
             }
         }
-        
+
         Ok(parts)
     }
 }

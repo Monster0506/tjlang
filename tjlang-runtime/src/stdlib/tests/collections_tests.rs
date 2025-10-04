@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use crate::stdlib::collections::*;
-    use std::collections::{HashMap, HashSet, VecDeque, BinaryHeap};
+    use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
     #[test]
     fn test_array_new() {

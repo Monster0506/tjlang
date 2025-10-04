@@ -1,5 +1,5 @@
 //! TJLang AST
-//! 
+//!
 //! Abstract Syntax Tree nodes for TJLang language constructs.
 
 use std::fmt;
@@ -167,8 +167,8 @@ pub enum PrimitiveType {
 }
 
 // Include submodules
-mod statements;
 mod expressions;
+mod statements;
 
 // Custom type declarations
 /// Type alias declaration
@@ -250,5 +250,5 @@ pub struct MethodDecl {
 }
 
 // Re-export all types from submodules
-pub use statements::*;
 pub use expressions::*;
+pub use statements::*;

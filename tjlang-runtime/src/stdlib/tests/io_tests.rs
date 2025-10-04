@@ -287,7 +287,7 @@ mod tests {
         let mut buffer = Buffer::new();
         let data = b"Hello, World!";
         buffer.write(data).unwrap();
-        
+
         let mut read_buf = [0u8; 13];
         let result = buffer.read(&mut read_buf);
         assert!(result.is_ok());
@@ -300,7 +300,7 @@ mod tests {
         let mut buffer = Buffer::new();
         let data = b"Hello, World!";
         buffer.write(data).unwrap();
-        
+
         let result = buffer.seek(7);
         assert!(result.is_ok());
         assert_eq!(buffer.tell(), 7);
@@ -324,7 +324,7 @@ mod tests {
         let data = b"Hello, World!";
         buffer.write(data).unwrap();
         assert_eq!(buffer.size(), 13);
-        
+
         buffer.clear();
         assert_eq!(buffer.size(), 0);
         assert_eq!(buffer.tell(), 0);
@@ -335,7 +335,7 @@ mod tests {
         let mut buffer = Buffer::new();
         let data = b"Hello, World!";
         buffer.write(data).unwrap();
-        
+
         let result = buffer.to_string();
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "Hello, World!");

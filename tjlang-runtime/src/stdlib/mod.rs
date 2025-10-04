@@ -10,24 +10,24 @@
 //! - Error handling
 //! - Testing framework
 
-pub mod io;
+pub mod collections;
+pub mod error;
 pub mod file;
+pub mod io;
 pub mod math;
 pub mod string;
-pub mod collections;
-pub mod time;
-pub mod error;
 pub mod testing;
+pub mod time;
 
 // Re-export commonly used modules
-pub use io::*;
+pub use collections::*;
+pub use error::*;
 pub use file::*;
+pub use io::*;
 pub use math::*;
 pub use string::*;
-pub use collections::*;
-pub use time::*;
-pub use error::*;
 pub use testing::*;
+pub use time::*;
 
 #[cfg(test)]
 mod tests;

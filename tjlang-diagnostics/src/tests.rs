@@ -1,13 +1,13 @@
 //! Comprehensive tests for the TJLang diagnostics system
 
-use codespan::{Span, Files};
+use codespan::{Files, Span};
 use codespan_reporting::diagnostic::Severity;
 
-use crate::error_codes::ErrorCode;
-use crate::source_span::SourceSpan;
-use crate::diagnostic::{Suggestion, TJLangDiagnostic};
 use crate::collection::DiagnosticCollection;
+use crate::diagnostic::{Suggestion, TJLangDiagnostic};
+use crate::error_codes::ErrorCode;
 use crate::helpers::helpers;
+use crate::source_span::SourceSpan;
 
 // Helper function to create test spans
 fn create_test_span() -> SourceSpan {
@@ -34,7 +34,7 @@ mod error_code_tests {
         assert_eq!(ErrorCode::LexerUnterminatedComment.as_str(), "L0003");
         assert_eq!(ErrorCode::LexerInvalidNumber.as_str(), "L0004");
         assert_eq!(ErrorCode::LexerInvalidEscape.as_str(), "L0005");
-        
+
         // Test parser error codes
         assert_eq!(ErrorCode::ParserUnexpectedToken.as_str(), "P1000");
         assert_eq!(ErrorCode::ParserExpectedToken.as_str(), "P1001");
@@ -50,7 +50,7 @@ mod error_code_tests {
         assert_eq!(ErrorCode::ParserInvalidModule.as_str(), "P1011");
         assert_eq!(ErrorCode::ParserInvalidImport.as_str(), "P1012");
         assert_eq!(ErrorCode::ParserInvalidExport.as_str(), "P1013");
-        
+
         // Test analyzer error codes
         assert_eq!(ErrorCode::AnalyzerUndefinedVariable.as_str(), "A2000");
         assert_eq!(ErrorCode::AnalyzerUndefinedFunction.as_str(), "A2001");
@@ -67,7 +67,7 @@ mod error_code_tests {
         assert_eq!(ErrorCode::AnalyzerInvalidModule.as_str(), "A2012");
         assert_eq!(ErrorCode::AnalyzerInvalidImport.as_str(), "A2013");
         assert_eq!(ErrorCode::AnalyzerInvalidExport.as_str(), "A2014");
-        
+
         // Test codegen error codes
         assert_eq!(ErrorCode::CodegenInvalidType.as_str(), "C3000");
         assert_eq!(ErrorCode::CodegenInvalidExpression.as_str(), "C3001");
@@ -78,7 +78,7 @@ mod error_code_tests {
         assert_eq!(ErrorCode::CodegenInvalidModule.as_str(), "C3006");
         assert_eq!(ErrorCode::CodegenInvalidImport.as_str(), "C3007");
         assert_eq!(ErrorCode::CodegenInvalidExport.as_str(), "C3008");
-        
+
         // Test runtime error codes
         assert_eq!(ErrorCode::RuntimePanic.as_str(), "R4000");
         assert_eq!(ErrorCode::RuntimeTaskError.as_str(), "R4001");
@@ -95,7 +95,7 @@ mod error_code_tests {
         assert_eq!(ErrorCode::LexerUnterminatedComment.category(), "Lexer");
         assert_eq!(ErrorCode::LexerInvalidNumber.category(), "Lexer");
         assert_eq!(ErrorCode::LexerInvalidEscape.category(), "Lexer");
-        
+
         // Test parser category
         assert_eq!(ErrorCode::ParserUnexpectedToken.category(), "Parser");
         assert_eq!(ErrorCode::ParserExpectedToken.category(), "Parser");
@@ -111,24 +111,33 @@ mod error_code_tests {
         assert_eq!(ErrorCode::ParserInvalidModule.category(), "Parser");
         assert_eq!(ErrorCode::ParserInvalidImport.category(), "Parser");
         assert_eq!(ErrorCode::ParserInvalidExport.category(), "Parser");
-        
+
         // Test analyzer category
         assert_eq!(ErrorCode::AnalyzerUndefinedVariable.category(), "Analyzer");
         assert_eq!(ErrorCode::AnalyzerUndefinedFunction.category(), "Analyzer");
         assert_eq!(ErrorCode::AnalyzerUndefinedType.category(), "Analyzer");
         assert_eq!(ErrorCode::AnalyzerTypeMismatch.category(), "Analyzer");
-        assert_eq!(ErrorCode::AnalyzerTraitNotImplemented.category(), "Analyzer");
+        assert_eq!(
+            ErrorCode::AnalyzerTraitNotImplemented.category(),
+            "Analyzer"
+        );
         assert_eq!(ErrorCode::AnalyzerNonExhaustiveMatch.category(), "Analyzer");
-        assert_eq!(ErrorCode::AnalyzerDuplicateDefinition.category(), "Analyzer");
+        assert_eq!(
+            ErrorCode::AnalyzerDuplicateDefinition.category(),
+            "Analyzer"
+        );
         assert_eq!(ErrorCode::AnalyzerCircularDependency.category(), "Analyzer");
         assert_eq!(ErrorCode::AnalyzerInvalidGeneric.category(), "Analyzer");
         assert_eq!(ErrorCode::AnalyzerInvalidTraitBound.category(), "Analyzer");
         assert_eq!(ErrorCode::AnalyzerInvalidInterface.category(), "Analyzer");
-        assert_eq!(ErrorCode::AnalyzerInvalidImplementation.category(), "Analyzer");
+        assert_eq!(
+            ErrorCode::AnalyzerInvalidImplementation.category(),
+            "Analyzer"
+        );
         assert_eq!(ErrorCode::AnalyzerInvalidModule.category(), "Analyzer");
         assert_eq!(ErrorCode::AnalyzerInvalidImport.category(), "Analyzer");
         assert_eq!(ErrorCode::AnalyzerInvalidExport.category(), "Analyzer");
-        
+
         // Test codegen category
         assert_eq!(ErrorCode::CodegenInvalidType.category(), "Codegen");
         assert_eq!(ErrorCode::CodegenInvalidExpression.category(), "Codegen");
@@ -139,7 +148,7 @@ mod error_code_tests {
         assert_eq!(ErrorCode::CodegenInvalidModule.category(), "Codegen");
         assert_eq!(ErrorCode::CodegenInvalidImport.category(), "Codegen");
         assert_eq!(ErrorCode::CodegenInvalidExport.category(), "Codegen");
-        
+
         // Test runtime category
         assert_eq!(ErrorCode::RuntimePanic.category(), "Runtime");
         assert_eq!(ErrorCode::RuntimeTaskError.category(), "Runtime");
@@ -150,23 +159,41 @@ mod error_code_tests {
 
     #[test]
     fn test_error_code_equality() {
-        assert_eq!(ErrorCode::LexerInvalidCharacter, ErrorCode::LexerInvalidCharacter);
-        assert_ne!(ErrorCode::LexerInvalidCharacter, ErrorCode::LexerUnterminatedString);
-        assert_ne!(ErrorCode::ParserUnexpectedToken, ErrorCode::AnalyzerTypeMismatch);
+        assert_eq!(
+            ErrorCode::LexerInvalidCharacter,
+            ErrorCode::LexerInvalidCharacter
+        );
+        assert_ne!(
+            ErrorCode::LexerInvalidCharacter,
+            ErrorCode::LexerUnterminatedString
+        );
+        assert_ne!(
+            ErrorCode::ParserUnexpectedToken,
+            ErrorCode::AnalyzerTypeMismatch
+        );
     }
 
     #[test]
     fn test_error_code_hash() {
         use std::collections::HashMap;
-        
+
         let mut map = HashMap::new();
         map.insert(ErrorCode::LexerInvalidCharacter, "invalid character");
         map.insert(ErrorCode::ParserUnexpectedToken, "unexpected token");
         map.insert(ErrorCode::AnalyzerTypeMismatch, "type mismatch");
-        
-        assert_eq!(map.get(&ErrorCode::LexerInvalidCharacter), Some(&"invalid character"));
-        assert_eq!(map.get(&ErrorCode::ParserUnexpectedToken), Some(&"unexpected token"));
-        assert_eq!(map.get(&ErrorCode::AnalyzerTypeMismatch), Some(&"type mismatch"));
+
+        assert_eq!(
+            map.get(&ErrorCode::LexerInvalidCharacter),
+            Some(&"invalid character")
+        );
+        assert_eq!(
+            map.get(&ErrorCode::ParserUnexpectedToken),
+            Some(&"unexpected token")
+        );
+        assert_eq!(
+            map.get(&ErrorCode::AnalyzerTypeMismatch),
+            Some(&"type mismatch")
+        );
         assert_eq!(map.get(&ErrorCode::RuntimePanic), None);
     }
 }
@@ -181,7 +208,7 @@ mod source_span_tests {
         let file_id = files.add("test.tj", "test content");
         let span = Span::new(10, 20);
         let source_span = SourceSpan::new(file_id, span);
-        
+
         assert_eq!(source_span.file_id, file_id);
         assert_eq!(source_span.span, span);
     }
@@ -192,7 +219,7 @@ mod source_span_tests {
         let file_id = files.add("test.tj", "test content");
         let span = Span::new(10, 20);
         let source_span = SourceSpan::new(file_id, span);
-        
+
         assert_eq!(source_span.start(), 10);
         assert_eq!(source_span.end(), 20);
         assert_eq!(source_span.len(), 10);
@@ -204,7 +231,7 @@ mod source_span_tests {
         let file_id = files.add("test.tj", "test content");
         let span = Span::new(15, 15);
         let source_span = SourceSpan::new(file_id, span);
-        
+
         assert_eq!(source_span.start(), 15);
         assert_eq!(source_span.end(), 15);
         assert_eq!(source_span.len(), 0);
@@ -218,12 +245,12 @@ mod source_span_tests {
         let span1 = Span::new(10, 20);
         let span2 = Span::new(10, 20);
         let span3 = Span::new(15, 25);
-        
+
         let source_span1 = SourceSpan::new(file_id1, span1);
         let source_span2 = SourceSpan::new(file_id1, span2);
         let source_span3 = SourceSpan::new(file_id1, span3);
         let source_span4 = SourceSpan::new(file_id2, span1);
-        
+
         assert_eq!(source_span1, source_span2);
         assert_ne!(source_span1, source_span3);
         assert_ne!(source_span1, source_span4);
@@ -236,7 +263,7 @@ mod source_span_tests {
         let span = Span::new(10, 20);
         let source_span = SourceSpan::new(file_id, span);
         let cloned = source_span.clone();
-        
+
         assert_eq!(source_span, cloned);
     }
 }
@@ -244,7 +271,6 @@ mod source_span_tests {
 #[cfg(test)]
 mod diagnostic_tests {
     use super::*;
-
 
     #[test]
     fn test_diagnostic_creation() {
@@ -255,7 +281,7 @@ mod diagnostic_tests {
             "expected int, found str".to_string(),
             span,
         );
-        
+
         assert_eq!(diagnostic.code, ErrorCode::AnalyzerTypeMismatch);
         assert_eq!(diagnostic.severity, Severity::Error);
         assert_eq!(diagnostic.message, "expected int, found str");
@@ -269,14 +295,15 @@ mod diagnostic_tests {
     fn test_diagnostic_with_secondary_span() {
         let primary_span = create_test_span();
         let secondary_span = create_test_span_at(30, 40);
-        
+
         let diagnostic = TJLangDiagnostic::new(
             ErrorCode::AnalyzerTypeMismatch,
             Severity::Error,
             "expected int, found str".to_string(),
             primary_span,
-        ).with_secondary_span(secondary_span);
-        
+        )
+        .with_secondary_span(secondary_span);
+
         assert_eq!(diagnostic.secondary_spans.len(), 1);
         assert_eq!(diagnostic.secondary_spans[0], secondary_span);
     }
@@ -284,19 +311,16 @@ mod diagnostic_tests {
     #[test]
     fn test_diagnostic_with_suggestion() {
         let span = create_test_span();
-        let suggestion = Suggestion::new(
-            "change to int".to_string(),
-            "int".to_string(),
-            span,
-        );
-        
+        let suggestion = Suggestion::new("change to int".to_string(), "int".to_string(), span);
+
         let diagnostic = TJLangDiagnostic::new(
             ErrorCode::AnalyzerTypeMismatch,
             Severity::Error,
             "expected int, found str".to_string(),
             span,
-        ).with_suggestion(suggestion.clone());
-        
+        )
+        .with_suggestion(suggestion.clone());
+
         assert_eq!(diagnostic.suggestions.len(), 1);
         assert_eq!(diagnostic.suggestions[0], suggestion);
     }
@@ -309,8 +333,9 @@ mod diagnostic_tests {
             Severity::Error,
             "expected int, found str".to_string(),
             span,
-        ).with_note("consider using a type conversion".to_string());
-        
+        )
+        .with_note("consider using a type conversion".to_string());
+
         assert_eq!(diagnostic.notes.len(), 1);
         assert_eq!(diagnostic.notes[0], "consider using a type conversion");
     }
@@ -319,12 +344,9 @@ mod diagnostic_tests {
     fn test_diagnostic_chaining() {
         let primary_span = create_test_span();
         let secondary_span = create_test_span_at(30, 40);
-        let suggestion = Suggestion::new(
-            "change to int".to_string(),
-            "int".to_string(),
-            primary_span,
-        );
-        
+        let suggestion =
+            Suggestion::new("change to int".to_string(), "int".to_string(), primary_span);
+
         let diagnostic = TJLangDiagnostic::new(
             ErrorCode::AnalyzerTypeMismatch,
             Severity::Error,
@@ -334,7 +356,7 @@ mod diagnostic_tests {
         .with_secondary_span(secondary_span)
         .with_suggestion(suggestion.clone())
         .with_note("consider using a type conversion".to_string());
-        
+
         assert_eq!(diagnostic.secondary_spans.len(), 1);
         assert_eq!(diagnostic.suggestions.len(), 1);
         assert_eq!(diagnostic.notes.len(), 1);
@@ -352,7 +374,7 @@ mod diagnostic_tests {
             "expected int, found str".to_string(),
             span,
         );
-        
+
         assert_eq!(
             format!("{}", diagnostic),
             "error[A2003]: expected int, found str"
@@ -368,7 +390,7 @@ mod diagnostic_tests {
             "expected int, found str".to_string(),
             span,
         );
-        
+
         let codespan_diagnostic = diagnostic.to_codespan_diagnostic();
         assert_eq!(codespan_diagnostic.severity, Severity::Error);
         assert_eq!(codespan_diagnostic.code, Some("A2003".to_string()));
@@ -380,16 +402,11 @@ mod diagnostic_tests {
 mod suggestion_tests {
     use super::*;
 
-
     #[test]
     fn test_suggestion_creation() {
         let span = create_test_span();
-        let suggestion = Suggestion::new(
-            "change to int".to_string(),
-            "int".to_string(),
-            span,
-        );
-        
+        let suggestion = Suggestion::new("change to int".to_string(), "int".to_string(), span);
+
         assert_eq!(suggestion.message, "change to int");
         assert_eq!(suggestion.replacement, "int");
         assert_eq!(suggestion.span, span);
@@ -400,28 +417,12 @@ mod suggestion_tests {
         let span1 = create_test_span();
         let span2 = create_test_span();
         let span3 = create_test_span_at(30, 40);
-        
-        let suggestion1 = Suggestion::new(
-            "change to int".to_string(),
-            "int".to_string(),
-            span1,
-        );
-        let suggestion2 = Suggestion::new(
-            "change to int".to_string(),
-            "int".to_string(),
-            span2,
-        );
-        let suggestion3 = Suggestion::new(
-            "change to str".to_string(),
-            "str".to_string(),
-            span1,
-        );
-        let suggestion4 = Suggestion::new(
-            "change to int".to_string(),
-            "int".to_string(),
-            span3,
-        );
-        
+
+        let suggestion1 = Suggestion::new("change to int".to_string(), "int".to_string(), span1);
+        let suggestion2 = Suggestion::new("change to int".to_string(), "int".to_string(), span2);
+        let suggestion3 = Suggestion::new("change to str".to_string(), "str".to_string(), span1);
+        let suggestion4 = Suggestion::new("change to int".to_string(), "int".to_string(), span3);
+
         assert_eq!(suggestion1, suggestion2);
         assert_ne!(suggestion1, suggestion3);
         assert_ne!(suggestion1, suggestion4);
@@ -431,7 +432,6 @@ mod suggestion_tests {
 #[cfg(test)]
 mod collection_tests {
     use super::*;
-
 
     #[test]
     fn test_empty_collection() {
@@ -452,9 +452,9 @@ mod collection_tests {
             "expected int, found str".to_string(),
             span,
         );
-        
+
         collection.add(diagnostic);
-        
+
         assert!(!collection.is_empty());
         assert!(collection.has_errors());
         assert!(!collection.has_warnings());
@@ -465,13 +465,13 @@ mod collection_tests {
     fn test_add_error() {
         let mut collection = DiagnosticCollection::new();
         let span = create_test_span();
-        
+
         collection.add_error(
             ErrorCode::AnalyzerTypeMismatch,
             "expected int, found str".to_string(),
             span,
         );
-        
+
         assert!(!collection.is_empty());
         assert!(collection.has_errors());
         assert!(!collection.has_warnings());
@@ -482,13 +482,13 @@ mod collection_tests {
     fn test_add_warning() {
         let mut collection = DiagnosticCollection::new();
         let span = create_test_span();
-        
+
         collection.add_warning(
             ErrorCode::AnalyzerTypeMismatch,
             "expected int, found str".to_string(),
             span,
         );
-        
+
         assert!(!collection.is_empty());
         assert!(!collection.has_errors());
         assert!(collection.has_warnings());
@@ -499,13 +499,13 @@ mod collection_tests {
     fn test_add_info() {
         let mut collection = DiagnosticCollection::new();
         let span = create_test_span();
-        
+
         collection.add_info(
             ErrorCode::AnalyzerTypeMismatch,
             "expected int, found str".to_string(),
             span,
         );
-        
+
         assert!(!collection.is_empty());
         assert!(!collection.has_errors());
         assert!(!collection.has_warnings());
@@ -517,7 +517,7 @@ mod collection_tests {
         let mut collection = DiagnosticCollection::new();
         let span1 = create_test_span();
         let span2 = create_test_span_at(30, 40);
-        
+
         collection.add_error(
             ErrorCode::AnalyzerTypeMismatch,
             "expected int, found str".to_string(),
@@ -528,7 +528,7 @@ mod collection_tests {
             "undefined variable 'x'".to_string(),
             span2,
         );
-        
+
         assert!(!collection.is_empty());
         assert!(collection.has_errors());
         assert!(collection.has_warnings());
@@ -539,13 +539,13 @@ mod collection_tests {
     fn test_clear() {
         let mut collection = DiagnosticCollection::new();
         let span = create_test_span();
-        
+
         collection.add_error(
             ErrorCode::AnalyzerTypeMismatch,
             "expected int, found str".to_string(),
             span,
         );
-        
+
         assert!(!collection.is_empty());
         collection.clear();
         assert!(collection.is_empty());
@@ -557,7 +557,7 @@ mod collection_tests {
         let mut collection = DiagnosticCollection::new();
         let span1 = create_test_span();
         let span2 = create_test_span_at(30, 40);
-        
+
         collection.add_error(
             ErrorCode::AnalyzerTypeMismatch,
             "expected int, found str".to_string(),
@@ -568,13 +568,19 @@ mod collection_tests {
             "undefined variable 'x'".to_string(),
             span2,
         );
-        
+
         let diagnostics: Vec<_> = collection.iter().collect();
         assert_eq!(diagnostics.len(), 2);
-        
-        let error_count = diagnostics.iter().filter(|d| d.severity == Severity::Error).count();
-        let warning_count = diagnostics.iter().filter(|d| d.severity == Severity::Warning).count();
-        
+
+        let error_count = diagnostics
+            .iter()
+            .filter(|d| d.severity == Severity::Error)
+            .count();
+        let warning_count = diagnostics
+            .iter()
+            .filter(|d| d.severity == Severity::Warning)
+            .count();
+
         assert_eq!(error_count, 1);
         assert_eq!(warning_count, 1);
     }
@@ -583,13 +589,13 @@ mod collection_tests {
     fn test_into_iter() {
         let mut collection = DiagnosticCollection::new();
         let span = create_test_span();
-        
+
         collection.add_error(
             ErrorCode::AnalyzerTypeMismatch,
             "expected int, found str".to_string(),
             span,
         );
-        
+
         let diagnostics: Vec<_> = collection.into_iter().collect();
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, ErrorCode::AnalyzerTypeMismatch);
@@ -600,12 +606,11 @@ mod collection_tests {
 mod helpers_tests {
     use super::*;
 
-
     #[test]
     fn test_type_mismatch_helper() {
         let span = create_test_span();
         let diagnostic = helpers::type_mismatch("int", "str", span);
-        
+
         assert_eq!(diagnostic.code, ErrorCode::AnalyzerTypeMismatch);
         assert_eq!(diagnostic.severity, Severity::Error);
         assert_eq!(diagnostic.message, "expected `int`, found `str`");
@@ -616,7 +621,7 @@ mod helpers_tests {
     fn test_undefined_variable_helper() {
         let span = create_test_span();
         let diagnostic = helpers::undefined_variable("x", span);
-        
+
         assert_eq!(diagnostic.code, ErrorCode::AnalyzerUndefinedVariable);
         assert_eq!(diagnostic.severity, Severity::Error);
         assert_eq!(diagnostic.message, "undefined variable `x`");
@@ -627,7 +632,7 @@ mod helpers_tests {
     fn test_undefined_function_helper() {
         let span = create_test_span();
         let diagnostic = helpers::undefined_function("foo", span);
-        
+
         assert_eq!(diagnostic.code, ErrorCode::AnalyzerUndefinedFunction);
         assert_eq!(diagnostic.severity, Severity::Error);
         assert_eq!(diagnostic.message, "undefined function `foo`");
@@ -639,10 +644,13 @@ mod helpers_tests {
         let span = create_test_span();
         let missing_patterns = vec!["Some(_)".to_string(), "None".to_string()];
         let diagnostic = helpers::non_exhaustive_match(missing_patterns, span);
-        
+
         assert_eq!(diagnostic.code, ErrorCode::AnalyzerNonExhaustiveMatch);
         assert_eq!(diagnostic.severity, Severity::Error);
-        assert_eq!(diagnostic.message, "non-exhaustive match: missing patterns: Some(_), None");
+        assert_eq!(
+            diagnostic.message,
+            "non-exhaustive match: missing patterns: Some(_), None"
+        );
         assert_eq!(diagnostic.primary_span, span);
     }
 
@@ -650,7 +658,7 @@ mod helpers_tests {
     fn test_unexpected_token_helper() {
         let span = create_test_span();
         let diagnostic = helpers::unexpected_token("int", "str", span);
-        
+
         assert_eq!(diagnostic.code, ErrorCode::ParserUnexpectedToken);
         assert_eq!(diagnostic.severity, Severity::Error);
         assert_eq!(diagnostic.message, "expected `int`, found `str`");
@@ -661,7 +669,7 @@ mod helpers_tests {
     fn test_unterminated_string_helper() {
         let span = create_test_span();
         let diagnostic = helpers::unterminated_string(span);
-        
+
         assert_eq!(diagnostic.code, ErrorCode::LexerUnterminatedString);
         assert_eq!(diagnostic.severity, Severity::Error);
         assert_eq!(diagnostic.message, "unterminated string literal");
@@ -673,23 +681,18 @@ mod helpers_tests {
 mod integration_tests {
     use super::*;
 
-
     #[test]
     fn test_complete_diagnostic_workflow() {
         // Create a diagnostic collection
         let mut collection = DiagnosticCollection::new();
-        
+
         // Add various types of diagnostics
         let span1 = create_test_span();
         let span2 = create_test_span_at(30, 40);
         let span3 = create_test_span_at(50, 60);
-        
+
         // Add a type mismatch error with suggestion
-        let suggestion = Suggestion::new(
-            "change to int".to_string(),
-            "int".to_string(),
-            span1,
-        );
+        let suggestion = Suggestion::new("change to int".to_string(), "int".to_string(), span1);
         let diagnostic1 = TJLangDiagnostic::new(
             ErrorCode::AnalyzerTypeMismatch,
             Severity::Error,
@@ -698,42 +701,51 @@ mod integration_tests {
         )
         .with_suggestion(suggestion)
         .with_note("consider using a type conversion".to_string());
-        
+
         collection.add(diagnostic1);
-        
+
         // Add an undefined variable warning
         collection.add_warning(
             ErrorCode::AnalyzerUndefinedVariable,
             "undefined variable 'x'".to_string(),
             span2,
         );
-        
+
         // Add a parser error
         collection.add_error(
             ErrorCode::ParserUnexpectedToken,
             "expected ';', found '}'".to_string(),
             span3,
         );
-        
+
         // Verify the collection
         assert!(!collection.is_empty());
         assert!(collection.has_errors());
         assert!(collection.has_warnings());
         assert_eq!(collection.len(), 3);
-        
+
         // Test iteration
         let diagnostics: Vec<_> = collection.iter().collect();
         assert_eq!(diagnostics.len(), 3);
-        
+
         // Count by severity
-        let error_count = diagnostics.iter().filter(|d| d.severity == Severity::Error).count();
-        let warning_count = diagnostics.iter().filter(|d| d.severity == Severity::Warning).count();
-        
+        let error_count = diagnostics
+            .iter()
+            .filter(|d| d.severity == Severity::Error)
+            .count();
+        let warning_count = diagnostics
+            .iter()
+            .filter(|d| d.severity == Severity::Warning)
+            .count();
+
         assert_eq!(error_count, 2);
         assert_eq!(warning_count, 1);
-        
+
         // Test specific diagnostics
-        let type_mismatch = diagnostics.iter().find(|d| d.code == ErrorCode::AnalyzerTypeMismatch).unwrap();
+        let type_mismatch = diagnostics
+            .iter()
+            .find(|d| d.code == ErrorCode::AnalyzerTypeMismatch)
+            .unwrap();
         assert_eq!(type_mismatch.suggestions.len(), 1);
         assert_eq!(type_mismatch.notes.len(), 1);
         assert_eq!(type_mismatch.suggestions[0].message, "change to int");
@@ -749,7 +761,7 @@ mod integration_tests {
             "expected int, found str".to_string(),
             span,
         );
-        
+
         let formatted = format!("{}", diagnostic);
         assert_eq!(formatted, "error[A2003]: expected int, found str");
     }
@@ -758,7 +770,7 @@ mod integration_tests {
     fn test_error_code_consistency() {
         // Ensure all error codes have unique strings
         let mut codes = Vec::new();
-        
+
         // Collect all error code strings
         let error_codes = [
             ErrorCode::LexerInvalidCharacter,
@@ -810,16 +822,20 @@ mod integration_tests {
             ErrorCode::RuntimeTypeError,
             ErrorCode::RuntimeValueError,
         ];
-        
+
         for code in &error_codes {
             codes.push(code.as_str());
         }
-        
+
         // Check for duplicates
         let mut sorted_codes = codes.clone();
         sorted_codes.sort();
         sorted_codes.dedup();
-        
-        assert_eq!(codes.len(), sorted_codes.len(), "Duplicate error codes found");
+
+        assert_eq!(
+            codes.len(),
+            sorted_codes.len(),
+            "Duplicate error codes found"
+        );
     }
 }

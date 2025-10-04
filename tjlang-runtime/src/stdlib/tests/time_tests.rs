@@ -77,8 +77,8 @@ mod tests {
         let timestamp = 1609459200; // 2021-01-01 00:00:00 UTC
         let result = TIME::to_components(timestamp);
         assert_eq!(result.0, 2021); // year
-        assert_eq!(result.1, 1);    // month
-        assert_eq!(result.2, 1);    // day
+        assert_eq!(result.1, 1); // month
+        assert_eq!(result.2, 1); // day
     }
 
     #[test]

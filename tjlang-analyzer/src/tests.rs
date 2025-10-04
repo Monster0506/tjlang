@@ -3,10 +3,10 @@
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AnalysisPipeline, AnalysisPhase, RuleCategory, AnalysisResult, RuleSeverity};
-    use tjlang_diagnostics::{ErrorCode, TJLangDiagnostic};
-    use codespan_reporting::diagnostic::Severity;
+    use crate::{AnalysisPhase, AnalysisPipeline, AnalysisResult, RuleCategory, RuleSeverity};
     use codespan::Files;
+    use codespan_reporting::diagnostic::Severity;
+    use tjlang_diagnostics::{ErrorCode, TJLangDiagnostic};
 
     /// Helper function to create a test file ID
     fn create_test_file_id(source: &str) -> codespan::FileId {
@@ -16,41 +16,78 @@ mod tests {
 
     /// Helper function to create a configuration with all rules enabled
     fn create_all_rules_enabled_config() -> crate::config::RuleConfig {
+        use crate::config::{GlobalSettings, RuleConfig, RuleSettings, RuleSeverity};
         use std::collections::HashMap;
-        use crate::config::{RuleConfig, RuleSettings, RuleSeverity, GlobalSettings};
-        
+
         let mut enabled_rules = HashMap::new();
         let mut rule_settings = HashMap::new();
-        
+
         // List of all available rules
         let all_rules = vec![
-            "TypeSafetyRule", "NullPointerRule", "BufferOverflowRule", "UnsafeOperationRule",
-            "UnusedVariableRule", "DeadCodeRule", "UnusedParameterRule", "DuplicateNameRule",
-            "UndefinedVariableRule", "CircularDependencyRule", "NamingConventionRule",
-            "FunctionComplexityRule", "MagicNumberRule", "ParameterCountRule",
-            "InefficientLoopRule", "MemoryAllocationRule", "StringConcatenationRule",
-            "LargeFileRule", "TooManyImportsRule", "GlobalVariableRule",
-            "FormattingConventionRule", "IndentationRule", "TrailingWhitespaceRule",
-            "LineLengthRule", "CommentCoverageRule", "FunctionLengthRule",
-            "NestingDepthRule", "EmptyFunctionRule", "UnreachableCodeRule",
-            "RecursionDepthRule", "ResourceLeakRule", "AsyncAwaitRule",
-            "ErrorHandlingRule", "PatternMatchingRule", "GenericConstraintRule",
-            "CommentStyleRule", "SemicolonRule", "BracketMatchingRule",
-            "ImportOrderRule", "CacheEfficiencyRule", "BranchPredictionRule",
-            "VectorizationRule", "ConcurrencyRule", "MemoryLeakRule",
-            "RaceConditionRule", "InputValidationRule", "HardcodedCredentialsRule",
-            "SQLInjectionRule", "CouplingRule", "CohesionRule",
+            "TypeSafetyRule",
+            "NullPointerRule",
+            "BufferOverflowRule",
+            "UnsafeOperationRule",
+            "UnusedVariableRule",
+            "DeadCodeRule",
+            "UnusedParameterRule",
+            "DuplicateNameRule",
+            "UndefinedVariableRule",
+            "CircularDependencyRule",
+            "NamingConventionRule",
+            "FunctionComplexityRule",
+            "MagicNumberRule",
+            "ParameterCountRule",
+            "InefficientLoopRule",
+            "MemoryAllocationRule",
+            "StringConcatenationRule",
+            "LargeFileRule",
+            "TooManyImportsRule",
+            "GlobalVariableRule",
+            "FormattingConventionRule",
+            "IndentationRule",
+            "TrailingWhitespaceRule",
+            "LineLengthRule",
+            "CommentCoverageRule",
+            "FunctionLengthRule",
+            "NestingDepthRule",
+            "EmptyFunctionRule",
+            "UnreachableCodeRule",
+            "RecursionDepthRule",
+            "ResourceLeakRule",
+            "AsyncAwaitRule",
+            "ErrorHandlingRule",
+            "PatternMatchingRule",
+            "GenericConstraintRule",
+            "CommentStyleRule",
+            "SemicolonRule",
+            "BracketMatchingRule",
+            "ImportOrderRule",
+            "CacheEfficiencyRule",
+            "BranchPredictionRule",
+            "VectorizationRule",
+            "ConcurrencyRule",
+            "MemoryLeakRule",
+            "RaceConditionRule",
+            "InputValidationRule",
+            "HardcodedCredentialsRule",
+            "SQLInjectionRule",
+            "CouplingRule",
+            "CohesionRule",
         ];
-        
+
         // Enable all rules
         for rule in all_rules {
             enabled_rules.insert(rule.to_string(), true);
-            rule_settings.insert(rule.to_string(), RuleSettings {
-                severity: RuleSeverity::Warning,
-                config: HashMap::new(),
-            });
+            rule_settings.insert(
+                rule.to_string(),
+                RuleSettings {
+                    severity: RuleSeverity::Warning,
+                    config: HashMap::new(),
+                },
+            );
         }
-        
+
         RuleConfig {
             enabled_rules,
             rule_settings,
@@ -78,12 +115,22 @@ mod tests {
 
     /// Helper function to check if a specific warning code is present
     fn has_warning_code(result: &AnalysisResult, error_code: ErrorCode) -> bool {
-        result.diagnostics.iter().any(|d| d.code == error_code && d.severity == Severity::Warning)
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == error_code && d.severity == Severity::Warning)
     }
 
     /// Helper function to get diagnostics by error code
-    fn get_diagnostics_by_code(result: &AnalysisResult, error_code: ErrorCode) -> Vec<&TJLangDiagnostic> {
-        result.diagnostics.iter().filter(|d| d.code == error_code).collect()
+    fn get_diagnostics_by_code(
+        result: &AnalysisResult,
+        error_code: ErrorCode,
+    ) -> Vec<&TJLangDiagnostic> {
+        result
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == error_code)
+            .collect()
     }
 
     // ============================================================================
@@ -98,11 +145,12 @@ y: str = 42
 z: bool = "not a boolean"
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect type mismatches
         assert!(has_error_code(&result, ErrorCode::AnalyzerTypeMismatch));
-        
-        let type_mismatch_diagnostics = get_diagnostics_by_code(&result, ErrorCode::AnalyzerTypeMismatch);
+
+        let type_mismatch_diagnostics =
+            get_diagnostics_by_code(&result, ErrorCode::AnalyzerTypeMismatch);
         assert!(!type_mismatch_diagnostics.is_empty());
     }
 
@@ -113,9 +161,12 @@ x: int = 42
 y = x + z  # z is undefined
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect undefined variable
-        assert!(has_error_code(&result, ErrorCode::AnalyzerUndefinedVariable));
+        assert!(has_error_code(
+            &result,
+            ErrorCode::AnalyzerUndefinedVariable
+        ));
     }
 
     #[test]
@@ -125,9 +176,12 @@ def func1() -> int { return 1 }
 def func1() -> str { return "duplicate" }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect duplicate function names
-        assert!(has_error_code(&result, ErrorCode::AnalyzerDuplicateDefinition));
+        assert!(has_error_code(
+            &result,
+            ErrorCode::AnalyzerDuplicateDefinition
+        ));
     }
 
     // ============================================================================
@@ -142,9 +196,12 @@ normalVariable: int = 43
 CONSTANT_VALUE: int = 44
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect naming convention violations
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerNamingConvention));
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerNamingConvention
+        ));
     }
 
     #[test]
@@ -155,9 +212,12 @@ def normalFunction() -> int { return 2 }
 def CONSTANT_FUNCTION() -> int { return 3 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect naming convention violations
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerNamingConvention));
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerNamingConvention
+        ));
     }
 
     // ============================================================================
@@ -172,7 +232,7 @@ y: int = 43
 z: int = x + 1
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect unused variable
         assert!(has_warning_code(&result, ErrorCode::AnalyzerUnusedVariable));
     }
@@ -185,9 +245,12 @@ def func(x: int, unused_param: int) -> int {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect unused parameter
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerUnusedParameter));
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerUnusedParameter
+        ));
     }
 
     #[test]
@@ -199,7 +262,7 @@ def func() -> int {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect unreachable code
         assert!(has_warning_code(&result, ErrorCode::AnalyzerDeadCode));
     }
@@ -212,7 +275,7 @@ def empty_func() -> void {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect empty function
         assert!(has_warning_code(&result, ErrorCode::AnalyzerEmptyFunction));
     }
@@ -246,9 +309,12 @@ def complex_function(a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: 
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect high complexity
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerFunctionComplexity));
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerFunctionComplexity
+        ));
     }
 
     #[test]
@@ -259,7 +325,7 @@ def too_many_params(a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: i
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect too many parameters
         assert!(has_warning_code(&result, ErrorCode::AnalyzerParameterCount));
     }
@@ -272,7 +338,7 @@ def test() -> int {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect magic numbers
         assert!(has_warning_code(&result, ErrorCode::AnalyzerMagicNumber));
     }
@@ -287,7 +353,7 @@ def test() -> int {
 this_is_a_very_long_line_that_exceeds_the_recommended_line_length_limit_and_should_trigger_a_warning_about_line_length
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect long lines
         assert!(has_warning_code(&result, ErrorCode::AnalyzerLineLength));
     }
@@ -299,9 +365,12 @@ x: int = 42
 y: str = "test"    
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect trailing whitespace
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerTrailingWhitespace));
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerTrailingWhitespace
+        ));
     }
 
     #[test]
@@ -314,7 +383,7 @@ def func() -> int {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect inconsistent indentation
         assert!(has_warning_code(&result, ErrorCode::AnalyzerIndentation));
     }
@@ -338,9 +407,12 @@ def inefficient_search(items: [int], target: int) -> bool {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect inefficient nested loops
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerInefficientLoop));
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerInefficientLoop
+        ));
     }
 
     #[test]
@@ -355,9 +427,12 @@ def build_string(parts: [str]) -> str {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect inefficient string concatenation
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerStringConcatenation));
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerStringConcatenation
+        ));
     }
 
     #[test]
@@ -376,9 +451,12 @@ def process_data(data: [int]) -> [int] {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect excessive memory allocation
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerMemoryAllocation));
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerMemoryAllocation
+        ));
     }
 
     // ============================================================================
@@ -392,9 +470,9 @@ def process_data(data: [int]) -> [int] {
         for i in 0..1000 {
             source.push_str(&format!("x{}: int = {}\n", i, i));
         }
-        
+
         let result = analyze_source(&source);
-        
+
         // Should detect large file
         assert!(has_warning_code(&result, ErrorCode::AnalyzerLargeFile));
     }
@@ -409,7 +487,7 @@ def increment_counter() -> void {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect global variables
         assert!(has_warning_code(&result, ErrorCode::AnalyzerGlobalVariable));
     }
@@ -426,7 +504,7 @@ def process_user(user: User?) -> str {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect potential null pointer dereference
         assert!(has_warning_code(&result, ErrorCode::AnalyzerNullPointer));
     }
@@ -441,7 +519,7 @@ def copy_string(source: str, dest: str) -> void {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect potential buffer overflow
         assert!(has_warning_code(&result, ErrorCode::AnalyzerBufferOverflow));
     }
@@ -456,9 +534,12 @@ def connect_to_database() -> Connection {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect hardcoded credentials
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerHardcodedCredentials));
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerHardcodedCredentials
+        ));
     }
 
     #[test]
@@ -470,7 +551,7 @@ def get_user_by_id(id: str) -> User {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect potential SQL injection
         assert!(has_warning_code(&result, ErrorCode::AnalyzerSQLInjection));
     }
@@ -487,7 +568,7 @@ def process_input(input: str) -> str {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect missing error handling
         assert!(has_warning_code(&result, ErrorCode::AnalyzerErrorHandling));
     }
@@ -503,9 +584,12 @@ def process_value(value: int) -> str {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect non-exhaustive pattern matching
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerPatternMatching));
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerPatternMatching
+        ));
     }
 
     // ============================================================================
@@ -520,15 +604,15 @@ unused_var: int = 42  # Unused variable
 "#;
         let pipeline = AnalysisPipeline::new();
         let file_id = create_test_file_id(source);
-        
+
         // Test Pre-AST analysis
         let pre_ast_result = pipeline.analyze_phase(AnalysisPhase::PreAST, source, file_id);
         assert!(pre_ast_result.diagnostics_count >= 0);
-        
+
         // Test AST analysis
         let ast_result = pipeline.analyze_phase(AnalysisPhase::AST, source, file_id);
         assert!(ast_result.diagnostics_count >= 0);
-        
+
         // Test Post-AST analysis
         let post_ast_result = pipeline.analyze_phase(AnalysisPhase::PostAST, source, file_id);
         assert!(post_ast_result.diagnostics_count >= 0);
@@ -542,11 +626,12 @@ unused_var: int = 42  # Dead code issue
 "#;
         let pipeline = AnalysisPipeline::new();
         let file_id = create_test_file_id(source);
-        
+
         // Test type safety category
-        let type_safety_result = pipeline.analyze_category(RuleCategory::TypeSafety, source, file_id);
+        let type_safety_result =
+            pipeline.analyze_category(RuleCategory::TypeSafety, source, file_id);
         assert!(type_safety_result.diagnostics_count >= 0);
-        
+
         // Test dead code category
         let dead_code_result = pipeline.analyze_category(RuleCategory::DeadCode, source, file_id);
         assert!(dead_code_result.diagnostics_count >= 0);
@@ -559,15 +644,15 @@ x: int = "hello"  # Type mismatch
 "#;
         let mut pipeline = AnalysisPipeline::new();
         let file_id = create_test_file_id(source);
-        
+
         // Disable type safety rule
         pipeline.disable_rule("TypeSafetyRule");
         let result_disabled = pipeline.analyze(source, file_id);
-        
+
         // Enable type safety rule
         pipeline.enable_rule("TypeSafetyRule");
         let result_enabled = pipeline.analyze(source, file_id);
-        
+
         // The enabled result should have more diagnostics
         assert!(result_enabled.diagnostics_count >= result_disabled.diagnostics_count);
     }
@@ -579,11 +664,11 @@ x: int = "hello"  # Type mismatch
 "#;
         let mut pipeline = AnalysisPipeline::new();
         let file_id = create_test_file_id(source);
-        
+
         // Set type safety rule to error severity
         pipeline.set_rule_severity("TypeSafetyRule", RuleSeverity::Error);
         let result = pipeline.analyze(source, file_id);
-        
+
         // Should have error-level diagnostics
         let error_diagnostics = result.get_diagnostics_by_severity(Severity::Error);
         assert!(!error_diagnostics.is_empty());
@@ -631,18 +716,27 @@ def inefficient_search(items: [int], target: int) -> bool {
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect multiple types of issues
         assert!(result.diagnostics_count > 0);
-        
+
         // Check for specific error types
         assert!(has_error_code(&result, ErrorCode::AnalyzerTypeMismatch));
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerNamingConvention));
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerNamingConvention
+        ));
         assert!(has_warning_code(&result, ErrorCode::AnalyzerUnusedVariable));
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerUnusedParameter));
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerUnusedParameter
+        ));
         assert!(has_warning_code(&result, ErrorCode::AnalyzerMagicNumber));
         assert!(has_warning_code(&result, ErrorCode::AnalyzerLineLength));
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerInefficientLoop));
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerInefficientLoop
+        ));
     }
 
     #[test]
@@ -653,7 +747,7 @@ y: str = "hello"
 z: bool = true
 "#;
         let result = analyze_source(source);
-        
+
         // Analysis should be fast
         assert!(result.execution_time.as_micros() < 1000); // Less than 1ms
     }
@@ -666,7 +760,7 @@ unused_var: int = 42  # Warning
 "#;
         let result = analyze_source(source);
         let summary = result.get_summary();
-        
+
         assert!(summary.total_rules > 0);
         assert!(summary.total_diagnostics >= 0);
         assert!(summary.execution_time.as_micros() > 0);
@@ -680,16 +774,16 @@ unused_var: int = 42  # Warning
     fn test_empty_source() {
         let source = "";
         let result = analyze_source(source);
-        
+
         // Should handle empty source gracefully
         assert!(result.diagnostics_count >= 0);
     }
 
     #[test]
     fn test_invalid_syntax() {
-        let source = "+++";  // Invalid syntax
+        let source = "+++"; // Invalid syntax
         let result = analyze_source(source);
-        
+
         // Should handle invalid syntax gracefully
         assert!(result.diagnostics_count >= 0);
     }
@@ -701,9 +795,9 @@ unused_var: int = 42  # Warning
         for i in 0..10000 {
             source.push_str(&format!("x{}: int = {}\n", i, i));
         }
-        
+
         let result = analyze_source(&source);
-        
+
         // Should handle large files
         assert!(result.diagnostics_count >= 0);
     }
@@ -722,19 +816,26 @@ a: int = 44  # Single letter
 very_long_variable_name_that_might_exceed_recommended_length: int = 45
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect the long identifier (58 characters > 50 limit)
-        assert!(has_warning_code(&result, ErrorCode::AnalyzerNamingConvention));
-        
+        assert!(has_warning_code(
+            &result,
+            ErrorCode::AnalyzerNamingConvention
+        ));
+
         // Should have exactly 1 naming convention warning
-        let naming_warnings: Vec<_> = result.diagnostics.iter()
+        let naming_warnings: Vec<_> = result
+            .diagnostics
+            .iter()
             .filter(|d| d.code == ErrorCode::AnalyzerNamingConvention)
             .collect();
         assert_eq!(naming_warnings.len(), 1);
-        
+
         // Verify the warning message mentions the long identifier
         let warning = &naming_warnings[0];
-        assert!(warning.message.contains("very_long_variable_name_that_might_exceed_recommended_length"));
+        assert!(warning
+            .message
+            .contains("very_long_variable_name_that_might_exceed_recommended_length"));
         assert!(warning.message.contains("too long"));
         assert!(warning.message.contains("60 characters"));
         assert!(warning.message.contains("max recommended: 50"));
@@ -751,7 +852,7 @@ pi: float = 3.14159  # Mathematical constant
 e: float = 2.71828  # Mathematical constant
 "#;
         let result = analyze_source(source);
-        
+
         // Should handle edge cases appropriately
         assert!(result.diagnostics_count == 0);
     }
@@ -772,7 +873,7 @@ def complex_function_with_many_parameters(
 }
 "#;
         let result = analyze_source(source);
-        
+
         // Should detect complexity issues appropriately
         assert!(result.diagnostics_count >= 0);
     }

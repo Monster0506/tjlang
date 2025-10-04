@@ -17,7 +17,7 @@ mod tests {
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
         let result = parser.parse(source, file_id);
-        
+
         assert!(result.is_ok());
         let program = result.unwrap();
         assert_eq!(program.units.len(), 1); // Should have one dummy variable declaration
@@ -29,11 +29,11 @@ mod tests {
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
         let result = parser.parse(source, file_id);
-        
+
         match &result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
-                
+
                 // The parser creates an expression for simple identifiers
                 if let ProgramUnit::Expression(Expression::Variable(name)) = &program.units[0] {
                     assert_eq!(name, "x");
@@ -50,12 +50,12 @@ mod tests {
 
     #[test]
     fn test_parse_or_operator_pest_raw() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
-        
+
         let source = "result: bool = false or true";
         let pairs = TJLangPestParser::parse(Rule::program, source);
-        
+
         match pairs {
             Ok(pairs) => {
                 eprintln!("\n===  Pest Parse Tree ===");
@@ -66,7 +66,7 @@ mod tests {
             }
             Err(e) => eprintln!("Pest parse error: {}", e),
         }
-        
+
         fn print_pest_pair(pair: pest::iterators::Pair<Rule>, depth: usize) {
             let indent = "  ".repeat(depth);
             eprintln!("{}Rule::{:?} = '{}'", indent, pair.as_rule(), pair.as_str());
@@ -82,25 +82,47 @@ mod tests {
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
         let result = parser.parse(source, file_id);
-        
+
         match &result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
-                
-                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
+
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0]
+                {
                     assert_eq!(var_decl.name, "result");
-                    
+
                     // Check that value is a Binary expression with Or operator
-                    if let Expression::Binary { left, operator, right, .. } = &var_decl.value {
-                        assert!(matches!(operator, BinaryOperator::Or), "Expected Or operator, got: {:?}", operator);
-                        
+                    if let Expression::Binary {
+                        left,
+                        operator,
+                        right,
+                        ..
+                    } = &var_decl.value
+                    {
+                        assert!(
+                            matches!(operator, BinaryOperator::Or),
+                            "Expected Or operator, got: {:?}",
+                            operator
+                        );
+
                         // Check left is false
-                        assert!(matches!(left.as_ref(), Expression::Literal(Literal::Bool(false))), "Expected false literal, got: {:?}", left);
-                        
+                        assert!(
+                            matches!(left.as_ref(), Expression::Literal(Literal::Bool(false))),
+                            "Expected false literal, got: {:?}",
+                            left
+                        );
+
                         // Check right is true
-                        assert!(matches!(right.as_ref(), Expression::Literal(Literal::Bool(true))), "Expected true literal, got: {:?}", right);
+                        assert!(
+                            matches!(right.as_ref(), Expression::Literal(Literal::Bool(true))),
+                            "Expected true literal, got: {:?}",
+                            right
+                        );
                     } else {
-                        panic!("Expected Binary expression with Or operator, got: {:?}", var_decl.value);
+                        panic!(
+                            "Expected Binary expression with Or operator, got: {:?}",
+                            var_decl.value
+                        );
                     }
                 } else {
                     panic!("Expected variable declaration, got: {:?}", program.units[0]);
@@ -119,25 +141,47 @@ mod tests {
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
         let result = parser.parse(source, file_id);
-        
+
         match &result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
-                
-                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
+
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0]
+                {
                     assert_eq!(var_decl.name, "result");
-                    
+
                     // Check that value is a Binary expression with And operator
-                    if let Expression::Binary { left, operator, right, .. } = &var_decl.value {
-                        assert!(matches!(operator, BinaryOperator::And), "Expected And operator, got: {:?}", operator);
-                        
+                    if let Expression::Binary {
+                        left,
+                        operator,
+                        right,
+                        ..
+                    } = &var_decl.value
+                    {
+                        assert!(
+                            matches!(operator, BinaryOperator::And),
+                            "Expected And operator, got: {:?}",
+                            operator
+                        );
+
                         // Check left is true
-                        assert!(matches!(left.as_ref(), Expression::Literal(Literal::Bool(true))), "Expected true literal, got: {:?}", left);
-                        
+                        assert!(
+                            matches!(left.as_ref(), Expression::Literal(Literal::Bool(true))),
+                            "Expected true literal, got: {:?}",
+                            left
+                        );
+
                         // Check right is false
-                        assert!(matches!(right.as_ref(), Expression::Literal(Literal::Bool(false))), "Expected false literal, got: {:?}", right);
+                        assert!(
+                            matches!(right.as_ref(), Expression::Literal(Literal::Bool(false))),
+                            "Expected false literal, got: {:?}",
+                            right
+                        );
                     } else {
-                        panic!("Expected Binary expression with And operator, got: {:?}", var_decl.value);
+                        panic!(
+                            "Expected Binary expression with And operator, got: {:?}",
+                            var_decl.value
+                        );
                     }
                 } else {
                     panic!("Expected variable declaration, got: {:?}", program.units[0]);
@@ -156,17 +200,26 @@ mod tests {
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
         let result = parser.parse(source, file_id);
-        
+
         match &result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
-                
+
                 // The parser should create a binary expression with Assign operator
-                if let ProgramUnit::Expression(Expression::Binary { left, operator, right, .. }) = &program.units[0] {
+                if let ProgramUnit::Expression(Expression::Binary {
+                    left,
+                    operator,
+                    right,
+                    ..
+                }) = &program.units[0]
+                {
                     if let Expression::Variable(name) = left.as_ref() {
                         assert_eq!(name, "i");
                     } else {
-                        panic!("Expected variable on left side of assignment, got: {:?}", left);
+                        panic!(
+                            "Expected variable on left side of assignment, got: {:?}",
+                            left
+                        );
                     }
                     if let BinaryOperator::Assign = operator {
                         // Correct operator
@@ -176,7 +229,10 @@ mod tests {
                     if let Expression::Literal(Literal::Int(0)) = right.as_ref() {
                         // Correct
                     } else {
-                        panic!("Expected integer literal on right side of assignment, got: {:?}", right);
+                        panic!(
+                            "Expected integer literal on right side of assignment, got: {:?}",
+                            right
+                        );
                     }
                 } else {
                     panic!("Expected binary expression, got: {:?}", program.units[0]);
@@ -195,11 +251,11 @@ mod tests {
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
         let result = parser.parse(source, file_id);
-        
+
         match &result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
-                
+
                 // The parser should create a variable expression
                 if let ProgramUnit::Expression(Expression::Variable(name)) = &program.units[0] {
                     assert_eq!(name, "i");
@@ -220,20 +276,19 @@ mod tests {
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
         let result = parser.parse(source, file_id);
-        
+
         assert!(result.is_ok());
         let program = result.unwrap();
         assert_eq!(program.units.len(), 3); // Should be 3 separate identifier expressions
     }
 
-
     #[test]
     fn test_parse_invalid_syntax() {
-        let source = "+++";  // This should fail because we don't have unary operators defined
+        let source = "+++"; // This should fail because we don't have unary operators defined
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
         let result = parser.parse(source, file_id);
-        
+
         match &result {
             Ok(program) => {
                 println!("Unexpectedly parsed successfully: {:?}", program);
@@ -252,7 +307,7 @@ mod tests {
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
         let result = parser.parse(source, file_id);
-        
+
         // This should fail because semicolons are not allowed
         assert!(result.is_err());
     }
@@ -263,11 +318,11 @@ mod tests {
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
         let result = parser.parse(source, file_id);
-        
+
         match result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
-                
+
                 // The parser should now parse the actual variable declaration
                 if let ProgramUnit::Declaration(Declaration::Variable(var)) = &program.units[0] {
                     assert_eq!(var.name, "x"); // This should be the actual variable name
@@ -294,7 +349,7 @@ mod tests {
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
         let result = parser.parse(source, file_id);
-        
+
         match result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
@@ -316,13 +371,13 @@ mod tests {
             ("false", "boolean"),
             ("None", "none"),
         ];
-        
+
         for (source, description) in test_cases {
             // println!("Testing {}: {}", description, source);
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
-            
+            let result = parser.parse(source, file_id);
+
             match result {
                 Ok(program) => {
                     assert_eq!(program.units.len(), 1);
@@ -337,20 +392,13 @@ mod tests {
 
     #[test]
     fn test_parse_comparison_expressions() {
-        let test_cases = vec![
-            "1 == 2",
-            "1 != 2", 
-            "1 < 2",
-            "1 > 2",
-            "1 <= 2",
-            "1 >= 2",
-        ];
-        
+        let test_cases = vec!["1 == 2", "1 != 2", "1 < 2", "1 > 2", "1 <= 2", "1 >= 2"];
+
         for source in test_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
-            
+            let result = parser.parse(source, file_id);
+
             match result {
                 Ok(program) => {
                     assert_eq!(program.units.len(), 1);
@@ -365,18 +413,18 @@ mod tests {
 
     #[test]
     fn test_parse_logical_expressions() {
-        let test_cases = vec![
-            "true and false",
-            "true or false",
-            "not true",
-        ];
-        
+        let test_cases = vec!["true and false", "true or false", "not true"];
+
         for source in test_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
-            
-            assert!(result.is_ok(), "Failed to parse logical expression: {}", source);
+            let result = parser.parse(source, file_id);
+
+            assert!(
+                result.is_ok(),
+                "Failed to parse logical expression: {}",
+                source
+            );
             let program = result.unwrap();
             assert_eq!(program.units.len(), 1);
         }
@@ -390,20 +438,20 @@ mod tests {
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
         let result = parser.parse(source, file_id);
-        
+
         // Should not panic during compilation
         assert!(result.is_ok() || result.is_err()); // Either is fine, just no panic
     }
 
     #[test]
     fn test_grammar_parse_direct() {
-        use pest::Parser;
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
-        
+        use crate::parser::TJLangPestParser;
+        use pest::Parser;
+
         let source = "x: int = 42";
         let result = TJLangPestParser::parse(Rule::program, source);
-        
+
         match result {
             Ok(pairs) => {
                 println!("Grammar parse successful!");
@@ -411,26 +459,44 @@ mod tests {
                 for pair in pairs {
                     println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                     for inner in pair.into_inner() {
-                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        println!(
+                            "  Inner: {:?}, Content: '{}'",
+                            inner.as_rule(),
+                            inner.as_str()
+                        );
                         if inner.as_rule() == Rule::statement {
                             for inner2 in inner.into_inner() {
-                                println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                                println!(
+                                    "    Inner2: {:?}, Content: '{}'",
+                                    inner2.as_rule(),
+                                    inner2.as_str()
+                                );
                                 if inner2.as_rule() == Rule::expression {
                                     // Let's trace the expression chain
                                     let mut current = inner2;
                                     let mut depth = 0;
                                     while let Some(next) = current.into_inner().next() {
                                         depth += 1;
-                                        println!("      Depth {}: {:?}, Content: '{}'", depth, next.as_rule(), next.as_str());
+                                        println!(
+                                            "      Depth {}: {:?}, Content: '{}'",
+                                            depth,
+                                            next.as_rule(),
+                                            next.as_str()
+                                        );
                                         if next.as_rule() == Rule::primary {
                                             println!("        Found primary! Checking inner...");
                                             for primary_inner in next.into_inner() {
-                                                println!("          Primary inner: {:?}, Content: '{}'", primary_inner.as_rule(), primary_inner.as_str());
+                                                println!(
+                                                    "          Primary inner: {:?}, Content: '{}'",
+                                                    primary_inner.as_rule(),
+                                                    primary_inner.as_str()
+                                                );
                                             }
                                             break;
                                         }
                                         current = next;
-                                        if depth > 20 { // Prevent infinite loop
+                                        if depth > 20 {
+                                            // Prevent infinite loop
                                             println!("        Stopping at depth 20 to prevent infinite loop");
                                             break;
                                         }
@@ -454,19 +520,19 @@ mod tests {
             "while true { pass }",
             "return 42",
             "break",
-            "continue", 
+            "continue",
             "pass",
             "raise \"error\"",
         ];
-        
+
         for source in test_cases {
             println!("\n=== DEBUGGING CONTROL FLOW: '{}' ===", source);
-            
+
             // Test the grammar rule directly first
-            use pest::Parser;
-            use crate::parser::TJLangPestParser;
             use crate::parser::Rule;
-            
+            use crate::parser::TJLangPestParser;
+            use pest::Parser;
+
             if source.starts_with("if ") {
                 println!("Testing if_stmt rule directly:");
                 let if_result = TJLangPestParser::parse(Rule::if_stmt, source);
@@ -476,13 +542,17 @@ mod tests {
                         for pair in pairs {
                             println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                             for inner in pair.into_inner() {
-                                println!("    Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                                println!(
+                                    "    Inner: {:?}, Content: '{}'",
+                                    inner.as_rule(),
+                                    inner.as_str()
+                                );
                             }
                         }
-                    },
+                    }
                     Err(e) => println!("✗ if_stmt failed: {}", e),
                 }
-                
+
                 // Test the expression part separately
                 println!("Testing 'true' expression:");
                 let expr_result = TJLangPestParser::parse(Rule::expression, "true");
@@ -492,19 +562,19 @@ mod tests {
                         for pair in pairs {
                             println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                         }
-                    },
+                    }
                     Err(e) => println!("✗ expression failed: {}", e),
                 }
             }
-            
+
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
-            
+            let result = parser.parse(source, file_id);
+
             match &result {
                 Ok(program) => {
                     println!("✓ Parsed successfully: {:?}", program);
-            assert_eq!(program.units.len(), 1);
+                    assert_eq!(program.units.len(), 1);
                 }
                 Err(e) => {
                     println!("✗ Parse failed: {}", e);
@@ -516,13 +586,13 @@ mod tests {
 
     #[test]
     fn test_parse_for_loop() {
-        use pest::Parser;
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
-        
+        use crate::parser::TJLangPestParser;
+        use pest::Parser;
+
         let source = "for ( x : int ; 42 $ 45 ) { pass }";
         let result = TJLangPestParser::parse(Rule::statement, source);
-        
+
         match result {
             Ok(pairs) => {
                 println!("Grammar parse successful for for_stmt!");
@@ -534,12 +604,12 @@ mod tests {
                 println!("Grammar parse failed for for_stmt: {}", e);
             }
         }
-        
+
         // Now test the full program
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
         let result = parser.parse(source, file_id);
-        
+
         match result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
@@ -556,12 +626,12 @@ mod tests {
         let source = "if true { pass } elif false { pass } else { pass }";
         println!("\n=== DEBUGGING IF STATEMENT WITH ELIF/ELSE ===");
         println!("Source: '{}'", source);
-        
+
         // Test individual components
-        use pest::Parser;
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
-        
+        use crate::parser::TJLangPestParser;
+        use pest::Parser;
+
         println!("\n--- Testing if_stmt rule ---");
         let if_result = TJLangPestParser::parse(Rule::if_stmt, source);
         match if_result {
@@ -570,10 +640,10 @@ mod tests {
                 for pair in pairs {
                     println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                 }
-            },
+            }
             Err(e) => println!("✗ if_stmt failed: {}", e),
         }
-        
+
         println!("\n--- Testing full program ---");
         let mut parser = PestParser::new();
         let file_id = create_test_file_id();
@@ -582,7 +652,7 @@ mod tests {
         match &result {
             Ok(program) => {
                 println!("✓ Parsed successfully: {:?}", program);
-        assert_eq!(program.units.len(), 1);
+                assert_eq!(program.units.len(), 1);
             }
             Err(e) => {
                 println!("✗ Parse failed: {}", e);
@@ -602,7 +672,7 @@ mod tests {
         for source in test_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
+            let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(program) => {
@@ -614,10 +684,14 @@ mod tests {
                 }
             }
 
-            assert!(result.is_ok(), "Failed to parse function declaration: {}", source);
+            assert!(
+                result.is_ok(),
+                "Failed to parse function declaration: {}",
+                source
+            );
             let program = result.unwrap();
             assert_eq!(program.units.len(), 1);
-            
+
             // Verify it's a function declaration
             match &program.units[0] {
                 ProgramUnit::Declaration(Declaration::Function(func)) => {
@@ -630,9 +704,9 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_function() {
-        use pest::Parser;
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
+        use pest::Parser;
 
         let source = "def add(x: int, y: int) -> int { return x + y }";
         let result = TJLangPestParser::parse(Rule::function_decl, source);
@@ -643,9 +717,17 @@ mod tests {
                 for pair in pairs {
                     println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                     for inner in pair.into_inner() {
-                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        println!(
+                            "  Inner: {:?}, Content: '{}'",
+                            inner.as_rule(),
+                            inner.as_str()
+                        );
                         for inner2 in inner.into_inner() {
-                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                            println!(
+                                "    Inner2: {:?}, Content: '{}'",
+                                inner2.as_rule(),
+                                inner2.as_str()
+                            );
                         }
                     }
                 }
@@ -660,9 +742,9 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_simple_function() {
-        use pest::Parser;
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
+        use pest::Parser;
 
         let source = "def main() -> int { return 42 }";
         let result = TJLangPestParser::parse(Rule::function_decl, source);
@@ -673,9 +755,17 @@ mod tests {
                 for pair in pairs {
                     println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                     for inner in pair.into_inner() {
-                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        println!(
+                            "  Inner: {:?}, Content: '{}'",
+                            inner.as_rule(),
+                            inner.as_str()
+                        );
                         for inner2 in inner.into_inner() {
-                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                            println!(
+                                "    Inner2: {:?}, Content: '{}'",
+                                inner2.as_rule(),
+                                inner2.as_str()
+                            );
                         }
                     }
                 }
@@ -690,9 +780,9 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_program_with_function() {
-        use pest::Parser;
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
+        use pest::Parser;
 
         let source = "def main() -> int { return 42 }";
         let result = TJLangPestParser::parse(Rule::program, source);
@@ -703,13 +793,24 @@ mod tests {
                 for pair in pairs {
                     println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                     for inner in pair.into_inner() {
-                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        println!(
+                            "  Inner: {:?}, Content: '{}'",
+                            inner.as_rule(),
+                            inner.as_str()
+                        );
                         for inner2 in inner.into_inner() {
-                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                            println!(
+                                "    Inner2: {:?}, Content: '{}'",
+                                inner2.as_rule(),
+                                inner2.as_str()
+                            );
                         }
                     }
                 }
-                assert!(true, "Program with function grammar should parse successfully");
+                assert!(
+                    true,
+                    "Program with function grammar should parse successfully"
+                );
             }
             Err(e) => {
                 println!("Program with function grammar parse failed: {}", e);
@@ -720,9 +821,9 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_program_unit() {
-        use pest::Parser;
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
+        use pest::Parser;
 
         let source = "def main() -> int { return 42 }";
         let result = TJLangPestParser::parse(Rule::program_unit, source);
@@ -733,9 +834,17 @@ mod tests {
                 for pair in pairs {
                     println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                     for inner in pair.into_inner() {
-                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        println!(
+                            "  Inner: {:?}, Content: '{}'",
+                            inner.as_rule(),
+                            inner.as_str()
+                        );
                         for inner2 in inner.into_inner() {
-                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                            println!(
+                                "    Inner2: {:?}, Content: '{}'",
+                                inner2.as_rule(),
+                                inner2.as_str()
+                            );
                         }
                     }
                 }
@@ -750,9 +859,9 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_map_literal() {
-        use pest::Parser;
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
+        use pest::Parser;
 
         let source = "{\"key\": \"value\"}";
         let result = TJLangPestParser::parse(Rule::collection_literal, source);
@@ -763,9 +872,17 @@ mod tests {
                 for pair in pairs {
                     println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                     for inner in pair.into_inner() {
-                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        println!(
+                            "  Inner: {:?}, Content: '{}'",
+                            inner.as_rule(),
+                            inner.as_str()
+                        );
                         for inner2 in inner.into_inner() {
-                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                            println!(
+                                "    Inner2: {:?}, Content: '{}'",
+                                inner2.as_rule(),
+                                inner2.as_str()
+                            );
                         }
                     }
                 }
@@ -780,9 +897,9 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_lambda() {
-        use pest::Parser;
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
+        use pest::Parser;
 
         let source = "() -> 42";
         let result = TJLangPestParser::parse(Rule::lambda_expr, source);
@@ -793,9 +910,17 @@ mod tests {
                 for pair in pairs {
                     println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                     for inner in pair.into_inner() {
-                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        println!(
+                            "  Inner: {:?}, Content: '{}'",
+                            inner.as_rule(),
+                            inner.as_str()
+                        );
                         for inner2 in inner.into_inner() {
-                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                            println!(
+                                "    Inner2: {:?}, Content: '{}'",
+                                inner2.as_rule(),
+                                inner2.as_str()
+                            );
                         }
                     }
                 }
@@ -810,9 +935,9 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_postfix() {
-        use pest::Parser;
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
+        use pest::Parser;
 
         let source = "func()";
         let result = TJLangPestParser::parse(Rule::postfix_expr, source);
@@ -823,9 +948,17 @@ mod tests {
                 for pair in pairs {
                     println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                     for inner in pair.into_inner() {
-                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        println!(
+                            "  Inner: {:?}, Content: '{}'",
+                            inner.as_rule(),
+                            inner.as_str()
+                        );
                         for inner2 in inner.into_inner() {
-                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                            println!(
+                                "    Inner2: {:?}, Content: '{}'",
+                                inner2.as_rule(),
+                                inner2.as_str()
+                            );
                         }
                     }
                 }
@@ -840,9 +973,9 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_type_decl() {
-        use pest::Parser;
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
+        use pest::Parser;
 
         let source = "type MyType = int | str";
         let result = TJLangPestParser::parse(Rule::type_decl, source);
@@ -853,9 +986,17 @@ mod tests {
                 for pair in pairs {
                     println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                     for inner in pair.into_inner() {
-                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        println!(
+                            "  Inner: {:?}, Content: '{}'",
+                            inner.as_rule(),
+                            inner.as_str()
+                        );
                         for inner2 in inner.into_inner() {
-                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                            println!(
+                                "    Inner2: {:?}, Content: '{}'",
+                                inner2.as_rule(),
+                                inner2.as_str()
+                            );
                         }
                     }
                 }
@@ -870,9 +1011,9 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_map_type() {
-        use pest::Parser;
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
+        use pest::Parser;
 
         let source = "fn(int) -> str";
         let result = TJLangPestParser::parse(Rule::function_type, source);
@@ -883,9 +1024,17 @@ mod tests {
                 for pair in pairs {
                     println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                     for inner in pair.into_inner() {
-                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        println!(
+                            "  Inner: {:?}, Content: '{}'",
+                            inner.as_rule(),
+                            inner.as_str()
+                        );
                         for inner2 in inner.into_inner() {
-                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                            println!(
+                                "    Inner2: {:?}, Content: '{}'",
+                                inner2.as_rule(),
+                                inner2.as_str()
+                            );
                         }
                     }
                 }
@@ -905,17 +1054,14 @@ mod tests {
             "type MyType = int | str",
             "type Point = (int, int)",
             "type Callback = fn() -> int",
-            
             // Struct declarations
             "type Point { x: int, y: int }",
             "type Person { name: str, age: int }",
             "type Complex { real: float, imag: float }",
-            
             // Enum declarations
             "enum Option<T> { Some(T), Empty }",
             "enum Result<T, E> { Ok(T), Err(E) }",
             "enum Color { Red, Green, Blue }",
-            
             // Interface declarations
             "interface Drawable { draw() -> int }",
         ];
@@ -923,7 +1069,7 @@ mod tests {
         for source in test_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
+            let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(_program) => {
@@ -934,7 +1080,11 @@ mod tests {
                 }
             }
 
-            assert!(result.is_ok(), "Failed to parse custom type declaration: {}", source);
+            assert!(
+                result.is_ok(),
+                "Failed to parse custom type declaration: {}",
+                source
+            );
         }
     }
 
@@ -951,7 +1101,7 @@ mod tests {
         for source in impl_test_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
+            let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(_program) => {
@@ -985,13 +1135,21 @@ mod tests {
         ];
 
         for (trait_name, type_name) in trait_type_combinations {
-            let source = format!("impl {}:{} {{ method() -> int {{ 42 }} }}", trait_name, type_name);
+            let source = format!(
+                "impl {}:{} {{ method() -> int {{ 42 }} }}",
+                trait_name, type_name
+            );
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
             let result = parser.parse(&source, file_id);
 
-            assert!(result.is_ok(), "Failed to parse impl block with trait '{}' and type '{}': {}", 
-                trait_name, type_name, result.unwrap_err());
+            assert!(
+                result.is_ok(),
+                "Failed to parse impl block with trait '{}' and type '{}': {}",
+                trait_name,
+                type_name,
+                result.unwrap_err()
+            );
         }
     }
 
@@ -1011,9 +1169,13 @@ mod tests {
         for source in method_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
+            let result = parser.parse(source, file_id);
 
-            assert!(result.is_ok(), "Failed to parse impl block with method: {}", source);
+            assert!(
+                result.is_ok(),
+                "Failed to parse impl block with method: {}",
+                source
+            );
         }
     }
 
@@ -1037,9 +1199,13 @@ mod tests {
         for source in complex_method_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
+            let result = parser.parse(source, file_id);
 
-            assert!(result.is_ok(), "Failed to parse impl block with complex methods: {}", source);
+            assert!(
+                result.is_ok(),
+                "Failed to parse impl block with complex methods: {}",
+                source
+            );
         }
     }
 
@@ -1063,9 +1229,13 @@ mod tests {
         for source in edge_case_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
+            let result = parser.parse(source, file_id);
 
-            assert!(result.is_ok(), "Failed to parse impl block edge case: {}", source);
+            assert!(
+                result.is_ok(),
+                "Failed to parse impl block edge case: {}",
+                source
+            );
         }
     }
 
@@ -1093,15 +1263,19 @@ mod tests {
         for source in invalid_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
+            let result = parser.parse(source, file_id);
 
-            assert!(result.is_err(), "Expected parsing to fail for invalid syntax: {}", source);
+            assert!(
+                result.is_err(),
+                "Expected parsing to fail for invalid syntax: {}",
+                source
+            );
         }
     }
 
     #[test]
     fn test_parse_impl_blocks_grammar_rules() {
-        use crate::parser::{TJLangPestParser, Rule};
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
 
         // Test individual grammar rules
@@ -1122,8 +1296,13 @@ mod tests {
             };
 
             let result = TJLangPestParser::parse(rule, input);
-            assert!(result.is_ok(), "Failed to parse {} rule with input '{}': {:?}", 
-                rule_name, input, result);
+            assert!(
+                result.is_ok(),
+                "Failed to parse {} rule with input '{}': {:?}",
+                rule_name,
+                input,
+                result
+            );
         }
     }
 
@@ -1151,16 +1330,16 @@ mod tests {
         use crate::parser::PestParser;
 
         let lambda_test_cases = vec![
-            "() -> 42",                      // No parameters
-            "(x: int) -> x + 1",             // Single parameter
-            "(x: int, y: int) -> x + y",     // Multiple parameters
-            "(x: int) -> x * 2",             // Single typed parameter
+            "() -> 42",                  // No parameters
+            "(x: int) -> x + 1",         // Single parameter
+            "(x: int, y: int) -> x + y", // Multiple parameters
+            "(x: int) -> x * 2",         // Single typed parameter
         ];
 
         for source in lambda_test_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
+            let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(_program) => {
@@ -1171,21 +1350,25 @@ mod tests {
                 }
             }
 
-            assert!(result.is_ok(), "Failed to parse lambda expression: {}", source);
+            assert!(
+                result.is_ok(),
+                "Failed to parse lambda expression: {}",
+                source
+            );
         }
     }
 
     #[test]
     fn test_parse_range_expressions() {
-        use crate::parser::{PestParser, TJLangPestParser, Rule};
+        use crate::parser::{PestParser, Rule, TJLangPestParser};
         use pest::Parser;
 
         // Test the grammar rule directly first
         let range_test_cases = vec![
-            "0 $ 10",     // Exclusive range
-            "0 $= 10",    // Inclusive range
-            "1 $ 5",      // Simple range
-            "10 $= 20",   // Inclusive range with different numbers
+            "0 $ 10",   // Exclusive range
+            "0 $= 10",  // Inclusive range
+            "1 $ 5",    // Simple range
+            "10 $= 20", // Inclusive range with different numbers
         ];
 
         for source in range_test_cases {
@@ -1201,20 +1384,24 @@ mod tests {
             }
 
             // For now, just test that the grammar rule works
-            assert!(grammar_result.is_ok(), "Failed to parse range expression grammar rule: {}", source);
+            assert!(
+                grammar_result.is_ok(),
+                "Failed to parse range expression grammar rule: {}",
+                source
+            );
         }
 
         // Test range expressions in valid contexts
         let context_test_cases = vec![
-            "for (x: int ; 0 $ 10) { pass }",     // Range in for loop
-            "for (i: int ; 1  $ 5) { pass }",      // Simple range in for loop
-            "for (j: int ; 0$=10) { pass }",    // Inclusive range in for loop
+            "for (x: int ; 0 $ 10) { pass }", // Range in for loop
+            "for (i: int ; 1  $ 5) { pass }", // Simple range in for loop
+            "for (j: int ; 0$=10) { pass }",  // Inclusive range in for loop
         ];
 
         for source in context_test_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
+            let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(_program) => {
@@ -1225,7 +1412,11 @@ mod tests {
                 }
             }
 
-            assert!(result.is_ok(), "Failed to parse range expression in context: {}", source);
+            assert!(
+                result.is_ok(),
+                "Failed to parse range expression in context: {}",
+                source
+            );
         }
     }
 
@@ -1234,35 +1425,29 @@ mod tests {
         let test_cases = vec![
             // Primitive types
             "int",
-            "float", 
+            "float",
             "bool",
             "str",
             "any",
-            
             // Collection types
             "[int]",
             "{str}",
             "Map<int, str>",
             "(int, str, bool)",
-            
             // Optional types
             "?int",
             "?str",
-            
             // Union types
             "int | str",
             "int | str | bool",
-            
             // Function types
             "fn() -> int",
             "fn(int) -> str",
             "fn(int, str) -> bool",
-            
             // Generic types
             "Vec<int>",
             "Option<str>",
             "Result<int, str>",
-            
             // Complex nested types
             "Map<str, [int]>",
             "Option<Result<int, str>>",
@@ -1298,27 +1483,22 @@ mod tests {
             "func(arg1, arg2)",
             "obj.method()",
             "obj.method(arg1, arg2)",
-            
             // Member access
             "obj.field",
             "obj.method",
             "arr.length",
-            
             // Indexing
             "arr[0]",
             "map[\"key\"]",
             "arr[1 + 2]",
-            
             // Chained operations
             "obj.method().field",
             "arr[0].method()",
             "obj.field[0]",
-            
             // Lambda expressions (temporarily disabled due to whitespace issues)
             // "| x | x + 1",
             // "| x, y | x + y",
             "() -> 42",
-            
             // Range expressions (temporarily disabled due to whitespace issues)
             // "0..10",
             // "0..=10",
@@ -1328,7 +1508,7 @@ mod tests {
         for source in test_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
+            let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(_program) => {
@@ -1339,7 +1519,11 @@ mod tests {
                 }
             }
 
-            assert!(result.is_ok(), "Failed to parse postfix expression: {}", source);
+            assert!(
+                result.is_ok(),
+                "Failed to parse postfix expression: {}",
+                source
+            );
         }
     }
 
@@ -1351,18 +1535,15 @@ mod tests {
             "[1, 2, 3]",
             "[\"hello\", \"world\"]",
             "[1 + 2, 3 * 4]",
-            
             // Set literals
             "{}",
             "{1, 2, 3}",
             "{\"a\", \"b\", \"c\"}",
-            
             // Map literals
             "{}",
             "{\"key\": \"value\"}",
             "{1: \"one\", 2: \"two\"}",
             "{\"a\": 1, \"b\": 2, \"c\": 3}",
-            
             // Tuple literals
             "(1, 2)",
             "(\"hello\", 42, true)",
@@ -1372,7 +1553,7 @@ mod tests {
         for source in test_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
+            let result = parser.parse(source, file_id);
 
             match &result {
                 Ok(program) => {
@@ -1383,21 +1564,25 @@ mod tests {
                 }
             }
 
-            assert!(result.is_ok(), "Failed to parse collection literal: {}", source);
+            assert!(
+                result.is_ok(),
+                "Failed to parse collection literal: {}",
+                source
+            );
         }
     }
 
     #[test]
     fn test_grammar_parse_impl_block() {
-        use pest::Parser;
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
+        use pest::Parser;
 
         let source = "impl Drawable:Point { draw() -> int { 0 } }";
         println!("=== DEBUGGING IMPL BLOCK PARSING ===");
         println!("Source: '{}'", source);
         println!("Source length: {}", source.len());
-        
+
         // Test individual components first
         println!("\n--- Testing 'impl' keyword ---");
         let impl_result = TJLangPestParser::parse(Rule::impl_kw, "impl");
@@ -1405,58 +1590,66 @@ mod tests {
             Ok(pairs) => println!("✓ 'impl' parsed successfully"),
             Err(e) => println!("✗ 'impl' failed: {}", e),
         }
-        
+
         println!("\n--- Testing 'for' keyword ---");
         let for_result = TJLangPestParser::parse(Rule::for_kw, "for");
         match for_result {
             Ok(pairs) => println!("✓ 'for' parsed successfully"),
             Err(e) => println!("✗ 'for' failed: {}", e),
         }
-        
+
         println!("\n--- Testing identifier 'Drawable' ---");
         let ident_result = TJLangPestParser::parse(Rule::identifier, "Drawable");
         match ident_result {
             Ok(pairs) => println!("✓ 'Drawable' parsed successfully"),
             Err(e) => println!("✗ 'Drawable' failed: {}", e),
         }
-        
+
         println!("\n--- Testing method_decl 'draw() -> int {{ 0 }}' ---");
         let method_result = TJLangPestParser::parse(Rule::method_decl, "draw() -> int { 0 }");
         match method_result {
             Ok(pairs) => {
                 println!("✓ method_decl parsed successfully");
                 for pair in pairs {
-                    println!("  Method rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    println!(
+                        "  Method rule: {:?}, Content: '{}'",
+                        pair.as_rule(),
+                        pair.as_str()
+                    );
                     for inner in pair.into_inner() {
-                        println!("    Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        println!(
+                            "    Inner: {:?}, Content: '{}'",
+                            inner.as_rule(),
+                            inner.as_str()
+                        );
                     }
                 }
-            },
+            }
             Err(e) => {
                 println!("✗ method_decl failed: {}", e);
                 // Let's test the components of method_decl
                 println!("  Testing 'draw' identifier:");
                 let ident_test = TJLangPestParser::parse(Rule::identifier, "draw");
                 println!("    Result: {:?}", ident_test);
-                
+
                 println!("  Testing '()' param_list:");
                 let param_test = TJLangPestParser::parse(Rule::param_list, "");
                 println!("    Result: {:?}", param_test);
-                
+
                 println!("  Testing '->' ARROW:");
                 let arrow_test = TJLangPestParser::parse(Rule::ARROW, "->");
                 println!("    Result: {:?}", arrow_test);
-                
+
                 println!("  Testing 'int' type:");
                 let type_test = TJLangPestParser::parse(Rule::type_, "int");
                 println!("    Result: {:?}", type_test);
-                
+
                 println!("  Testing '{{ 0 }}' block:");
                 let block_test = TJLangPestParser::parse(Rule::block, "{ 0 }");
                 println!("    Result: {:?}", block_test);
             }
         }
-        
+
         // Test a simpler method_decl
         println!("\n--- Testing simpler method_decl 'c() -> int {{ 0 }}' ---");
         let simple_method_result = TJLangPestParser::parse(Rule::method_decl, "c() -> int { 0 }");
@@ -1464,72 +1657,88 @@ mod tests {
             Ok(pairs) => {
                 println!("✓ simple method_decl parsed successfully");
                 for pair in pairs {
-                    println!("  Method rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
+                    println!(
+                        "  Method rule: {:?}, Content: '{}'",
+                        pair.as_rule(),
+                        pair.as_str()
+                    );
                 }
             }
             Err(e) => println!("✗ simple method_decl failed: {}", e),
         }
-        
+
         println!("\n--- Testing if impl_block rule exists ---");
         // Let's check if the rule exists by trying to parse an empty string
         let empty_test = TJLangPestParser::parse(Rule::impl_block, "");
         println!("Empty string test: {:?}", empty_test);
-        
+
         // Let's try to see what rules are available by checking the Rule enum
         println!("Checking if impl_block is in the Rule enum...");
         match std::mem::discriminant(&Rule::impl_block) {
             _ => println!("✓ impl_block rule exists in enum"),
         }
-        
+
         // Let's test a minimal impl_block with a simple method
         println!("\n--- Testing minimal impl_block ---");
         let minimal_impl = "impl A:B { c() -> int { 0 } }";
         let minimal_result = TJLangPestParser::parse(Rule::impl_block, minimal_impl);
         println!("Minimal impl_block test: {:?}", minimal_result);
-        
+
         println!("\n--- Testing step by step impl_block ---");
         // Test: "Drawable"
         let step1 = TJLangPestParser::parse(Rule::impl_block, "Drawable");
         println!("Step 1 - 'Drawable': {:?}", step1);
-        
+
         // Test: "Drawable for"
         let step2 = TJLangPestParser::parse(Rule::impl_block, "Drawable for");
         println!("Step 2 - 'Drawable for': {:?}", step2);
-        
+
         // Test: "Drawable for Point"
         let step3 = TJLangPestParser::parse(Rule::impl_block, "Drawable for Point");
         println!("Step 3 - 'Drawable for Point': {:?}", step3);
-        
+
         // Test: "Drawable for Point {"
         let step4 = TJLangPestParser::parse(Rule::impl_block, "Drawable for Point {");
         println!("Step 4 - 'Drawable for Point {{': {:?}", step4);
-        
+
         // Let's test the exact components step by step
         println!("\n--- Testing exact components ---");
         let test1 = TJLangPestParser::parse(Rule::impl_block, "A for B { test }");
         println!("Test 1: {:?}", test1);
-        
+
         let test2 = TJLangPestParser::parse(Rule::impl_block, "A for B { test }");
         println!("Test 2: {:?}", test2);
-        
+
         // Let's try to parse just the method_decl part
         let method_test = TJLangPestParser::parse(Rule::method_decl, "c() -> int { 0 }");
         println!("Method test: {:?}", method_test);
-        
+
         // Test the final impl_block rule
-        let combined_test = TJLangPestParser::parse(Rule::impl_block, "impl Drawable:Point { draw() -> int { 0 } }");
+        let combined_test = TJLangPestParser::parse(
+            Rule::impl_block,
+            "impl Drawable:Point { draw() -> int { 0 } }",
+        );
         println!("impl_block result: {:?}", combined_test);
-        
+
         // Test with different trait and type names
-        let test1 = TJLangPestParser::parse(Rule::impl_block, "impl Comparable:Point { compare(other: Point) -> int { 0 } }");
+        let test1 = TJLangPestParser::parse(
+            Rule::impl_block,
+            "impl Comparable:Point { compare(other: Point) -> int { 0 } }",
+        );
         println!("Different names test 1: {:?}", test1);
-        
-        let test2 = TJLangPestParser::parse(Rule::impl_block, "impl Iterator:List { next() -> Option<T> { None } }");
+
+        let test2 = TJLangPestParser::parse(
+            Rule::impl_block,
+            "impl Iterator:List { next() -> Option<T> { None } }",
+        );
         println!("Different names test 2: {:?}", test2);
-        
-        let test3 = TJLangPestParser::parse(Rule::impl_block, "impl Serializable:User { serialize() -> string { \"{}\" } }");
+
+        let test3 = TJLangPestParser::parse(
+            Rule::impl_block,
+            "impl Serializable:User { serialize() -> string { \"{}\" } }",
+        );
         println!("Different names test 3: {:?}", test3);
-        
+
         println!("\n--- Testing full impl_block ---");
         let result = TJLangPestParser::parse(Rule::impl_block, source);
 
@@ -1539,9 +1748,17 @@ mod tests {
                 for pair in pairs {
                     println!("Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                     for inner in pair.into_inner() {
-                        println!("  Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                        println!(
+                            "  Inner: {:?}, Content: '{}'",
+                            inner.as_rule(),
+                            inner.as_str()
+                        );
                         for inner2 in inner.into_inner() {
-                            println!("    Inner2: {:?}, Content: '{}'", inner2.as_rule(), inner2.as_str());
+                            println!(
+                                "    Inner2: {:?}, Content: '{}'",
+                                inner2.as_rule(),
+                                inner2.as_str()
+                            );
                         }
                     }
                 }
@@ -1556,16 +1773,12 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_interface_debug() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
-        
+
         // Test identifier parsing first
-        let identifier_tests = vec![
-            "Drawable",
-            "extends",
-            "Printable",
-        ];
-        
+        let identifier_tests = vec!["Drawable", "extends", "Printable"];
+
         for source in identifier_tests {
             println!("Testing identifier: {}", source);
             let result = TJLangPestParser::parse(Rule::identifier, source);
@@ -1580,13 +1793,13 @@ mod tests {
             }
             println!();
         }
-        
+
         // Test interface declaration grammar directly
         let test_cases = vec![
             "interface Drawable { draw() -> int }",
             "interface Drawable extends Printable { draw() -> int }",
         ];
-        
+
         for source in test_cases {
             println!("Testing: {}", source);
             let result = TJLangPestParser::parse(Rule::interface_decl, source);
@@ -1597,14 +1810,24 @@ mod tests {
                         println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                         println!("  Parse tree depth analysis:");
                         for (i, inner) in pair.into_inner().enumerate() {
-                            println!("    [{}] Rule={:?}, Content='{}'", i, inner.as_rule(), inner.as_str());
+                            println!(
+                                "    [{}] Rule={:?}, Content='{}'",
+                                i,
+                                inner.as_rule(),
+                                inner.as_str()
+                            );
                             println!("         Span: {:?}", inner.as_span());
                             // Check if this inner has more children
                             let inner_children: Vec<_> = inner.clone().into_inner().collect();
                             if !inner_children.is_empty() {
                                 println!("         Has {} children:", inner_children.len());
                                 for (j, child) in inner_children.iter().enumerate() {
-                                    println!("           [{}] Rule={:?}, Content='{}'", j, child.as_rule(), child.as_str());
+                                    println!(
+                                        "           [{}] Rule={:?}, Content='{}'",
+                                        j,
+                                        child.as_rule(),
+                                        child.as_str()
+                                    );
                                 }
                             }
                         }
@@ -1614,7 +1837,7 @@ mod tests {
             }
             println!();
         }
-        
+
         // Test the specific problematic part
         println!("=== Testing specific parts ===");
         let problematic_parts = vec![
@@ -1624,7 +1847,7 @@ mod tests {
             "Drawable\t",
             "Drawable\n",
         ];
-        
+
         for part in problematic_parts {
             println!("Testing part: '{}'", part);
             let result = TJLangPestParser::parse(Rule::identifier, part);
@@ -1641,13 +1864,11 @@ mod tests {
             }
             println!();
         }
-        
+
         // Test character sets
         println!("=== Testing character sets ===");
-        let char_tests = vec![
-            "a", "A", "1", "_", " ", "\t", "\n", "extends",
-        ];
-        
+        let char_tests = vec!["a", "A", "1", "_", " ", "\t", "\n", "extends"];
+
         for ch in char_tests {
             println!("Testing character: '{}' (bytes: {:?})", ch, ch.as_bytes());
             let result = TJLangPestParser::parse(Rule::identifier, ch);
@@ -1656,15 +1877,17 @@ mod tests {
                 Err(e) => println!("✗ Failed: {}", e),
             }
         }
-        
+
         // Test what ASCII_ALPHANUMERIC includes
         println!("=== Testing ASCII_ALPHANUMERIC behavior ===");
-        let ascii_tests = vec![
-            "a1", "a_", "a ", "a\t", "a\n", "ab", "a1b", "a_b", "a b",
-        ];
-        
+        let ascii_tests = vec!["a1", "a_", "a ", "a\t", "a\n", "ab", "a1b", "a_b", "a b"];
+
         for test in ascii_tests {
-            println!("Testing ASCII pattern: '{}' (bytes: {:?})", test, test.as_bytes());
+            println!(
+                "Testing ASCII pattern: '{}' (bytes: {:?})",
+                test,
+                test.as_bytes()
+            );
             let result = TJLangPestParser::parse(Rule::identifier, test);
             match result {
                 Ok(pairs) => {
@@ -1675,7 +1898,7 @@ mod tests {
                 Err(e) => println!("✗ Failed: {}", e),
             }
         }
-        
+
         // Test the exact problematic string
         println!("=== Testing exact problematic string ===");
         let exact_test = "Drawable extends Printable";
@@ -1691,7 +1914,7 @@ mod tests {
             }
             Err(e) => println!("✗ Failed: {}", e),
         }
-        
+
         // Test if the issue is with the grammar rule structure
         println!("=== Testing grammar rule structure ===");
         let grammar_test = "interface Drawable extends Printable { draw() -> int }";
@@ -1702,14 +1925,19 @@ mod tests {
                 for pair in pairs {
                     println!("✓ Parsed as interface_decl");
                     for (i, inner) in pair.into_inner().enumerate() {
-                        println!("  [{}] Rule={:?}, Content='{}'", i, inner.as_rule(), inner.as_str());
+                        println!(
+                            "  [{}] Rule={:?}, Content='{}'",
+                            i,
+                            inner.as_rule(),
+                            inner.as_str()
+                        );
                         println!("       Span: {:?}", inner.as_span());
                     }
                 }
             }
             Err(e) => println!("✗ Failed: {}", e),
         }
-        
+
         // Minimal test to understand the issue
         println!("=== Minimal test ===");
         let minimal_test = "a b";
@@ -1730,18 +1958,18 @@ mod tests {
     #[test]
     fn test_parse_interface_extends() {
         use crate::parser::PestParser;
-        
+
         let test_cases = vec![
             "interface Drawable { draw() -> int }",
             "interface Drawable extends Printable { draw() -> int }",
             "interface Drawable extends Printable, Serializable { draw() -> int }",
         ];
-        
+
         for source in test_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
-            
+            let result = parser.parse(source, file_id);
+
             match result {
                 Ok(program) => {
                     println!("✓ Successfully parsed interface: {}", source);
@@ -1759,25 +1987,25 @@ mod tests {
                 Err(e) => panic!("Failed to parse interface '{}': {}", source, e),
             }
         }
-        
+
         println!("✓ All interface extension parsing tests passed");
     }
 
     #[test]
     fn test_parse_struct_literals() {
         use crate::parser::PestParser;
-        
+
         let test_cases = vec![
             "Point { x: 1, y: 2 }",
             "Person { name: \"Alice\", age: 30 }",
             "Config { debug: true, port: 8080 }",
         ];
-        
+
         for source in test_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
-            
+            let result = parser.parse(source, file_id);
+
             match result {
                 Ok(program) => {
                     println!("✓ Successfully parsed struct literal: {}", source);
@@ -1785,7 +2013,10 @@ mod tests {
                     if let Some(unit) = program.units.first() {
                         if let tjlang_ast::ProgramUnit::Declaration(decl) = unit {
                             if let tjlang_ast::Declaration::Variable(var_decl) = decl {
-                                if let tjlang_ast::Expression::StructLiteral { name, fields, .. } = &var_decl.value {
+                                if let tjlang_ast::Expression::StructLiteral {
+                                    name, fields, ..
+                                } = &var_decl.value
+                                {
                                     println!("  Struct name: {}", name);
                                     println!("  Fields: {} field(s)", fields.len());
                                     for field in fields {
@@ -1799,7 +2030,7 @@ mod tests {
                 Err(e) => panic!("Failed to parse struct literal '{}': {}", source, e),
             }
         }
-        
+
         println!("✓ All struct literal parsing tests passed");
     }
 
@@ -1828,8 +2059,12 @@ mod tests {
         for source in ok_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
-            assert!(result.is_ok(), "Failed to parse spawn expression: {}", source);
+            let result = parser.parse(source, file_id);
+            assert!(
+                result.is_ok(),
+                "Failed to parse spawn expression: {}",
+                source
+            );
         }
 
         // Note: Currently there are no invalid spawn usage cases that actually fail
@@ -1838,9 +2073,9 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_fstring_literals() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
-        
+
         // Test f-string literal grammar rule directly
         let test_cases = vec![
             "f\"Hello world\"",
@@ -1849,7 +2084,7 @@ mod tests {
             "f\"Multiple: {a}, {b}\"",
             "f\"Escaped: {{brace}}\"",
         ];
-        
+
         for source in test_cases {
             let result = TJLangPestParser::parse(Rule::fstring_literal, source);
             match result {
@@ -1862,24 +2097,27 @@ mod tests {
                 Err(e) => panic!("Failed to parse f-string literal '{}': {}", source, e),
             }
         }
-        
+
         println!("✓ All f-string literal grammar tests passed");
     }
 
     #[test]
     fn test_parse_fstring_literals() {
         use crate::parser::PestParser;
-        use tjlang_ast::{ProgramUnit, Declaration, Expression, Literal, FStringPart};
-        
+        use tjlang_ast::{Declaration, Expression, FStringPart, Literal, ProgramUnit};
+
         let mut parser = PestParser::new();
-        
+
         // Test basic f-string literal in variable declaration
         let file_id = create_test_file_id();
         let result = parser.parse("x: str = f\"Hello world\"", file_id);
         match result {
             Ok(program) => {
-                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
-                    if let Expression::Literal(Literal::FStringInterpolation(parts)) = &var_decl.value {
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0]
+                {
+                    if let Expression::Literal(Literal::FStringInterpolation(parts)) =
+                        &var_decl.value
+                    {
                         assert_eq!(parts.len(), 1);
                         if let FStringPart::Text(text) = &parts[0] {
                             assert_eq!(text, "Hello world");
@@ -1887,7 +2125,10 @@ mod tests {
                             panic!("Expected text part, got: {:?}", parts[0]);
                         }
                     } else {
-                        panic!("Expected FStringInterpolation literal, got: {:?}", var_decl.value);
+                        panic!(
+                            "Expected FStringInterpolation literal, got: {:?}",
+                            var_decl.value
+                        );
                     }
                 } else {
                     panic!("Expected variable declaration, got: {:?}", program.units);
@@ -1895,14 +2136,17 @@ mod tests {
             }
             Err(e) => panic!("Failed to parse f-string literal: {}", e),
         }
-        
+
         // Test f-string with interpolation syntax
         let file_id = create_test_file_id();
         let result = parser.parse("y: str = f\"Hello {name}\"", file_id);
         match result {
             Ok(program) => {
-                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
-                    if let Expression::Literal(Literal::FStringInterpolation(parts)) = &var_decl.value {
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0]
+                {
+                    if let Expression::Literal(Literal::FStringInterpolation(parts)) =
+                        &var_decl.value
+                    {
                         assert_eq!(parts.len(), 2);
                         if let FStringPart::Text(text) = &parts[0] {
                             assert_eq!(text, "Hello");
@@ -1919,7 +2163,10 @@ mod tests {
                             panic!("Expected expression part, got: {:?}", parts[1]);
                         }
                     } else {
-                        panic!("Expected FStringInterpolation literal, got: {:?}", var_decl.value);
+                        panic!(
+                            "Expected FStringInterpolation literal, got: {:?}",
+                            var_decl.value
+                        );
                     }
                 } else {
                     panic!("Expected variable declaration, got: {:?}", program.units);
@@ -1927,14 +2174,17 @@ mod tests {
             }
             Err(e) => panic!("Failed to parse f-string with interpolation: {}", e),
         }
-        
+
         // Test f-string with complex interpolation
         let file_id = create_test_file_id();
         let result = parser.parse("z: str = f\"Value: {x + y}\"", file_id);
         match result {
             Ok(program) => {
-                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
-                    if let Expression::Literal(Literal::FStringInterpolation(parts)) = &var_decl.value {
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0]
+                {
+                    if let Expression::Literal(Literal::FStringInterpolation(parts)) =
+                        &var_decl.value
+                    {
                         assert_eq!(parts.len(), 2);
                         if let FStringPart::Text(text) = &parts[0] {
                             assert_eq!(text, "Value:");
@@ -1946,12 +2196,18 @@ mod tests {
                             println!("DEBUG: Expression in f-string: {:?}", expr);
                             // For now, just check that we got an expression
                             // The actual structure might be different than expected
-                            assert!(matches!(expr.as_ref(), Expression::Variable(_) | Expression::Binary { .. }));
+                            assert!(matches!(
+                                expr.as_ref(),
+                                Expression::Variable(_) | Expression::Binary { .. }
+                            ));
                         } else {
                             panic!("Expected expression part, got: {:?}", parts[1]);
                         }
                     } else {
-                        panic!("Expected FStringInterpolation literal, got: {:?}", var_decl.value);
+                        panic!(
+                            "Expected FStringInterpolation literal, got: {:?}",
+                            var_decl.value
+                        );
                     }
                 } else {
                     panic!("Expected variable declaration, got: {:?}", program.units);
@@ -1959,16 +2215,22 @@ mod tests {
             }
             Err(e) => panic!("Failed to parse f-string with complex interpolation: {}", e),
         }
-        
+
         // Test f-string with multiple interpolations
         let file_id = create_test_file_id();
-        let result = parser.parse("msg: str = f\"Hello {name}, you are {age} years old\"", file_id);
+        let result = parser.parse(
+            "msg: str = f\"Hello {name}, you are {age} years old\"",
+            file_id,
+        );
         match result {
             Ok(program) => {
-                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
-                    if let Expression::Literal(Literal::FStringInterpolation(parts)) = &var_decl.value {
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0]
+                {
+                    if let Expression::Literal(Literal::FStringInterpolation(parts)) =
+                        &var_decl.value
+                    {
                         assert_eq!(parts.len(), 5); // "Hello", name, ", you are", age, "years old"
-                        // Check first text part
+                                                    // Check first text part
                         if let FStringPart::Text(text) = &parts[0] {
                             assert_eq!(text, "Hello");
                         } else {
@@ -2007,24 +2269,33 @@ mod tests {
                             panic!("Expected text part, got: {:?}", parts[4]);
                         }
                     } else {
-                        panic!("Expected FStringInterpolation literal, got: {:?}", var_decl.value);
+                        panic!(
+                            "Expected FStringInterpolation literal, got: {:?}",
+                            var_decl.value
+                        );
                     }
                 } else {
                     panic!("Expected variable declaration, got: {:?}", program.units);
                 }
             }
-            Err(e) => panic!("Failed to parse f-string with multiple interpolations: {}", e),
+            Err(e) => panic!(
+                "Failed to parse f-string with multiple interpolations: {}",
+                e
+            ),
         }
-        
+
         // Test f-string with only expressions
         let file_id = create_test_file_id();
         let result = parser.parse("result: str = f\"{x}{y}\"", file_id);
         match result {
             Ok(program) => {
-                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0] {
-                    if let Expression::Literal(Literal::FStringInterpolation(parts)) = &var_decl.value {
+                if let ProgramUnit::Declaration(Declaration::Variable(var_decl)) = &program.units[0]
+                {
+                    if let Expression::Literal(Literal::FStringInterpolation(parts)) =
+                        &var_decl.value
+                    {
                         assert_eq!(parts.len(), 2); // x, y
-                        // Check first expression
+                                                    // Check first expression
                         if let FStringPart::Expression(expr) = &parts[0] {
                             if let Expression::Variable(name) = expr.as_ref() {
                                 assert_eq!(name, "x");
@@ -2045,7 +2316,10 @@ mod tests {
                             panic!("Expected expression part, got: {:?}", parts[1]);
                         }
                     } else {
-                        panic!("Expected FStringInterpolation literal, got: {:?}", var_decl.value);
+                        panic!(
+                            "Expected FStringInterpolation literal, got: {:?}",
+                            var_decl.value
+                        );
                     }
                 } else {
                     panic!("Expected variable declaration, got: {:?}", program.units);
@@ -2053,15 +2327,15 @@ mod tests {
             }
             Err(e) => panic!("Failed to parse f-string with only expressions: {}", e),
         }
-        
+
         println!("✓ All f-string interpolation tests passed");
     }
 
     #[test]
     fn test_grammar_parse_struct_literals() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
-        
+
         // Test struct literal grammar rule directly
         let test_cases = vec![
             "Point { x: 1, y: 2 }",
@@ -2069,7 +2343,7 @@ mod tests {
             "Config { debug: true, port: 8080 }",
             "Single { value: 42 }",
         ];
-        
+
         for source in test_cases {
             let result = TJLangPestParser::parse(Rule::struct_literal, source);
             match result {
@@ -2082,23 +2356,18 @@ mod tests {
                 Err(e) => panic!("Failed to parse struct literal '{}': {}", source, e),
             }
         }
-        
+
         println!("✓ All struct literal grammar tests passed");
     }
 
     #[test]
     fn test_grammar_parse_field_initialization() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
-        
+
         // Test field initialization grammar rule directly
-        let test_cases = vec![
-            "x: 42",
-            "name: \"hello\"",
-            "enabled: true",
-            "value: x + y",
-        ];
-        
+        let test_cases = vec!["x: 42", "name: \"hello\"", "enabled: true", "value: x + y"];
+
         for source in test_cases {
             let result = TJLangPestParser::parse(Rule::field_init, source);
             match result {
@@ -2111,22 +2380,22 @@ mod tests {
                 Err(e) => panic!("Failed to parse field initialization '{}': {}", source, e),
             }
         }
-        
+
         println!("✓ All field initialization grammar tests passed");
     }
 
     #[test]
     fn test_grammar_parse_match_statements_no_commas() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
-        
+
         // Test match statement with no commas between arms (corrected syntax)
         let test_cases = vec![
             "match x { 1: { pass } 2: { pass } _: { pass } }",
             "match value { true: { return 1 } false: { return 0 } }",
             "match status { \"ok\": { pass } \"error\": { raise \"failed\" } }",
         ];
-        
+
         for source in test_cases {
             let result = TJLangPestParser::parse(Rule::match_stmt, source);
             match result {
@@ -2139,22 +2408,18 @@ mod tests {
                 Err(e) => panic!("Failed to parse match statement '{}': {}", source, e),
             }
         }
-        
+
         println!("✓ All match statement grammar tests passed");
     }
 
     #[test]
     fn test_grammar_parse_identifier_list() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
-        
+
         // Test identifier list parsing
-        let test_cases = vec![
-            "Printable",
-            "Printable, Serializable",
-            "A, B, C",
-        ];
-        
+        let test_cases = vec!["Printable", "Printable, Serializable", "A, B, C"];
+
         for source in test_cases {
             let result = TJLangPestParser::parse(Rule::identifier_list, source);
             match result {
@@ -2167,21 +2432,21 @@ mod tests {
                 Err(e) => panic!("Failed to parse identifier list '{}': {}", source, e),
             }
         }
-        
+
         println!("✓ All identifier list grammar tests passed");
     }
 
     #[test]
     fn test_grammar_parse_interface_extends() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
-        
+
         // Test interface with extends clause
         let test_cases = vec![
             "interface Drawable { draw() -> int }",
             "interface Drawable extends Printable { draw() -> int }",
         ];
-        
+
         for source in test_cases {
             let result = TJLangPestParser::parse(Rule::interface_decl, source);
             match result {
@@ -2194,63 +2459,78 @@ mod tests {
                 Err(e) => panic!("Failed to parse interface declaration '{}': {}", source, e),
             }
         }
-        
+
         println!("✓ All interface declaration grammar tests passed");
     }
 
     #[test]
     fn test_grammar_parse_generic_params() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
-        
+
         // Test generic parameters with bounds
         let test_cases = vec![
             "def process<T: implements [Comparable]> (item: T) -> int { 0 }",
             "def sort<T: implements [Comparable, Serializable]> (items: [T]) -> [T] { items }",
             "def map<T: implements [Clone], U: implements [Default]> (f: fn(T) -> U, items: [T]) -> [U] { [] }",
         ];
-        
+
         for source in test_cases {
             let result = TJLangPestParser::parse(Rule::function_decl, source);
             match result {
                 Ok(pairs) => {
-                    println!("✓ Function with generic parameters parsed successfully: {}", source);
+                    println!(
+                        "✓ Function with generic parameters parsed successfully: {}",
+                        source
+                    );
                     for pair in pairs {
                         println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                     }
                 }
-                Err(e) => panic!("Failed to parse function with generic parameters '{}': {}", source, e),
+                Err(e) => panic!(
+                    "Failed to parse function with generic parameters '{}': {}",
+                    source, e
+                ),
             }
         }
-        
+
         println!("✓ All generic parameters grammar tests passed");
     }
 
     #[test]
     fn test_parse_generic_params() {
         use crate::parser::PestParser;
-        
+
         let test_cases = vec![
             "def identity<T: implements [Comparable]>(x: T) -> T { return x }",
             "def compare<T: implements [Comparable, Serializable]>(a: T, b: T) -> int { return a.compare(b) }",
             "def process<T: implements [Comparable], U: implements [Clone]>(item: T, backup: U) -> T { return item }",
         ];
-        
+
         for source in test_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
-            
+            let result = parser.parse(source, file_id);
+
             match result {
                 Ok(program) => {
-                    println!("✓ Successfully parsed function with generic parameters: {}", source);
+                    println!(
+                        "✓ Successfully parsed function with generic parameters: {}",
+                        source
+                    );
                     if let Some(unit) = program.units.first() {
                         if let tjlang_ast::ProgramUnit::Declaration(decl) = unit {
                             if let tjlang_ast::Declaration::Function(func_decl) = decl {
                                 println!("  Function name: {}", func_decl.name);
-                                println!("  Generic parameters: {} parameter(s)", func_decl.generic_params.len());
+                                println!(
+                                    "  Generic parameters: {} parameter(s)",
+                                    func_decl.generic_params.len()
+                                );
                                 for (i, param) in func_decl.generic_params.iter().enumerate() {
-                                    println!("    [{}] {}: Implements {:?}", i, param.name, param.bounds);
+                                    println!(
+                                        "    [{}] {}: Implements {:?}",
+                                        i, param.name, param.bounds
+                                    );
                                 }
                                 println!("  Parameters: {} parameter(s)", func_decl.params.len());
                                 println!("  Return type: {:?}", func_decl.return_type);
@@ -2258,24 +2538,27 @@ mod tests {
                         }
                     }
                 }
-                Err(e) => panic!("Failed to parse function with generic parameters '{}': {}", source, e),
+                Err(e) => panic!(
+                    "Failed to parse function with generic parameters '{}': {}",
+                    source, e
+                ),
             }
         }
-        
+
         println!("✓ All generic parameters parsing tests passed");
     }
 
     #[test]
     fn test_debug_generic_params() {
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
         use pest::Parser;
-        
+
         let test_cases = vec![
             "<T: implements [Comparable]>",
             "<T: implements [Comparable, Serializable]>",
         ];
-        
+
         for source in test_cases {
             println!("Testing generic_params: {}", source);
             let result = TJLangPestParser::parse(Rule::generic_params, source);
@@ -2285,7 +2568,11 @@ mod tests {
                     for pair in pairs {
                         println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                         for inner in pair.into_inner() {
-                            println!("    Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                            println!(
+                                "    Inner: {:?}, Content: '{}'",
+                                inner.as_rule(),
+                                inner.as_str()
+                            );
                         }
                     }
                 }
@@ -2297,15 +2584,15 @@ mod tests {
 
     #[test]
     fn test_debug_generic_param() {
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
         use pest::Parser;
-        
+
         let test_cases = vec![
             "T: implements [Comparable]",
             "T: implements [Comparable, Serializable]",
         ];
-        
+
         for source in test_cases {
             println!("Testing generic_param: {}", source);
             let result = TJLangPestParser::parse(Rule::generic_param, source);
@@ -2315,7 +2602,11 @@ mod tests {
                     for pair in pairs {
                         println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                         for inner in pair.into_inner() {
-                            println!("    Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                            println!(
+                                "    Inner: {:?}, Content: '{}'",
+                                inner.as_rule(),
+                                inner.as_str()
+                            );
                         }
                     }
                 }
@@ -2327,9 +2618,9 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_operator_methods() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
-        
+
         // Test operator symbols in method signatures
         let test_cases = vec![
             "interface Math { + (other: int) -> int }",
@@ -2337,65 +2628,82 @@ mod tests {
             "interface Indexable { [] (index: int) -> int }",
             "interface Logic { and (other: bool) -> bool }",
         ];
-        
+
         for source in test_cases {
             let result = TJLangPestParser::parse(Rule::interface_decl, source);
             match result {
                 Ok(pairs) => {
-                    println!("✓ Interface with operator method parsed successfully: {}", source);
+                    println!(
+                        "✓ Interface with operator method parsed successfully: {}",
+                        source
+                    );
                     for pair in pairs {
                         println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                     }
                 }
-                Err(e) => panic!("Failed to parse interface with operator method '{}': {}", source, e),
+                Err(e) => panic!(
+                    "Failed to parse interface with operator method '{}': {}",
+                    source, e
+                ),
             }
         }
-        
+
         println!("✓ All operator method grammar tests passed");
     }
 
     #[test]
     fn test_parse_operator_methods() {
         use crate::parser::PestParser;
-        
+
         let test_cases = vec![
             "interface Math { + (other: int) -> int }",
             "interface Comparable { == (other: int) -> bool }",
             "interface Indexable { [] (index: int) -> int }",
             "interface Logic { and (other: bool) -> bool }",
         ];
-        
+
         for source in test_cases {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
-        let result = parser.parse(source, file_id);
-            
+            let result = parser.parse(source, file_id);
+
             match result {
                 Ok(program) => {
-                    println!("✓ Successfully parsed interface with operator method: {}", source);
+                    println!(
+                        "✓ Successfully parsed interface with operator method: {}",
+                        source
+                    );
                     if let Some(unit) = program.units.first() {
                         if let tjlang_ast::ProgramUnit::Declaration(decl) = unit {
                             if let tjlang_ast::Declaration::Interface(interface_decl) = decl {
                                 println!("  Interface name: {}", interface_decl.name);
                                 println!("  Methods: {} method(s)", interface_decl.methods.len());
                                 for (i, method) in interface_decl.methods.iter().enumerate() {
-                                    println!("    [{}] {}: {} parameter(s) -> {:?}", 
-                                        i, method.name, method.params.len(), method.return_type);
+                                    println!(
+                                        "    [{}] {}: {} parameter(s) -> {:?}",
+                                        i,
+                                        method.name,
+                                        method.params.len(),
+                                        method.return_type
+                                    );
                                 }
                             }
                         }
                     }
                 }
-                Err(e) => panic!("Failed to parse interface with operator method '{}': {}", source, e),
+                Err(e) => panic!(
+                    "Failed to parse interface with operator method '{}': {}",
+                    source, e
+                ),
             }
         }
-        
+
         println!("✓ All operator method parsing tests passed");
     }
 
     #[test]
     fn test_grammar_parse_bitwise_and_power_precedence() {
-        use crate::parser::{TJLangPestParser, Rule};
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
 
         let cases = vec![
@@ -2426,13 +2734,18 @@ mod tests {
             let mut p = PestParser::new();
             let file_id = create_test_file_id();
             let program = p.parse(src, file_id).expect("parse failed");
-            assert_eq!(program.units.len(), expect_units, "Unexpected unit count for {}", src);
+            assert_eq!(
+                program.units.len(),
+                expect_units,
+                "Unexpected unit count for {}",
+                src
+            );
         }
     }
 
     // Match statement coverage: literals, type binds, enums/constructors, option, traits, guards, tuples, structs, nested
     fn parse_match_stmt_ok(src: &str) {
-        use crate::parser::{TJLangPestParser, Rule};
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
         let res = TJLangPestParser::parse(Rule::match_stmt, src);
         assert!(res.is_ok(), "Failed to parse match statement: {}", src);
@@ -2465,7 +2778,9 @@ mod tests {
 
     #[test]
     fn test_grammar_match_tuple_patterns() {
-        parse_match_stmt_ok("match pair { (0, y: int): { pass } (x: int, 0): { pass } (a: int, b: int): { pass } }");
+        parse_match_stmt_ok(
+            "match pair { (0, y: int): { pass } (x: int, 0): { pass } (a: int, b: int): { pass } }",
+        );
     }
 
     fn parse_ok_program_helper(src: &str) {
@@ -2473,17 +2788,25 @@ mod tests {
         let mut p = PestParser::new();
         let file_id = create_test_file_id();
         let result = p.parse(src, file_id);
-        assert!(result.is_ok(), "Failed to parse program with match: {}", src);
+        assert!(
+            result.is_ok(),
+            "Failed to parse program with match: {}",
+            src
+        );
     }
 
     #[test]
     fn test_parse_match_literals_and_wildcard() {
-        parse_ok_program_helper("def main() -> int { match 5 { 0: { pass } 5: { return 1 } _: { return 0 } } }");
+        parse_ok_program_helper(
+            "def main() -> int { match 5 { 0: { pass } 5: { return 1 } _: { return 0 } } }",
+        );
     }
 
     #[test]
     fn test_parse_match_type_binds() {
-        parse_ok_program_helper("def main() -> int { match 1 { n: int: { return n } s: str: { return 0 } } }");
+        parse_ok_program_helper(
+            "def main() -> int { match 1 { n: int: { return n } s: str: { return 0 } } }",
+        );
     }
 
     #[test]
@@ -2493,7 +2816,9 @@ mod tests {
 
     #[test]
     fn test_parse_match_option_patterns() {
-        parse_ok_program_helper("def main() -> int { match None { Some(v: int): { return v } None: { return 0 } } }");
+        parse_ok_program_helper(
+            "def main() -> int { match None { Some(v: int): { return v } None: { return 0 } } }",
+        );
     }
 
     #[test]
@@ -2540,11 +2865,12 @@ mod tests {
     // Multiple methods in impl blocks
     #[test]
     fn test_grammar_parse_impl_multiple_methods() {
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
         use pest::Parser;
-        
-        let source = "impl Drawable: Point { draw() -> int { return 1 } clear() -> int { return 0 } }";
+
+        let source =
+            "impl Drawable: Point { draw() -> int { return 1 } clear() -> int { return 0 } }";
         let result = TJLangPestParser::parse(Rule::impl_block, source);
         match result {
             Ok(pairs) => {
@@ -2560,10 +2886,13 @@ mod tests {
     #[test]
     fn test_parse_impl_multiple_methods() {
         use crate::parser::PestParser;
-        use tjlang_ast::{ProgramUnit, Declaration, ExportDecl};
+        use tjlang_ast::{Declaration, ExportDecl, ProgramUnit};
         let mut p = PestParser::new();
         let file_id = create_test_file_id();
-        let result = p.parse("impl Drawable: Point { draw() -> int { return 1 } clear() -> int { return 0 } }", file_id);
+        let result = p.parse(
+            "impl Drawable: Point { draw() -> int { return 1 } clear() -> int { return 0 } }",
+            file_id,
+        );
         match result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
@@ -2585,10 +2914,10 @@ mod tests {
     // Export declarations
     #[test]
     fn test_grammar_parse_export_function() {
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
         use pest::Parser;
-        
+
         let source = "export def my_func() -> int { return 42 }";
         let result = TJLangPestParser::parse(Rule::export_decl, source);
         match result {
@@ -2604,10 +2933,10 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_export_interface() {
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
         use pest::Parser;
-        
+
         let source = "export interface Drawable { draw() -> int }";
         let result = TJLangPestParser::parse(Rule::export_decl, source);
         match result {
@@ -2623,10 +2952,10 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_export_type() {
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
         use pest::Parser;
-        
+
         let source = "export type MyType = int";
         let result = TJLangPestParser::parse(Rule::export_decl, source);
         match result {
@@ -2643,7 +2972,7 @@ mod tests {
     #[test]
     fn test_parse_export_function() {
         use crate::parser::PestParser;
-        use tjlang_ast::{ProgramUnit, Declaration, ExportDecl};
+        use tjlang_ast::{Declaration, ExportDecl, ProgramUnit};
         let mut p = PestParser::new();
         let file_id = create_test_file_id();
         let result = p.parse("export def my_func() -> int { return 42 }", file_id);
@@ -2651,14 +2980,12 @@ mod tests {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
                 match &program.units[0] {
-                    ProgramUnit::Export(export_decl) => {
-                        match export_decl {
-                            ExportDecl::Declaration(Declaration::Function(func_decl)) => {
-                                assert_eq!(func_decl.name, "my_func");
-                            }
-                            _ => panic!("Expected Function declaration in export"),
+                    ProgramUnit::Export(export_decl) => match export_decl {
+                        ExportDecl::Declaration(Declaration::Function(func_decl)) => {
+                            assert_eq!(func_decl.name, "my_func");
                         }
-                    }
+                        _ => panic!("Expected Function declaration in export"),
+                    },
                     _ => panic!("Expected Export, got {:?}", program.units[0]),
                 }
             }
@@ -2669,7 +2996,7 @@ mod tests {
     #[test]
     fn test_parse_export_interface() {
         use crate::parser::PestParser;
-        use tjlang_ast::{ProgramUnit, Declaration, ExportDecl};
+        use tjlang_ast::{Declaration, ExportDecl, ProgramUnit};
         let mut p = PestParser::new();
         let file_id = create_test_file_id();
         let result = p.parse("export interface Drawable { draw() -> int }", file_id);
@@ -2677,14 +3004,12 @@ mod tests {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
                 match &program.units[0] {
-                    ProgramUnit::Export(export_decl) => {
-                        match export_decl {
-                            ExportDecl::Declaration(Declaration::Interface(interface_decl)) => {
-                                assert_eq!(interface_decl.name, "Drawable");
-                            }
-                            _ => panic!("Expected Interface declaration in export"),
+                    ProgramUnit::Export(export_decl) => match export_decl {
+                        ExportDecl::Declaration(Declaration::Interface(interface_decl)) => {
+                            assert_eq!(interface_decl.name, "Drawable");
                         }
-                    }
+                        _ => panic!("Expected Interface declaration in export"),
+                    },
                     _ => panic!("Expected Export, got {:?}", program.units[0]),
                 }
             }
@@ -2695,7 +3020,7 @@ mod tests {
     #[test]
     fn test_parse_export_type() {
         use crate::parser::PestParser;
-        use tjlang_ast::{ProgramUnit, Declaration, ExportDecl};
+        use tjlang_ast::{Declaration, ExportDecl, ProgramUnit};
         let mut p = PestParser::new();
         let file_id = create_test_file_id();
         let result = p.parse("export type MyType = int", file_id);
@@ -2703,14 +3028,12 @@ mod tests {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
                 match &program.units[0] {
-                    ProgramUnit::Export(export_decl) => {
-                        match export_decl {
-                            ExportDecl::Declaration(Declaration::Type(type_decl)) => {
-                                assert_eq!(type_decl.name, "MyType");
-                            }
-                            _ => panic!("Expected Type declaration in export"),
+                    ProgramUnit::Export(export_decl) => match export_decl {
+                        ExportDecl::Declaration(Declaration::Type(type_decl)) => {
+                            assert_eq!(type_decl.name, "MyType");
                         }
-                    }
+                        _ => panic!("Expected Type declaration in export"),
+                    },
                     _ => panic!("Expected Export, got {:?}", program.units[0]),
                 }
             }
@@ -2720,15 +3043,15 @@ mod tests {
 
     #[test]
     fn test_debug_function_decl() {
-        use crate::parser::TJLangPestParser;
         use crate::parser::Rule;
+        use crate::parser::TJLangPestParser;
         use pest::Parser;
-        
+
         let test_cases = vec![
             "def main() -> int { return 42 }",
             "def add(x: int, y: int) -> int { return x + y }",
         ];
-        
+
         for source in test_cases {
             println!("Testing function_decl: {}", source);
             let result = TJLangPestParser::parse(Rule::function_decl, source);
@@ -2738,7 +3061,11 @@ mod tests {
                     for pair in pairs {
                         println!("  Rule: {:?}, Content: '{}'", pair.as_rule(), pair.as_str());
                         for inner in pair.into_inner() {
-                            println!("    Inner: {:?}, Content: '{}'", inner.as_rule(), inner.as_str());
+                            println!(
+                                "    Inner: {:?}, Content: '{}'",
+                                inner.as_rule(),
+                                inner.as_str()
+                            );
                         }
                     }
                 }
@@ -2750,16 +3077,16 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_enum_type_parameters() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
-        
+
         // Test enum with type parameters (corrected syntax)
         let test_cases = vec![
             "enum Option { Some(T), Empty }",
             "enum Result { Ok(T), Err(E) }",
             "enum Color { Red, Green, Blue }",
         ];
-        
+
         for source in test_cases {
             let result = TJLangPestParser::parse(Rule::enum_decl, source);
             match result {
@@ -2772,14 +3099,14 @@ mod tests {
                 Err(e) => panic!("Failed to parse enum declaration '{}': {}", source, e),
             }
         }
-        
+
         println!("✓ All enum declaration grammar tests passed");
     }
 
     #[test]
     fn test_grammar_parse_modules_imports_exports() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
         // Grammar-level tests for modules/import/export
         let cases = vec![
             "module graphics.ui",
@@ -2792,14 +3119,19 @@ mod tests {
         ];
         for source in cases {
             let result = TJLangPestParser::parse(Rule::program_unit, source);
-            assert!(result.is_ok(), "Grammar failed for program_unit: {} -> {:?}", source, result.err());
+            assert!(
+                result.is_ok(),
+                "Grammar failed for program_unit: {} -> {:?}",
+                source,
+                result.err()
+            );
         }
     }
 
     #[test]
     fn test_grammar_parse_match_statements() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
 
         let cases = vec![
             // Basic match with literals - start simple
@@ -2826,14 +3158,18 @@ mod tests {
             if let Err(e) = &result {
                 println!("Failed to parse '{}': {:?}", source, e);
             }
-            assert!(result.is_ok(), "Failed to parse match statement: {}", source);
+            assert!(
+                result.is_ok(),
+                "Failed to parse match statement: {}",
+                source
+            );
         }
     }
 
     #[test]
     fn test_parse_export_identifier() {
         use crate::parser::PestParser;
-        use tjlang_ast::{ProgramUnit, ExportDecl};
+        use tjlang_ast::{ExportDecl, ProgramUnit};
         let mut p = PestParser::new();
         let file_id = create_test_file_id();
         let result = p.parse("export draw", file_id);
@@ -2841,14 +3177,12 @@ mod tests {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
                 match &program.units[0] {
-                    ProgramUnit::Export(export_decl) => {
-                        match export_decl {
-                            ExportDecl::Identifier(name) => {
-                                assert_eq!(name, "draw");
-                            }
-                            _ => panic!("Expected Identifier export, got {:?}", export_decl),
+                    ProgramUnit::Export(export_decl) => match export_decl {
+                        ExportDecl::Identifier(name) => {
+                            assert_eq!(name, "draw");
                         }
-                    }
+                        _ => panic!("Expected Identifier export, got {:?}", export_decl),
+                    },
                     _ => panic!("Expected Export, got {:?}", program.units[0]),
                 }
             }
@@ -2859,7 +3193,7 @@ mod tests {
     #[test]
     fn test_parse_export_identifier_list() {
         use crate::parser::PestParser;
-        use tjlang_ast::{ProgramUnit, ExportDecl};
+        use tjlang_ast::{ExportDecl, ProgramUnit};
         let mut p = PestParser::new();
         let file_id = create_test_file_id();
         let result = p.parse("export { draw, fill }", file_id);
@@ -2867,16 +3201,14 @@ mod tests {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
                 match &program.units[0] {
-                    ProgramUnit::Export(export_decl) => {
-                        match export_decl {
-                            ExportDecl::IdentifierList(identifiers) => {
-                                assert_eq!(identifiers.len(), 2);
-                                assert_eq!(identifiers[0], "draw");
-                                assert_eq!(identifiers[1], "fill");
-                            }
-                            _ => panic!("Expected IdentifierList export, got {:?}", export_decl),
+                    ProgramUnit::Export(export_decl) => match export_decl {
+                        ExportDecl::IdentifierList(identifiers) => {
+                            assert_eq!(identifiers.len(), 2);
+                            assert_eq!(identifiers[0], "draw");
+                            assert_eq!(identifiers[1], "fill");
                         }
-                    }
+                        _ => panic!("Expected IdentifierList export, got {:?}", export_decl),
+                    },
                     _ => panic!("Expected Export, got {:?}", program.units[0]),
                 }
             }
@@ -2886,9 +3218,9 @@ mod tests {
 
     #[test]
     fn test_grammar_parse_c_style_for_loops() {
+        use crate::parser::{Rule, TJLangPestParser};
         use pest::Parser;
-        use crate::parser::{TJLangPestParser, Rule};
-        
+
         let cases = vec![
             // Basic C-style for loop
             "for (i: int = 0; i < 10; i = i + 1) { pass }",
@@ -2901,22 +3233,30 @@ mod tests {
             // For loop with only semicolons
             "for (;;) { pass }",
         ];
-        
+
         for source in cases {
             let result = TJLangPestParser::parse(Rule::for_stmt, source);
-            assert!(result.is_ok(), "Grammar failed for C-style for loop: {} -> {:?}", source, result.err());
+            assert!(
+                result.is_ok(),
+                "Grammar failed for C-style for loop: {} -> {:?}",
+                source,
+                result.err()
+            );
         }
     }
 
     #[test]
     fn test_parse_c_style_for_loop() {
         use crate::parser::PestParser;
-        use tjlang_ast::{ProgramUnit, Declaration, Statement, ForStatement};
-        
+        use tjlang_ast::{Declaration, ForStatement, ProgramUnit, Statement};
+
         let mut p = PestParser::new();
         let file_id = create_test_file_id();
-        let result = p.parse("def test() -> int { for (i = 0; i < 10; i = i + 1) { pass } return 0 }", file_id);
-        
+        let result = p.parse(
+            "def test() -> int { for (i = 0; i < 10; i = i + 1) { pass } return 0 }",
+            file_id,
+        );
+
         match result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
@@ -2924,7 +3264,12 @@ mod tests {
                     ProgramUnit::Declaration(Declaration::Function(func_decl)) => {
                         assert_eq!(func_decl.body.statements.len(), 2);
                         match &func_decl.body.statements[0] {
-                            Statement::For(ForStatement::CStyle { initializer, condition, increment, .. }) => {
+                            Statement::For(ForStatement::CStyle {
+                                initializer,
+                                condition,
+                                increment,
+                                ..
+                            }) => {
                                 assert!(initializer.is_some(), "Expected initializer");
                                 assert!(condition.is_some(), "Expected condition");
                                 assert!(increment.is_some(), "Expected increment");
@@ -2942,12 +3287,12 @@ mod tests {
     #[test]
     fn test_parse_c_style_for_loop_minimal() {
         use crate::parser::PestParser;
-        use tjlang_ast::{ProgramUnit, Declaration, Statement, ForStatement};
-        
+        use tjlang_ast::{Declaration, ForStatement, ProgramUnit, Statement};
+
         let mut p = PestParser::new();
         let file_id = create_test_file_id();
         let result = p.parse("def test() -> int { for (;;) { pass } return 0 }", file_id);
-        
+
         match result {
             Ok(program) => {
                 assert_eq!(program.units.len(), 1);
@@ -2955,7 +3300,12 @@ mod tests {
                     ProgramUnit::Declaration(Declaration::Function(func_decl)) => {
                         assert_eq!(func_decl.body.statements.len(), 2);
                         match &func_decl.body.statements[0] {
-                            Statement::For(ForStatement::CStyle { initializer, condition, increment, .. }) => {
+                            Statement::For(ForStatement::CStyle {
+                                initializer,
+                                condition,
+                                increment,
+                                ..
+                            }) => {
                                 assert!(initializer.is_none(), "Expected no initializer");
                                 assert!(condition.is_none(), "Expected no condition");
                                 assert!(increment.is_none(), "Expected no increment");
@@ -2996,7 +3346,11 @@ mod tests {
             let mut parser = PestParser::new();
             let file_id = create_test_file_id();
             let result = parser.parse(source, file_id);
-            assert!(result.is_ok(), "Failed to parse range expression: {}", source);
+            assert!(
+                result.is_ok(),
+                "Failed to parse range expression: {}",
+                source
+            );
         }
 
         println!("✓ All range expression with method calls tests passed");

@@ -1,12 +1,12 @@
 //! TJLang Lexer
-//! 
+//!
 //! Tokenizes TJLang source code into a stream of tokens with source spans.
 
-use logos::Logos;
-use std::fmt;
-use tjlang_diagnostics::{ErrorCode, SourceSpan, TJLangDiagnostic, DiagnosticCollection};
 use codespan::{FileId, Span};
 use codespan_reporting::diagnostic::Severity;
+use logos::Logos;
+use std::fmt;
+use tjlang_diagnostics::{DiagnosticCollection, ErrorCode, SourceSpan, TJLangDiagnostic};
 
 /// A TJLang token with source span information
 #[derive(Debug, Clone, PartialEq)]
@@ -306,9 +306,10 @@ impl<'source> Iterator for Lexer<'source> {
         let token = self.inner.next()?;
         let span = self.inner.span();
         let text = &self.source[span.clone()];
-        
-        let source_span = SourceSpan::new(self.file_id, Span::new(span.start as u32, span.end as u32));
-        
+
+        let source_span =
+            SourceSpan::new(self.file_id, Span::new(span.start as u32, span.end as u32));
+
         match token {
             Ok(kind) => Some(Token::new(kind, source_span, text.to_string())),
             Err(_) => {
@@ -316,7 +317,10 @@ impl<'source> Iterator for Lexer<'source> {
                 let diagnostic = TJLangDiagnostic::new(
                     ErrorCode::LexerInvalidCharacter,
                     Severity::Error,
-                    format!("invalid character: '{}'", text.chars().next().unwrap_or('?')),
+                    format!(
+                        "invalid character: '{}'",
+                        text.chars().next().unwrap_or('?')
+                    ),
                     source_span,
                 );
                 self.diagnostics.add(diagnostic);
@@ -330,11 +334,11 @@ impl<'source> Iterator for Lexer<'source> {
 pub fn lex(source: &str, file_id: FileId) -> (Vec<Token>, DiagnosticCollection) {
     let mut lexer = Lexer::new(source, file_id);
     let mut tokens = Vec::new();
-    
+
     for token in lexer.by_ref() {
         tokens.push(token);
     }
-    
+
     let diagnostics = lexer.take_diagnostics();
     (tokens, diagnostics)
 }
@@ -354,19 +358,36 @@ mod tests {
         let source = "def return type enum interface mod import export if elif else while do for match Implements spawn raise break continue pass as extends";
         let file_id = create_test_file_id();
         let (tokens, diagnostics) = lex(source, file_id);
-        
+
         assert!(diagnostics.is_empty());
         assert_eq!(tokens.len(), 23);
-        
+
         let expected = [
-            TokenKind::Def, TokenKind::Return, TokenKind::Type, TokenKind::Enum,
-            TokenKind::Interface, TokenKind::Mod, TokenKind::Import, TokenKind::Export,
-            TokenKind::If, TokenKind::Elif, TokenKind::Else, TokenKind::While,
-            TokenKind::Do, TokenKind::For, TokenKind::Match, TokenKind::Implements,
-            TokenKind::Spawn, TokenKind::Raise, TokenKind::Break, TokenKind::Continue,
-            TokenKind::Pass, TokenKind::As, TokenKind::Extends,
+            TokenKind::Def,
+            TokenKind::Return,
+            TokenKind::Type,
+            TokenKind::Enum,
+            TokenKind::Interface,
+            TokenKind::Mod,
+            TokenKind::Import,
+            TokenKind::Export,
+            TokenKind::If,
+            TokenKind::Elif,
+            TokenKind::Else,
+            TokenKind::While,
+            TokenKind::Do,
+            TokenKind::For,
+            TokenKind::Match,
+            TokenKind::Implements,
+            TokenKind::Spawn,
+            TokenKind::Raise,
+            TokenKind::Break,
+            TokenKind::Continue,
+            TokenKind::Pass,
+            TokenKind::As,
+            TokenKind::Extends,
         ];
-        
+
         for (i, token) in tokens.iter().enumerate() {
             if i < expected.len() {
                 assert_eq!(token.kind, expected[i]);
@@ -379,11 +400,17 @@ mod tests {
         let source = "int float bool str any";
         let file_id = create_test_file_id();
         let (tokens, diagnostics) = lex(source, file_id);
-        
+
         assert!(diagnostics.is_empty());
         assert_eq!(tokens.len(), 5);
-        
-        let expected = [TokenKind::Int, TokenKind::Float, TokenKind::Bool, TokenKind::Str, TokenKind::Any];
+
+        let expected = [
+            TokenKind::Int,
+            TokenKind::Float,
+            TokenKind::Bool,
+            TokenKind::Str,
+            TokenKind::Any,
+        ];
         for (i, token) in tokens.iter().enumerate() {
             assert_eq!(token.kind, expected[i]);
         }
@@ -394,20 +421,41 @@ mod tests {
         let source = "-> = : , . ( ) { } [ ] + - * / % < > <= >= == != | ? or and ! _";
         let file_id = create_test_file_id();
         let (tokens, diagnostics) = lex(source, file_id);
-        
+
         assert!(diagnostics.is_empty());
         assert_eq!(tokens.len(), 28);
-        
+
         let expected = [
-            TokenKind::Arrow, TokenKind::Assign, TokenKind::Colon, TokenKind::Comma,
-            TokenKind::Dot, TokenKind::LParen, TokenKind::RParen, TokenKind::LBrace,
-            TokenKind::RBrace, TokenKind::LBrack, TokenKind::RBrack, TokenKind::Plus,
-            TokenKind::Minus, TokenKind::Star, TokenKind::Slash, TokenKind::Percent,
-            TokenKind::Lt, TokenKind::Gt, TokenKind::Lte, TokenKind::Gte,
-            TokenKind::Eq, TokenKind::Neq, TokenKind::Pipe, TokenKind::Question,
-            TokenKind::Or, TokenKind::And, TokenKind::Bang, TokenKind::Underscore,
+            TokenKind::Arrow,
+            TokenKind::Assign,
+            TokenKind::Colon,
+            TokenKind::Comma,
+            TokenKind::Dot,
+            TokenKind::LParen,
+            TokenKind::RParen,
+            TokenKind::LBrace,
+            TokenKind::RBrace,
+            TokenKind::LBrack,
+            TokenKind::RBrack,
+            TokenKind::Plus,
+            TokenKind::Minus,
+            TokenKind::Star,
+            TokenKind::Slash,
+            TokenKind::Percent,
+            TokenKind::Lt,
+            TokenKind::Gt,
+            TokenKind::Lte,
+            TokenKind::Gte,
+            TokenKind::Eq,
+            TokenKind::Neq,
+            TokenKind::Pipe,
+            TokenKind::Question,
+            TokenKind::Or,
+            TokenKind::And,
+            TokenKind::Bang,
+            TokenKind::Underscore,
         ];
-        
+
         for (i, token) in tokens.iter().enumerate() {
             if i < expected.len() {
                 assert_eq!(token.kind, expected[i]);
@@ -420,30 +468,30 @@ mod tests {
         let source = "42 3.14 \"hello\" f\"world {name}\" true false None";
         let file_id = create_test_file_id();
         let (tokens, diagnostics) = lex(source, file_id);
-        
+
         assert!(diagnostics.is_empty());
         assert_eq!(tokens.len(), 7);
-        
+
         match &tokens[0].kind {
-            TokenKind::IntLiteral(42) => {},
+            TokenKind::IntLiteral(42) => {}
             _ => panic!("Expected IntLiteral(42)"),
         }
-        
+
         match &tokens[1].kind {
-            TokenKind::FloatLiteral(3.14) => {},
+            TokenKind::FloatLiteral(3.14) => {}
             _ => panic!("Expected FloatLiteral(3.14)"),
         }
-        
+
         match &tokens[2].kind {
             TokenKind::StringLiteral(s) => assert_eq!(s, "hello"),
             _ => panic!("Expected StringLiteral(\"hello\")"),
         }
-        
+
         match &tokens[3].kind {
             TokenKind::FStringLiteral(s) => assert_eq!(s, "world {name}"),
             _ => panic!("Expected FStringLiteral(\"world {{name}}\")"),
         }
-        
+
         assert_eq!(tokens[4].kind, TokenKind::True);
         assert_eq!(tokens[5].kind, TokenKind::False);
         assert_eq!(tokens[6].kind, TokenKind::None);
@@ -454,10 +502,10 @@ mod tests {
         let source = "hello world _private var123";
         let file_id = create_test_file_id();
         let (tokens, diagnostics) = lex(source, file_id);
-        
+
         assert!(diagnostics.is_empty());
         assert_eq!(tokens.len(), 5); // hello, world, _, private, var123
-        
+
         // Check that we have the expected tokens
         assert_eq!(tokens[0].kind, TokenKind::Identifier("hello".to_string()));
         assert_eq!(tokens[1].kind, TokenKind::Identifier("world".to_string()));
@@ -471,7 +519,7 @@ mod tests {
         let source = "hello # this is a comment\nworld   \t  # another comment";
         let file_id = create_test_file_id();
         let (tokens, diagnostics) = lex(source, file_id);
-        
+
         assert!(diagnostics.is_empty());
         // Should only have the identifiers, comments and whitespace are skipped
         assert_eq!(tokens.len(), 2);
@@ -484,11 +532,11 @@ mod tests {
         let source = "hello @ invalid";
         let file_id = create_test_file_id();
         let (tokens, diagnostics) = lex(source, file_id);
-        
+
         // Should have a diagnostic for the invalid character
         assert!(!diagnostics.is_empty());
         assert_eq!(tokens.len(), 3); // hello, error token, invalid
-        
+
         assert_eq!(tokens[0].kind, TokenKind::Identifier("hello".to_string()));
         assert_eq!(tokens[1].kind, TokenKind::Error); // Error token for invalid character
         assert_eq!(tokens[2].kind, TokenKind::Identifier("invalid".to_string()));
@@ -508,13 +556,13 @@ result: int = add(x, 10)
 "#;
         let file_id = create_test_file_id();
         let (tokens, diagnostics) = lex(source, file_id);
-        
+
         // Should have no diagnostics for valid code
         assert!(diagnostics.is_empty());
-        
+
         // Should have tokens for the function definition
         let token_kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
-        
+
         // Check for key tokens
         assert!(token_kinds.contains(&&TokenKind::Def));
         assert!(token_kinds.contains(&&TokenKind::Identifier("add".to_string())));
@@ -522,7 +570,7 @@ result: int = add(x, 10)
         assert!(token_kinds.contains(&&TokenKind::Arrow));
         assert!(token_kinds.contains(&&TokenKind::Return));
         assert!(token_kinds.contains(&&TokenKind::Plus));
-        
+
         println!("Demo lexing successful! Found {} tokens", tokens.len());
     }
 }

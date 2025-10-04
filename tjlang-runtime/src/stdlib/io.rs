@@ -11,11 +11,10 @@
 //! - Interactive prompts
 
 use crate::values::Value;
-use std::io::{self, Write, Read, BufRead, BufReader, BufWriter};
 use std::fs::File;
+use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::str::FromStr;
-
 
 /// IO module for input/output operations
 pub struct IO;
@@ -27,18 +26,18 @@ impl IO {
         io::stdout().flush().map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     /// Print a value to stdout with newline
     pub fn println(value: &Value) -> Result<(), String> {
         println!("{}", value.to_string());
         Ok(())
     }
-    
+
     /// Print formatted string to stdout
     pub fn printf(format: &str, args: &[Value]) -> Result<(), String> {
         // Simple printf implementation - replace {} with arguments
         let mut result = format.to_string();
-        
+
         // Flatten arrays in arguments
         let mut flattened_args = Vec::new();
         for arg in args {
@@ -48,20 +47,20 @@ impl IO {
                     for item in vec {
                         flattened_args.push(item.clone());
                     }
-                },
+                }
                 _ => {
                     // Keep non-array arguments as-is
                     flattened_args.push(arg.clone());
                 }
             }
         }
-        
+
         // Handle indexed placeholders like {0}, {1}, etc.
         for (i, arg) in flattened_args.iter().enumerate() {
             let placeholder = format!("{{{}}}", i);
             result = result.replace(&placeholder, &arg.to_string());
         }
-        
+
         // Handle single {} without index (only if no indexed placeholders were found)
         if !result.contains("{0}") && !result.contains("{1}") && !result.contains("{2}") {
             for arg in &flattened_args {
@@ -72,38 +71,42 @@ impl IO {
                 }
             }
         }
-        
+
         print!("{}", result);
         io::stdout().flush().map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     /// Read a line from stdin
     pub fn read_line() -> Result<String, String> {
         let mut input = String::new();
-        io::stdin().read_line(&mut input).map_err(|e| e.to_string())?;
+        io::stdin()
+            .read_line(&mut input)
+            .map_err(|e| e.to_string())?;
         Ok(input.trim().to_string())
     }
-    
+
     /// Read a character from stdin
     pub fn read_char() -> Result<char, String> {
         let mut input = String::new();
-        io::stdin().read_line(&mut input).map_err(|e| e.to_string())?;
+        io::stdin()
+            .read_line(&mut input)
+            .map_err(|e| e.to_string())?;
         input.chars().next().ok_or("No character read".to_string())
     }
-    
+
     /// Read an integer from stdin
     pub fn read_int() -> Result<i64, String> {
         let input = Self::read_line()?;
         input.parse::<i64>().map_err(|e| e.to_string())
     }
-    
+
     /// Read a float from stdin
     pub fn read_float() -> Result<f64, String> {
         let input = Self::read_line()?;
         input.parse::<f64>().map_err(|e| e.to_string())
     }
-    
+
     /// Read a boolean from stdin
     pub fn read_bool() -> Result<bool, String> {
         let input = Self::read_line()?.to_lowercase();
@@ -114,13 +117,10 @@ impl IO {
         }
     }
 
-
-
-
     /// print with color
     pub fn print_color<C: IntoColor>(text: &str, color: C) -> Result<(), String> {
         let color_enum = color.into_color()?;
-    
+
         let color_code = match color_enum {
             Color::Red => "\x1b[31m",
             Color::Green => "\x1b[32m",
@@ -132,69 +132,69 @@ impl IO {
             Color::Black => "\x1b[30m",
             Color::Reset => "\x1b[0m",
         };
-    
+
         print!("{}{}{}", color_code, text, "\x1b[0m");
         io::stdout().flush().map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     /// Print error message in red
     pub fn print_error(message: &str) -> Result<(), String> {
         Self::print_color(&format!("Error: {}", message), Color::Red)
     }
-    
+
     /// Print warning message in yellow
     pub fn print_warning(message: &str) -> Result<(), String> {
         Self::print_color(&format!("Warning: {}", message), Color::Yellow)
     }
-    
+
     /// Print success message in green
     pub fn print_success(message: &str) -> Result<(), String> {
         Self::print_color(&format!("Success: {}", message), Color::Green)
     }
-    
+
     /// Print info message in blue
     pub fn print_info(message: &str) -> Result<(), String> {
         Self::print_color(&format!("Info: {}", message), Color::Blue)
     }
-    
+
     /// Print debug message in cyan
     pub fn print_debug(message: &str) -> Result<(), String> {
         Self::print_color(&format!("Debug: {}", message), Color::Cyan)
     }
-    
+
     /// Clear the screen
     pub fn clear_screen() -> Result<(), String> {
         print!("\x1b[2J\x1b[H");
         io::stdout().flush().map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     /// Move cursor to position
     pub fn move_cursor(row: u16, col: u16) -> Result<(), String> {
         print!("\x1b[{};{}H", row, col);
         io::stdout().flush().map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     /// Hide cursor
     pub fn hide_cursor() -> Result<(), String> {
         print!("\x1b[?25l");
         io::stdout().flush().map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     /// Show cursor
     pub fn show_cursor() -> Result<(), String> {
         print!("\x1b[?25h");
         io::stdout().flush().map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     /// Get terminal size
     pub fn get_terminal_size() -> Result<(u16, u16), String> {
-        use terminal_size::{Width, Height, terminal_size};
-        
+        use terminal_size::{terminal_size, Height, Width};
+
         match terminal_size() {
             Some((Width(w), Height(h))) => Ok((w, h)),
             None => {
@@ -214,34 +214,34 @@ impl IO {
             }
         }
     }
-    
+
     /// Check if output is a terminal
     pub fn is_terminal() -> bool {
         atty::is(atty::Stream::Stdout)
     }
-    
+
     /// Check if input is a terminal
     pub fn is_input_terminal() -> bool {
         atty::is(atty::Stream::Stdin)
     }
-    
+
     /// Create a progress bar
     pub fn create_progress_bar(total: u64) -> ProgressBar {
         ProgressBar::new(total)
     }
-    
+
     /// Create a spinner
     pub fn create_spinner() -> Spinner {
         Spinner::new()
     }
-    
+
     /// Prompt user for input with message
     pub fn prompt(message: &str) -> Result<String, String> {
         print!("{}: ", message);
         io::stdout().flush().map_err(|e| e.to_string())?;
         Self::read_line()
     }
-    
+
     /// Prompt user for input with default value
     pub fn prompt_with_default(message: &str, default: &str) -> Result<String, String> {
         print!("{} [{}]: ", message, default);
@@ -253,13 +253,13 @@ impl IO {
             Ok(input)
         }
     }
-    
+
     /// Confirm with yes/no prompt
     pub fn confirm(message: &str) -> Result<bool, String> {
         let input = Self::prompt_with_default(message, "y")?;
         Ok(input.to_lowercase().starts_with('y'))
     }
-    
+
     /// Select from options
     pub fn select(message: &str, options: &[String]) -> Result<usize, String> {
         println!("{}", message);
@@ -274,7 +274,7 @@ impl IO {
             Err("Invalid selection".to_string())
         }
     }
-    
+
     /// Multi-select from options
     pub fn multi_select(message: &str, options: &[String]) -> Result<Vec<usize>, String> {
         println!("{} (comma-separated indices)", message);
@@ -309,7 +309,6 @@ pub enum Color {
     Black,
     Reset,
 }
-
 
 impl FromStr for Color {
     type Err = String;
@@ -360,21 +359,21 @@ impl ProgressBar {
             width: 50,
         }
     }
-    
+
     pub fn update(&mut self, current: u64) -> Result<(), String> {
         self.current = current;
         self.display()
     }
-    
+
     pub fn increment(&mut self) -> Result<(), String> {
         self.current += 1;
         self.display()
     }
-    
+
     fn display(&self) -> Result<(), String> {
         let percentage = (self.current as f64 / self.total as f64) * 100.0;
         let filled = (self.current as f64 / self.total as f64 * self.width as f64) as u16;
-        
+
         print!("\r[");
         for i in 0..self.width {
             if i < filled {
@@ -387,7 +386,7 @@ impl ProgressBar {
         io::stdout().flush().map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     pub fn finish(&self) -> Result<(), String> {
         println!();
         Ok(())
@@ -407,14 +406,14 @@ impl Spinner {
             current: 0,
         }
     }
-    
+
     pub fn spin(&mut self, message: &str) -> Result<(), String> {
         print!("\r{} {}", self.frames[self.current], message);
         io::stdout().flush().map_err(|e| e.to_string())?;
         self.current = (self.current + 1) % self.frames.len();
         Ok(())
     }
-    
+
     pub fn stop(&self) -> Result<(), String> {
         print!("\r");
         io::stdout().flush().map_err(|e| e.to_string())?;
@@ -435,14 +434,14 @@ impl Stream {
             writer: None,
         }
     }
-    
+
     pub fn new_writer(file: File) -> Self {
         Self {
             reader: None,
             writer: Some(BufWriter::new(file)),
         }
     }
-    
+
     pub fn read_line(&mut self) -> Result<Option<String>, String> {
         if let Some(reader) = &mut self.reader {
             let mut line = String::new();
@@ -456,7 +455,7 @@ impl Stream {
             Err("No reader available".to_string())
         }
     }
-    
+
     pub fn write_line(&mut self, line: &str) -> Result<(), String> {
         if let Some(writer) = &mut self.writer {
             writeln!(writer, "{}", line).map_err(|e| e.to_string())?;
@@ -466,7 +465,7 @@ impl Stream {
             Err("No writer available".to_string())
         }
     }
-    
+
     pub fn write(&mut self, data: &str) -> Result<(), String> {
         if let Some(writer) = &mut self.writer {
             write!(writer, "{}", data).map_err(|e| e.to_string())?;
@@ -491,31 +490,31 @@ impl Buffer {
             position: 0,
         }
     }
-    
+
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             data: Vec::with_capacity(capacity),
             position: 0,
         }
     }
-    
+
     pub fn write(&mut self, data: &[u8]) -> Result<usize, String> {
         self.data.extend_from_slice(data);
         Ok(data.len())
     }
-    
+
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, String> {
         let available = self.data.len() - self.position;
         let to_read = buf.len().min(available);
-        
+
         if to_read > 0 {
             buf[..to_read].copy_from_slice(&self.data[self.position..self.position + to_read]);
             self.position += to_read;
         }
-        
+
         Ok(to_read)
     }
-    
+
     pub fn seek(&mut self, position: usize) -> Result<(), String> {
         if position <= self.data.len() {
             self.position = position;
@@ -524,23 +523,21 @@ impl Buffer {
             Err("Position out of bounds".to_string())
         }
     }
-    
+
     pub fn tell(&self) -> usize {
         self.position
     }
-    
+
     pub fn size(&self) -> usize {
         self.data.len()
     }
-    
+
     pub fn clear(&mut self) {
         self.data.clear();
         self.position = 0;
     }
-    
+
     pub fn to_string(&self) -> Result<String, String> {
         String::from_utf8(self.data.clone()).map_err(|e| e.to_string())
     }
 }
-
-

@@ -54,22 +54,22 @@ impl TJLangDiagnostic {
             notes: Vec::new(),
         }
     }
-    
+
     pub fn with_secondary_span(mut self, span: SourceSpan) -> Self {
         self.secondary_spans.push(span);
         self
     }
-    
+
     pub fn with_suggestion(mut self, suggestion: Suggestion) -> Self {
         self.suggestions.push(suggestion);
         self
     }
-    
+
     pub fn with_note(mut self, note: String) -> Self {
         self.notes.push(note);
         self
     }
-    
+
     /// Convert to a codespan Diagnostic for reporting
     pub fn to_codespan_diagnostic(&self) -> Diagnostic<FileId> {
         let mut diagnostic = Diagnostic::new(self.severity)
@@ -79,40 +79,29 @@ impl TJLangDiagnostic {
                 self.primary_span.file_id,
                 self.primary_span.span,
             )]);
-        
+
         // Add secondary labels
         for span in &self.secondary_spans {
-            diagnostic = diagnostic.with_labels(vec![Label::secondary(
-                span.file_id,
-                span.span,
-            )]);
+            diagnostic = diagnostic.with_labels(vec![Label::secondary(span.file_id, span.span)]);
         }
-        
+
         // Add suggestions as notes
         for suggestion in &self.suggestions {
-            diagnostic = diagnostic.with_notes(vec![format!(
-                "suggestion: {}",
-                suggestion.message
-            )]);
+            diagnostic = diagnostic.with_notes(vec![format!("suggestion: {}", suggestion.message)]);
         }
-        
+
         // Add additional notes
         for note in &self.notes {
             diagnostic = diagnostic.with_notes(vec![note.clone()]);
         }
-        
+
         diagnostic
     }
 }
 
 impl fmt::Display for TJLangDiagnostic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "error[{}]: {}",
-            self.code.as_str(),
-            self.message
-        )
+        write!(f, "error[{}]: {}", self.code.as_str(), self.message)
     }
 }
 

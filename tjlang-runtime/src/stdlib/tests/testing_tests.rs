@@ -55,15 +55,19 @@ mod tests {
 
     #[test]
     fn test_assert_contains() {
-        let result = TESTING::assert_contains("Hello World", "World", "String should contain World");
+        let result =
+            TESTING::assert_contains("Hello World", "World", "String should contain World");
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_assert_panics() {
-        let result = TESTING::assert_panics(|| {
-            panic!("This should panic");
-        }, "Function should panic");
+        let result = TESTING::assert_panics(
+            || {
+                panic!("This should panic");
+            },
+            "Function should panic",
+        );
         assert!(result.is_ok());
     }
 

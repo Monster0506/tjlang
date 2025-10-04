@@ -24,7 +24,7 @@ mod tests {
     #[test]
     fn test_to_string_all_types() {
         let (int_val, float_val, bool_val, str_val, none_val) = create_test_values();
-        
+
         // Test integer to_string
         let result = get_primitive_method(&int_val, "to_string").unwrap();
         assert!(matches!(result, Value::String(_)));
@@ -64,7 +64,7 @@ mod tests {
     #[test]
     fn test_clone_all_types() {
         let (int_val, float_val, bool_val, str_val, none_val) = create_test_values();
-        
+
         // Test integer clone
         let result = get_primitive_method(&int_val, "clone").unwrap();
         assert_eq!(result, int_val);
@@ -89,7 +89,7 @@ mod tests {
     #[test]
     fn test_type_name_all_types() {
         let (int_val, float_val, bool_val, str_val, none_val) = create_test_values();
-        
+
         // Test integer type_name
         let result = get_primitive_method(&int_val, "type_name").unwrap();
         if let Value::String(s) = result {
@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn test_is_null_is_not_null() {
         let (int_val, float_val, bool_val, str_val, none_val) = create_test_values();
-        
+
         // Test non-null values
         let result = get_primitive_method(&int_val, "is_null").unwrap();
         if let Value::Bool(b) = result {
@@ -149,7 +149,7 @@ mod tests {
     #[test]
     fn test_hash_all_types() {
         let (int_val, float_val, bool_val, str_val, none_val) = create_test_values();
-        
+
         // Test integer hash
         let result = get_primitive_method(&int_val, "hash").unwrap();
         if let Value::Int(h) = result {
@@ -184,7 +184,7 @@ mod tests {
     #[test]
     fn test_type_checking_methods() {
         let (int_val, float_val, bool_val, str_val, none_val) = create_test_values();
-        
+
         // Test is_int
         let result = get_primitive_method(&int_val, "is_int").unwrap();
         if let Value::Bool(b) = result {
@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn test_type_conversions() {
         let (int_val, float_val, bool_val, str_val, none_val) = create_test_values();
-        
+
         // Test to_int conversions
         let result = get_primitive_method(&int_val, "to_int").unwrap();
         if let Value::Int(i) = result {
@@ -318,7 +318,7 @@ mod tests {
         let int_val = Value::Int(42);
         let neg_int_val = Value::Int(-10);
         let zero_val = Value::Int(0);
-        
+
         // Test abs
         let result = get_primitive_method(&neg_int_val, "abs").unwrap();
         if let Value::Int(i) = result {
@@ -383,7 +383,7 @@ mod tests {
         let zero_float_val = Value::Float(0.0);
         let nan_val = Value::Float(f64::NAN);
         let inf_val = Value::Float(f64::INFINITY);
-        
+
         // Test ceil
         let result = get_primitive_method(&float_val, "ceil").unwrap();
         if let Value::Float(f) = result {
@@ -451,7 +451,7 @@ mod tests {
     fn test_boolean_methods() {
         let true_val = Value::Bool(true);
         let false_val = Value::Bool(false);
-        
+
         // Test not
         let result = get_primitive_method(&true_val, "not").unwrap();
         if let Value::Bool(b) = result {
@@ -471,7 +471,7 @@ mod tests {
         let str_val = Value::String("Hello World".to_string());
         let empty_str_val = Value::String("".to_string());
         let whitespace_str_val = Value::String("  hello  ".to_string());
-        
+
         // Test length
         let result = get_primitive_method(&str_val, "length").unwrap();
         if let Value::Int(l) = result {
@@ -509,7 +509,8 @@ mod tests {
         }
 
         // Test capitalize
-        let result = get_primitive_method(&Value::String("hello".to_string()), "capitalize").unwrap();
+        let result =
+            get_primitive_method(&Value::String("hello".to_string()), "capitalize").unwrap();
         if let Value::String(s) = result {
             assert_eq!(s, "Hello");
         }
@@ -526,7 +527,7 @@ mod tests {
     #[test]
     fn test_none_methods() {
         let none_val = Value::None;
-        
+
         // Test is_none
         let result = get_primitive_method(&none_val, "is_none").unwrap();
         if let Value::Bool(b) = result {
@@ -545,7 +546,7 @@ mod tests {
     #[test]
     fn test_debug_strings() {
         let (int_val, float_val, bool_val, str_val, none_val) = create_test_values();
-        
+
         // Test debug_string
         let result = get_primitive_method(&int_val, "debug_string").unwrap();
         if let Value::String(s) = result {
@@ -575,11 +576,11 @@ mod tests {
     #[test]
     fn test_invalid_methods() {
         let int_val = Value::Int(42);
-        
+
         // Test invalid method name
         let result = get_primitive_method(&int_val, "invalid_method");
         assert!(result.is_err());
-        
+
         // Test method that requires arguments on wrong type
         let result = get_primitive_method(&int_val, "starts_with");
         assert!(result.is_err());
@@ -603,7 +604,7 @@ mod tests {
     #[test]
     fn test_helper_functions() {
         let (int_val, float_val, bool_val, str_val, none_val) = create_test_values();
-        
+
         // Test get_type_name
         assert_eq!(get_type_name(&int_val), "int");
         assert_eq!(get_type_name(&float_val), "float");
@@ -680,7 +681,7 @@ mod tests {
     #[test]
     fn test_performance_basic_operations() {
         let int_val = Value::Int(42);
-        
+
         // Test that basic operations are fast
         let start = std::time::Instant::now();
         for _ in 0..1000 {
@@ -689,7 +690,7 @@ mod tests {
             let _ = get_primitive_method(&int_val, "type_name").unwrap();
         }
         let duration = start.elapsed();
-        
+
         // Should complete in under 1ms for 1000 operations
         assert!(duration.as_millis() < 10);
     }

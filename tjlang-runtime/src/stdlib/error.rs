@@ -17,7 +17,7 @@ impl ERROR {
     pub fn new(message: &str) -> String {
         message.to_string()
     }
-    
+
     /// Create a formatted error
     pub fn format(message: &str, args: &[String]) -> String {
         let mut result = message.to_string();
@@ -26,26 +26,24 @@ impl ERROR {
         }
         result
     }
-    
+
     /// Log an error
     pub fn log(message: &str) {
         eprintln!("ERROR: {}", message);
     }
-    
+
     /// Log a warning
     pub fn warn(message: &str) {
         eprintln!("WARNING: {}", message);
     }
-    
+
     /// Log an info message
     pub fn info(message: &str) {
         println!("INFO: {}", message);
     }
-    
+
     /// Log a debug message
     pub fn debug(message: &str) {
         println!("DEBUG: {}", message);
     }
 }
-
-

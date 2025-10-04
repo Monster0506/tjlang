@@ -1,17 +1,17 @@
 //! Rule configuration system
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Configuration for the analysis pipeline
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuleConfig {
     /// Enabled rules
     pub enabled_rules: HashMap<String, bool>,
-    
+
     /// Rule-specific settings
     pub rule_settings: HashMap<String, RuleSettings>,
-    
+
     /// Global analysis settings
     pub global_settings: GlobalSettings,
 }
@@ -21,13 +21,13 @@ pub struct RuleConfig {
 pub struct GlobalSettings {
     /// Maximum number of diagnostics to report
     pub max_diagnostics: Option<usize>,
-    
+
     /// Stop analysis on first error
     pub stop_on_error: bool,
-    
+
     /// Enable parallel rule execution
     pub parallel_execution: bool,
-    
+
     /// Analysis timeout in seconds
     pub timeout_seconds: Option<u64>,
 }
@@ -37,7 +37,7 @@ pub struct GlobalSettings {
 pub struct RuleSettings {
     /// Rule severity level
     pub severity: RuleSeverity,
-    
+
     /// Rule-specific configuration
     pub config: HashMap<String, serde_json::Value>,
 }
@@ -123,27 +123,34 @@ impl Default for RuleConfig {
     fn default() -> Self {
         let mut enabled_rules = HashMap::new();
         let mut rule_settings = HashMap::new();
-        
+
         // Enable critical rules by default
         let critical_rules = vec![
-            "TypeSafetyRule",
-            "UnusedVariableRule", 
-            "DeadCodeRule",
-            "NamingConventionRule",
-            "FormattingConventionRule",
-            "LineLengthRule",
-            "MagicNumberRule",
+            // Only enable rules that prevent runtime crashes
             "LiteralIndexBoundsRule", // Prevents runtime crashes
+            "LiteralDivisionByZeroRule", // Prevents runtime crashes
+
+                                      // Temporarily disabled warning rules:
+                                      // "TypeSafetyRule",
+                                      // "UnusedVariableRule",
+                                      // "DeadCodeRule",
+                                      // "NamingConventionRule",
+                                      // "FormattingConventionRule",
+                                      // "LineLengthRule",
+                                      // "MagicNumberRule",
         ];
-        
+
         for rule in critical_rules {
             enabled_rules.insert(rule.to_string(), true);
-            rule_settings.insert(rule.to_string(), RuleSettings {
-                severity: RuleSeverity::Warning,
-                config: HashMap::new(),
-            });
+            rule_settings.insert(
+                rule.to_string(),
+                RuleSettings {
+                    severity: RuleSeverity::Warning,
+                    config: HashMap::new(),
+                },
+            );
         }
-        
+
         Self {
             enabled_rules,
             rule_settings,
@@ -168,57 +175,59 @@ impl RuleConfig {
     pub fn is_rule_enabled(&self, rule_name: &str) -> bool {
         self.enabled_rules.get(rule_name).copied().unwrap_or(false)
     }
-    
+
     /// Enable a rule
     pub fn enable_rule(&mut self, rule_name: &str) {
         self.enabled_rules.insert(rule_name.to_string(), true);
     }
-    
+
     /// Disable a rule
     pub fn disable_rule(&mut self, rule_name: &str) {
         self.enabled_rules.insert(rule_name.to_string(), false);
     }
-    
+
     /// Get rule settings
     pub fn get_rule_settings(&self, rule_name: &str) -> Option<&RuleSettings> {
         self.rule_settings.get(rule_name)
     }
-    
+
     /// Set rule severity
     pub fn set_rule_severity(&mut self, rule_name: &str, severity: RuleSeverity) {
         if let Some(settings) = self.rule_settings.get_mut(rule_name) {
             settings.severity = severity;
         } else {
-            self.rule_settings.insert(rule_name.to_string(), RuleSettings {
-                severity,
-                config: HashMap::new(),
-            });
+            self.rule_settings.insert(
+                rule_name.to_string(),
+                RuleSettings {
+                    severity,
+                    config: HashMap::new(),
+                },
+            );
         }
     }
-    
+
     /// Get rule configuration value
     pub fn get_config_value<T>(&self, rule_name: &str, key: &str) -> Option<T>
     where
         T: for<'de> Deserialize<'de>,
     {
-        let value = self.rule_settings
-            .get(rule_name)?
-            .config
-            .get(key)?
-            .clone();
+        let value = self.rule_settings.get(rule_name)?.config.get(key)?.clone();
         serde_json::from_value(value).ok()
     }
-    
+
     /// Set rule configuration value
     pub fn set_config_value<T>(&mut self, rule_name: &str, key: &str, value: T)
     where
         T: Serialize,
     {
-        let settings = self.rule_settings.entry(rule_name.to_string()).or_insert_with(|| RuleSettings {
-            severity: RuleSeverity::Warning,
-            config: HashMap::new(),
-        });
-        
+        let settings = self
+            .rule_settings
+            .entry(rule_name.to_string())
+            .or_insert_with(|| RuleSettings {
+                severity: RuleSeverity::Warning,
+                config: HashMap::new(),
+            });
+
         if let Ok(json_value) = serde_json::to_value(value) {
             settings.config.insert(key.to_string(), json_value);
         }

@@ -1,20 +1,20 @@
 //! TJLang Runtime Values
-//! 
+//!
 //! Advanced value system supporting all TJLang types with garbage collection.
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::rc::Rc;
-use tjlang_ast::{Expression, Type, PrimitiveType, SourceSpan};
 use codespan::{Files, Span};
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::sync::Arc;
+use tjlang_ast::{Expression, PrimitiveType, SourceSpan, Type};
 
 /// Create a dummy SourceSpan for runtime values
 fn dummy_span() -> SourceSpan {
     let mut files = Files::new();
     let file_id = files.add("runtime", "");
-    SourceSpan { 
-        file_id, 
-        span: Span::new(0, 0) 
+    SourceSpan {
+        file_id,
+        span: Span::new(0, 0),
     }
 }
 
@@ -27,7 +27,7 @@ pub enum Value {
     Bool(bool),
     String(String),
     None,
-    
+
     // Complex types
     Struct {
         name: String,
@@ -42,7 +42,7 @@ pub enum Value {
     Vec(Vec<Value>),
     Set(std::collections::HashSet<Value>),
     Map(HashMap<Value, Value>),
-    
+
     // Function types
     Function {
         name: String,
@@ -55,7 +55,7 @@ pub enum Value {
         body: Expression,
         closure: HashMap<String, Value>,
     },
-    
+
     // Concurrency types
     Channel {
         sender: std::sync::mpsc::Sender<Value>,
@@ -65,10 +65,10 @@ pub enum Value {
         id: u64,
         handle: std::thread::JoinHandle<Value>,
     },
-    
+
     // Reference types (for GC)
     Reference(usize),
-    
+
     // Type information
     Type(Type),
 }
@@ -85,7 +85,11 @@ impl Clone for Value {
                 name: name.clone(),
                 fields: fields.clone(),
             },
-            Value::Enum { name, variant, fields } => Value::Enum {
+            Value::Enum {
+                name,
+                variant,
+                fields,
+            } => Value::Enum {
                 name: name.clone(),
                 variant: variant.clone(),
                 fields: fields.clone(),
@@ -94,13 +98,22 @@ impl Clone for Value {
             Value::Vec(elements) => Value::Vec(elements.clone()),
             Value::Set(elements) => Value::Set(elements.clone()),
             Value::Map(entries) => Value::Map(entries.clone()),
-            Value::Function { name, params, body, closure } => Value::Function {
+            Value::Function {
+                name,
+                params,
+                body,
+                closure,
+            } => Value::Function {
                 name: name.clone(),
                 params: params.clone(),
                 body: body.clone(),
                 closure: closure.clone(),
             },
-            Value::Closure { params, body, closure } => Value::Closure {
+            Value::Closure {
+                params,
+                body,
+                closure,
+            } => Value::Closure {
                 params: params.clone(),
                 body: body.clone(),
                 closure: closure.clone(),
@@ -127,12 +140,28 @@ impl PartialEq for Value {
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::String(a), Value::String(b)) => a == b,
             (Value::None, Value::None) => true,
-            (Value::Struct { name: a, fields: fa }, Value::Struct { name: b, fields: fb }) => {
-                a == b && fa == fb
-            },
-            (Value::Enum { name: a, variant: va, fields: fa }, Value::Enum { name: b, variant: vb, fields: fb }) => {
-                a == b && va == vb && fa == fb
-            },
+            (
+                Value::Struct {
+                    name: a,
+                    fields: fa,
+                },
+                Value::Struct {
+                    name: b,
+                    fields: fb,
+                },
+            ) => a == b && fa == fb,
+            (
+                Value::Enum {
+                    name: a,
+                    variant: va,
+                    fields: fa,
+                },
+                Value::Enum {
+                    name: b,
+                    variant: vb,
+                    fields: fb,
+                },
+            ) => a == b && va == vb && fa == fb,
             (Value::Tuple(a), Value::Tuple(b)) => a == b,
             (Value::Vec(a), Value::Vec(b)) => a == b,
             (Value::Set(a), Value::Set(b)) => a == b,
@@ -159,35 +188,39 @@ impl std::hash::Hash for Value {
                     k.hash(state);
                     v.hash(state);
                 }
-            },
-            Value::Enum { name, variant, fields } => {
+            }
+            Value::Enum {
+                name,
+                variant,
+                fields,
+            } => {
                 name.hash(state);
                 variant.hash(state);
                 for field in fields {
                     field.hash(state);
                 }
-            },
+            }
             Value::Tuple(values) => {
                 for value in values {
                     value.hash(state);
                 }
-            },
+            }
             Value::Vec(values) => {
                 for value in values {
                     value.hash(state);
                 }
-            },
+            }
             Value::Set(set) => {
                 for value in set {
                     value.hash(state);
                 }
-            },
+            }
             Value::Map(map) => {
                 for (k, v) in map {
                     k.hash(state);
                     v.hash(state);
                 }
-            },
+            }
             Value::Reference(addr) => addr.hash(state),
             _ => 0.hash(state), // Functions, channels, tasks are not hashable
         }
@@ -221,7 +254,7 @@ impl Value {
                         span: dummy_span(),
                     }
                 }
-            },
+            }
             Value::Set(elements) => {
                 if elements.is_empty() {
                     Type::Set {
@@ -234,7 +267,7 @@ impl Value {
                         span: dummy_span(),
                     }
                 }
-            },
+            }
             Value::Map(entries) => {
                 if entries.is_empty() {
                     Type::Map {
@@ -250,7 +283,7 @@ impl Value {
                         span: dummy_span(),
                     }
                 }
-            },
+            }
             Value::Function { .. } => Type::Function {
                 params: vec![], // TODO: Extract from function
                 return_type: Box::new(Type::Primitive(PrimitiveType::Any)),
@@ -267,7 +300,7 @@ impl Value {
             Value::Type(t) => t.clone(),
         }
     }
-    
+
     /// Check if this value is truthy
     pub fn is_truthy(&self) -> bool {
         match self {
@@ -282,7 +315,7 @@ impl Value {
             _ => true,
         }
     }
-    
+
     /// Convert to string representation
     pub fn to_string(&self) -> String {
         match self {
@@ -297,46 +330,38 @@ impl Value {
                     .map(|(k, v)| format!("{}: {}", k, v.to_string()))
                     .collect();
                 format!("{} {{ {} }}", name, field_strs.join(", "))
-            },
-            Value::Enum { name, variant, fields } => {
+            }
+            Value::Enum {
+                name,
+                variant,
+                fields,
+            } => {
                 if fields.is_empty() {
                     format!("{}::{}", name, variant)
                 } else {
-                    let field_strs: Vec<String> = fields
-                        .iter()
-                        .map(|f| f.to_string())
-                        .collect();
+                    let field_strs: Vec<String> = fields.iter().map(|f| f.to_string()).collect();
                     format!("{}::{} ({})", name, variant, field_strs.join(", "))
                 }
-            },
+            }
             Value::Tuple(values) => {
-                let value_strs: Vec<String> = values
-                    .iter()
-                    .map(|v| v.to_string())
-                    .collect();
+                let value_strs: Vec<String> = values.iter().map(|v| v.to_string()).collect();
                 format!("({})", value_strs.join(", "))
-            },
+            }
             Value::Vec(values) => {
-                let value_strs: Vec<String> = values
-                    .iter()
-                    .map(|v| v.to_string())
-                    .collect();
+                let value_strs: Vec<String> = values.iter().map(|v| v.to_string()).collect();
                 format!("[{}]", value_strs.join(", "))
-            },
+            }
             Value::Set(values) => {
-                let value_strs: Vec<String> = values
-                    .iter()
-                    .map(|v| v.to_string())
-                    .collect();
+                let value_strs: Vec<String> = values.iter().map(|v| v.to_string()).collect();
                 format!("{{{}}}", value_strs.join(", "))
-            },
+            }
             Value::Map(entries) => {
                 let entry_strs: Vec<String> = entries
                     .iter()
                     .map(|(k, v)| format!("{}: {}", k.to_string(), v.to_string()))
                     .collect();
                 format!("{{{}}}", entry_strs.join(", "))
-            },
+            }
             Value::Function { name, .. } => format!("<function {}>", name),
             Value::Closure { .. } => "<closure>".to_string(),
             Value::Channel { .. } => "<channel>".to_string(),
