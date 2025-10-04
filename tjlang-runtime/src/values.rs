@@ -38,6 +38,10 @@ pub enum Value {
         variant: String,
         fields: Vec<Value>,
     },
+    Union {
+        value: Box<Value>,
+        possible_types: Vec<String>, // Type names for debugging
+    },
     Tuple(Vec<Value>),
     Vec(Vec<Value>),
     Set(std::collections::HashSet<Value>),
@@ -128,6 +132,10 @@ impl Clone for Value {
             },
             Value::Reference(addr) => Value::Reference(*addr),
             Value::Type(t) => Value::Type(t.clone()),
+            Value::Union { value, possible_types } => Value::Union {
+                value: value.clone(),
+                possible_types: possible_types.clone(),
+            },
         }
     }
 }
@@ -298,6 +306,7 @@ impl Value {
             Value::Task { .. } => Type::Identifier("Task".to_string()),
             Value::Reference(_) => Type::Primitive(PrimitiveType::Any),
             Value::Type(t) => t.clone(),
+            Value::Union { value, .. } => value.get_type(),
         }
     }
 
@@ -343,6 +352,9 @@ impl Value {
                     format!("{}::{} ({})", name, variant, field_strs.join(", "))
                 }
             }
+            Value::Union { value, possible_types } => {
+                format!("Union<{}>({})", possible_types.join(" | "), value.to_string())
+            }
             Value::Tuple(values) => {
                 let value_strs: Vec<String> = values.iter().map(|v| v.to_string()).collect();
                 format!("({})", value_strs.join(", "))
@@ -368,6 +380,37 @@ impl Value {
             Value::Task { id, .. } => format!("<task {}>", id),
             Value::Reference(addr) => format!("<ref {}>", addr),
             Value::Type(t) => format!("<type {:?}>", t),
+        }
+    }
+
+    /// Check if this value is compatible with a union type
+    pub fn is_compatible_with_union(&self, union_types: &[String]) -> bool {
+        match self {
+            Value::Int(_) => union_types.contains(&"int".to_string()),
+            Value::Float(_) => union_types.contains(&"float".to_string()),
+            Value::Bool(_) => union_types.contains(&"bool".to_string()),
+            Value::String(_) => union_types.contains(&"str".to_string()),
+            Value::Union { value, possible_types } => {
+                // Check if any of the union's possible types are compatible
+                possible_types.iter().any(|t| union_types.contains(t))
+            }
+            _ => false,
+        }
+    }
+
+    /// Extract the inner value from a union type
+    pub fn unwrap_union(&self) -> &Value {
+        match self {
+            Value::Union { value, .. } => value,
+            _ => self,
+        }
+    }
+
+    /// Create a union value from a regular value
+    pub fn wrap_in_union(self, possible_types: Vec<String>) -> Value {
+        Value::Union {
+            value: Box::new(self),
+            possible_types,
         }
     }
 }

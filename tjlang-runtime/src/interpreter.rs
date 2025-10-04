@@ -877,6 +877,7 @@ impl Interpreter {
             Value::Task { .. } => "task",
             Value::Reference(_) => "reference",
             Value::Type(_) => "type",
+            Value::Union { .. } => "union",
         }
     }
 
@@ -1170,7 +1171,11 @@ impl Interpreter {
 
     /// Helper methods for operations
     fn add_values(&self, left: &Value, right: &Value) -> Result<Value, String> {
-        match (left, right) {
+        // Handle union types by unwrapping them
+        let left_unwrapped = left.unwrap_union();
+        let right_unwrapped = right.unwrap_union();
+        
+        match (left_unwrapped, right_unwrapped) {
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a + b)),
             (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a + b)),
             (Value::Int(a), Value::Float(b)) => Ok(Value::Float(*a as f64 + b)),
@@ -1181,7 +1186,11 @@ impl Interpreter {
     }
 
     fn subtract_values(&self, left: &Value, right: &Value) -> Result<Value, String> {
-        match (left, right) {
+        // Handle union types by unwrapping them
+        let left_unwrapped = left.unwrap_union();
+        let right_unwrapped = right.unwrap_union();
+        
+        match (left_unwrapped, right_unwrapped) {
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
             (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a - b)),
             (Value::Int(a), Value::Float(b)) => Ok(Value::Float(*a as f64 - b)),
@@ -1191,7 +1200,11 @@ impl Interpreter {
     }
 
     fn multiply_values(&self, left: &Value, right: &Value) -> Result<Value, String> {
-        match (left, right) {
+        // Handle union types by unwrapping them
+        let left_unwrapped = left.unwrap_union();
+        let right_unwrapped = right.unwrap_union();
+        
+        match (left_unwrapped, right_unwrapped) {
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
             (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a * b)),
             (Value::Int(a), Value::Float(b)) => Ok(Value::Float(*a as f64 * b)),
@@ -1201,7 +1214,11 @@ impl Interpreter {
     }
 
     fn divide_values(&self, left: &Value, right: &Value) -> Result<Value, String> {
-        match (left, right) {
+        // Handle union types by unwrapping them
+        let left_unwrapped = left.unwrap_union();
+        let right_unwrapped = right.unwrap_union();
+        
+        match (left_unwrapped, right_unwrapped) {
             (Value::Int(a), Value::Int(b)) => {
                 if *b == 0 {
                     Err("Division by zero".to_string())
@@ -1235,7 +1252,11 @@ impl Interpreter {
     }
 
     fn modulo_values(&self, left: &Value, right: &Value) -> Result<Value, String> {
-        match (left, right) {
+        // Handle union types by unwrapping them
+        let left_unwrapped = left.unwrap_union();
+        let right_unwrapped = right.unwrap_union();
+        
+        match (left_unwrapped, right_unwrapped) {
             (Value::Int(a), Value::Int(b)) => {
                 if *b == 0 {
                     Err("Modulo by zero".to_string())
@@ -1251,7 +1272,11 @@ impl Interpreter {
     where
         F: FnOnce(f64, f64) -> bool,
     {
-        match (left, right) {
+        // Handle union types by unwrapping them
+        let left_unwrapped = left.unwrap_union();
+        let right_unwrapped = right.unwrap_union();
+        
+        match (left_unwrapped, right_unwrapped) {
             (Value::Int(a), Value::Int(b)) => Ok(Value::Bool(cmp(*a as f64, *b as f64))),
             (Value::Float(a), Value::Float(b)) => Ok(Value::Bool(cmp(*a, *b))),
             (Value::Int(a), Value::Float(b)) => Ok(Value::Bool(cmp(*a as f64, *b))),
