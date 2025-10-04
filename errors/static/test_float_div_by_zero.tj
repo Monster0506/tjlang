@@ -1,0 +1,6 @@
+# Test: Literal float division by zero
+# Expected: error[A2801] at the division operation
+
+z: float = 3.14 / 0.0
+IO.println(z.to_string())
+

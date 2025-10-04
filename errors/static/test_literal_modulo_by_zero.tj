@@ -1,0 +1,6 @@
+# Test: Literal modulo by zero
+# Expected: error[A2801] at the modulo operation
+
+y: int = 15 % 0
+IO.println(y.to_string())
+

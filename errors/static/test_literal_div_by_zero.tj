@@ -1,0 +1,6 @@
+# Test: Literal division by zero
+# Expected: error[A2801] at the division operation
+
+x: int = 10 / 0
+IO.println(x.to_string())
+
