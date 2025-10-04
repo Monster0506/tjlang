@@ -220,6 +220,36 @@ impl TypeChecker {
                     } else {
                         Ok(Type::Int)
                     }
+                } else if let (Type::Sum(left_variants), Type::Sum(right_variants)) = (&left_type, &right_type) {
+                    // Handle union types in arithmetic - check if any combination works
+                    let mut compatible_combinations = Vec::new();
+                    for left_variant in left_variants {
+                        for right_variant in right_variants {
+                            if self.is_numeric_type(left_variant) && self.is_numeric_type(right_variant) {
+                                if *left_variant == Type::Float || *right_variant == Type::Float {
+                                    compatible_combinations.push(Type::Float);
+                                } else {
+                                    compatible_combinations.push(Type::Int);
+                                }
+                            }
+                        }
+                    }
+                    
+                    if compatible_combinations.is_empty() {
+                        self.add_diagnostic(
+                            ErrorCode::AnalyzerTypeMismatch,
+                            Severity::Error,
+                            format!("Cannot perform arithmetic operation on {:?} and {:?}", left_type, right_type),
+                            self.convert_span(tjlang_ast::SourceSpan { 
+                                file_id: self.current_file_id, 
+                                span: codespan::Span::new(0, 0) 
+                            })
+                        );
+                        Ok(Type::Int)
+                    } else {
+                        // Return union of all possible result types
+                        Ok(Type::Sum(compatible_combinations))
+                    }
                 } else {
                     self.add_diagnostic(
                         ErrorCode::AnalyzerTypeMismatch,
@@ -457,9 +487,21 @@ impl TypeChecker {
             return true;
         }
         
-        // Handle union types
+        // Handle union types - check if from type is compatible with any variant
         if let Type::Sum(variants) = to {
             return variants.iter().any(|variant| self.is_type_compatible(from, variant));
+        }
+        
+        // Handle union types in from - check if any variant is compatible with to
+        if let Type::Sum(variants) = from {
+            return variants.iter().any(|variant| self.is_type_compatible(variant, to));
+        }
+        
+        // Handle union to union compatibility
+        if let (Type::Sum(from_variants), Type::Sum(to_variants)) = (from, to) {
+            return from_variants.iter().all(|from_variant| {
+                to_variants.iter().any(|to_variant| self.is_type_compatible(from_variant, to_variant))
+            });
         }
         
         false
@@ -476,6 +518,10 @@ impl TypeChecker {
                     tjlang_ast::PrimitiveType::Str => Type::Str,
                     tjlang_ast::PrimitiveType::Any => Type::Int, // Default fallback
                 }
+            },
+            tjlang_ast::Type::Union { types, .. } => {
+                let variant_types: Vec<Type> = types.iter().map(|t| self.ast_type_to_type(t)).collect();
+                Type::Sum(variant_types)
             },
             tjlang_ast::Type::Vec { element_type, .. } => {
                 Type::Vec(Box::new(self.ast_type_to_type(element_type)))
