@@ -92,6 +92,60 @@ error[A2803]: Variable 'undefined_param' is used before being declared
 ```
 **Explanation:** The static analyzer should detect that `undefined_param` is used inside the function body but never declared.
 
+### `errors/static/test_undefined_function.tj`
+
+**Expected Output:**
+```
+error[A2803]: Function 'nonexistent_function' is called but never declared
+  ┌─ errors/static/test_undefined_function.tj:5:15
+  │
+5 │ result: int = nonexistent_function(x)
+  │               ^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = Function 'nonexistent_function' must be declared before use
+```
+**Explanation:** The static analyzer should detect that `nonexistent_function` is called but never declared in the program.
+
+**Implementation Notes:**
+- The rule checks for user-defined functions only (stdlib functions are in a whitelist)
+- Currently uses error code A2803 as a placeholder; should eventually use a specific UndefinedFunction error code
+
+### `errors/static/test_wrong_argument_count.tj`
+
+**Expected Output:**
+```
+error[A2803]: Function 'add' expects 2 argument(s), but 1 were provided
+  ┌─ errors/static/test_wrong_argument_count.tj:8:15
+  │
+8 │ result: int = add(5)  # Missing second argument
+  │               ^^^^^^
+  │
+```
+**Explanation:** The static analyzer should detect that the function `add` is defined with 2 parameters but called with only 1 argument.
+
+**Implementation Notes:**
+- Argument count validation is only performed on user-defined functions
+- Stdlib functions handle their own argument validation at runtime
+- This prevents false positives for variadic stdlib functions
+
+### `errors/static/test_undefined_module_method.tj`
+
+**Expected Output:**
+```
+error[A2804]: Method 'nonexistent_method' does not exist on module 'IO'
+  ┌─ errors/static/test_undefined_module_method.tj:5:22
+  │
+5 │ IO.nonexistent_method(x)
+  │                      ^^^^
+  │
+```
+**Explanation:** The static analyzer should detect that `nonexistent_method` is not a valid method on the `IO` module.
+
+**Implementation Notes:**
+- The rule maintains a registry of all stdlib functions (e.g., `IO::println`, `MATH::sqrt`, etc.)
+- Primitive methods (e.g., `.to_string()`, `.at()`, `.len()`) are excluded from this check as they're dynamically dispatched at runtime
+- Module names (IO, FILE, MATH, STRING, COLLECTIONS, TIME, ERROR, TESTING) are also whitelisted as valid identifiers
+
 ## Runtime Errors
 
 (To be added as runtime error system is refactored)

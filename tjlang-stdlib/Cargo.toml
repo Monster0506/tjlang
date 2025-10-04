@@ -1,0 +1,9 @@
+[package]
+name = "tjlang-stdlib"
+version = "0.1.0"
+edition = "2021"
+authors = ["TJ"]
+license = "MIT"
+description = "TJLang Standard Library Registry"
+
+[dependencies]

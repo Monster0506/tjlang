@@ -47,3 +47,4 @@ impl ERROR {
         println!("DEBUG: {}", message);
     }
 }
+

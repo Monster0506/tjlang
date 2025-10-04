@@ -1,0 +1,6 @@
+# Test: Undefined method on module
+# Expected: error[A2804] at line 5 for 'nonexistent_method'
+
+x: int = 10
+IO.nonexistent_method(x)
+

@@ -130,6 +130,7 @@ impl Default for RuleConfig {
             "LiteralIndexBoundsRule", // Prevents runtime crashes
             "LiteralDivisionByZeroRule", // Prevents runtime crashes
             "UndefinedVariableRule", // Prevents runtime crashes
+            "UndefinedFunctionRule", // Prevents runtime crashes
             
             // Temporarily disabled warning rules:
             // "TypeSafetyRule",

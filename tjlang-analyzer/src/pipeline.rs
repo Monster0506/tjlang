@@ -87,6 +87,7 @@ impl AnalysisPipeline {
         self.add_ast_rule(Box::new(LiteralIndexBoundsRule));
         self.add_ast_rule(Box::new(LiteralDivisionByZeroRule));
         self.add_ast_rule(Box::new(UndefinedVariableRule));
+        self.add_ast_rule(Box::new(UndefinedFunctionRule));
 
         // High priority rules (Phase 2)
         self.add_post_ast_rule(Box::new(NamingConventionRule));

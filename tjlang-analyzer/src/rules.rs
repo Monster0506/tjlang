@@ -9,6 +9,7 @@ use tjlang_ast::*;
 use tjlang_diagnostics::debug_println;
 use tjlang_diagnostics::DiagnosticCollection;
 use tjlang_lexer::Token;
+use tjlang_stdlib::{get_stdlib_function_names, get_stdlib_module_names, is_primitive_method};
 
 /// Base trait for all analysis rules
 pub trait AnalysisRule {
@@ -2999,19 +3000,9 @@ impl ASTRule for UndefinedVariableRule {
             
             // Add all stdlib module names to the global scope
             // These are always available and don't need to be declared
-            let stdlib_modules = vec![
-                "IO",           // Input/Output operations
-                "FILE",         // File system operations
-                "MATH",         // Mathematical operations
-                "STRING",       // String operations
-                "COLLECTIONS",  // Collection operations
-                "TIME",         // Time and date operations
-                "ERROR",        // Error handling
-                "TESTING",      // Testing framework
-            ];
-            
+            let stdlib_modules = get_stdlib_module_names();
             for module in stdlib_modules {
-                global_scope.insert(module.to_string());
+                global_scope.insert(module);
             }
             
             scope_stack.push(global_scope);
@@ -3237,7 +3228,8 @@ fn check_expr_for_undefined_vars(
             check_expr_for_undefined_vars(operand, scope_stack, diagnostics, file_id);
         }
         Expression::Call { callee, args, .. } => {
-            check_expr_for_undefined_vars(callee, scope_stack, diagnostics, file_id);
+            // Skip checking the callee as a variable - let UndefinedFunctionRule handle it
+            // Only check the arguments for undefined variables
             for arg in args {
                 check_expr_for_undefined_vars(arg, scope_stack, diagnostics, file_id);
             }
@@ -3264,3 +3256,299 @@ fn check_expr_for_undefined_vars(
         _ => {}
     }
 }
+
+// ============================================================================
+// UNDEFINED FUNCTION RULE (A2804)
+// ============================================================================
+
+/// Rule to detect calls to undefined functions at compile time
+pub struct UndefinedFunctionRule;
+
+impl AnalysisRule for UndefinedFunctionRule {
+    fn name(&self) -> &str { "UndefinedFunctionRule" }
+    fn description(&self) -> &str { "Detects calls to functions that haven't been declared" }
+    fn category(&self) -> RuleCategory { RuleCategory::TypeSafety }
+    fn priority(&self) -> u32 { 10 } // High priority - prevents runtime crash
+}
+
+impl ASTRule for UndefinedFunctionRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        debug_println!("[DEBUG] [UNDEF_FUNC] UndefinedFunctionRule.analyze() called");
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        if let Some(ast) = &context.ast {
+            debug_println!("[DEBUG] [UNDEF_FUNC] AST is present with {} units", ast.units.len());
+            
+            // Track user-defined functions and their parameter counts
+            let mut user_functions: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+            
+            // Get stdlib function names (module::function format)
+            let stdlib_functions = get_stdlib_function_names();
+            
+            // First pass: collect all user-defined functions
+            collect_user_functions(&ast.units, &mut user_functions);
+            
+            // Second pass: check all function calls
+            check_function_calls(&ast.units, &user_functions, &stdlib_functions, &mut diagnostics, context.file_id);
+        } else {
+            debug_println!("[DEBUG] [UNDEF_FUNC] No AST available");
+        }
+        
+        debug_println!("[DEBUG] [UNDEF_FUNC] Returning {} diagnostics", diagnostics.count());
+        diagnostics
+    }
+}
+
+
+/// Collect all user-defined functions and their parameter counts
+fn collect_user_functions(
+    units: &[ProgramUnit],
+    user_functions: &mut std::collections::HashMap<String, usize>,
+) {
+    for unit in units {
+        if let ProgramUnit::Declaration(Declaration::Function(func_decl)) = unit {
+            debug_println!("[DEBUG] [UNDEF_FUNC] Found user function: {} with {} params", 
+                func_decl.name, func_decl.params.len());
+            user_functions.insert(func_decl.name.clone(), func_decl.params.len());
+        }
+    }
+}
+
+/// Check all function calls in the program
+fn check_function_calls(
+    units: &[ProgramUnit],
+    user_functions: &std::collections::HashMap<String, usize>,
+    stdlib_functions: &std::collections::HashSet<String>,
+    diagnostics: &mut DiagnosticCollection,
+    file_id: codespan::FileId,
+) {
+    for unit in units {
+        match unit {
+            ProgramUnit::Declaration(Declaration::Function(func_decl)) => {
+                check_block_for_function_calls(&func_decl.body, user_functions, stdlib_functions, diagnostics, file_id);
+            }
+            ProgramUnit::Declaration(Declaration::Variable(var_decl)) => {
+                // Check variable initializer for function calls
+                debug_println!("[DEBUG] [UNDEF_FUNC] Checking variable declaration: {}", var_decl.name);
+                check_expr_for_function_calls(&var_decl.value, user_functions, stdlib_functions, diagnostics, file_id);
+            }
+            ProgramUnit::Statement(stmt) => {
+                check_statement_for_function_calls(stmt, user_functions, stdlib_functions, diagnostics, file_id);
+            }
+            ProgramUnit::Expression(expr) => {
+                check_expr_for_function_calls(expr, user_functions, stdlib_functions, diagnostics, file_id);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Check a statement for function calls
+fn check_statement_for_function_calls(
+    stmt: &Statement,
+    user_functions: &std::collections::HashMap<String, usize>,
+    stdlib_functions: &std::collections::HashSet<String>,
+    diagnostics: &mut DiagnosticCollection,
+    file_id: codespan::FileId,
+) {
+    match stmt {
+        Statement::Variable(var_decl) => {
+            check_expr_for_function_calls(&var_decl.value, user_functions, stdlib_functions, diagnostics, file_id);
+        }
+        Statement::Expression(expr) => {
+            check_expr_for_function_calls(expr, user_functions, stdlib_functions, diagnostics, file_id);
+        }
+        Statement::If(if_stmt) => {
+            check_expr_for_function_calls(&if_stmt.condition, user_functions, stdlib_functions, diagnostics, file_id);
+            check_block_for_function_calls(&if_stmt.then_block, user_functions, stdlib_functions, diagnostics, file_id);
+            if let Some(else_block) = &if_stmt.else_block {
+                check_block_for_function_calls(else_block, user_functions, stdlib_functions, diagnostics, file_id);
+            }
+        }
+        Statement::While(while_stmt) => {
+            check_expr_for_function_calls(&while_stmt.condition, user_functions, stdlib_functions, diagnostics, file_id);
+            check_block_for_function_calls(&while_stmt.body, user_functions, stdlib_functions, diagnostics, file_id);
+        }
+        Statement::DoWhile(do_while) => {
+            check_block_for_function_calls(&do_while.body, user_functions, stdlib_functions, diagnostics, file_id);
+            check_expr_for_function_calls(&do_while.condition, user_functions, stdlib_functions, diagnostics, file_id);
+        }
+        Statement::For(for_stmt) => {
+            match for_stmt {
+                ForStatement::ForEach { iterable, body, .. } => {
+                    check_expr_for_function_calls(iterable, user_functions, stdlib_functions, diagnostics, file_id);
+                    check_block_for_function_calls(body, user_functions, stdlib_functions, diagnostics, file_id);
+                }
+                ForStatement::CStyle { initializer, condition, increment, body, .. } => {
+                    if let Some(init) = initializer {
+                        check_statement_for_function_calls(init, user_functions, stdlib_functions, diagnostics, file_id);
+                    }
+                    if let Some(cond) = condition {
+                        check_expr_for_function_calls(cond, user_functions, stdlib_functions, diagnostics, file_id);
+                    }
+                    if let Some(inc) = increment {
+                        check_expr_for_function_calls(inc, user_functions, stdlib_functions, diagnostics, file_id);
+                    }
+                    check_block_for_function_calls(body, user_functions, stdlib_functions, diagnostics, file_id);
+                }
+            }
+        }
+        Statement::Return(ret_stmt) => {
+            if let Some(expr) = &ret_stmt.value {
+                check_expr_for_function_calls(expr, user_functions, stdlib_functions, diagnostics, file_id);
+            }
+        }
+        Statement::Block(block) => {
+            check_block_for_function_calls(block, user_functions, stdlib_functions, diagnostics, file_id);
+        }
+        _ => {}
+    }
+}
+
+/// Check a block for function calls
+fn check_block_for_function_calls(
+    block: &Block,
+    user_functions: &std::collections::HashMap<String, usize>,
+    stdlib_functions: &std::collections::HashSet<String>,
+    diagnostics: &mut DiagnosticCollection,
+    file_id: codespan::FileId,
+) {
+    for stmt in &block.statements {
+        check_statement_for_function_calls(stmt, user_functions, stdlib_functions, diagnostics, file_id);
+    }
+}
+
+/// Check an expression for function calls
+fn check_expr_for_function_calls(
+    expr: &Expression,
+    user_functions: &std::collections::HashMap<String, usize>,
+    stdlib_functions: &std::collections::HashSet<String>,
+    diagnostics: &mut DiagnosticCollection,
+    file_id: codespan::FileId,
+) {
+    use tjlang_diagnostics::ErrorCode;
+    
+    match expr {
+        Expression::Call { callee, args, span } => {
+            // Check if this is a direct function call (Variable) or a method call (Member)
+            match callee.as_ref() {
+                Expression::Variable(func_name) => {
+                    debug_println!("[DEBUG] [UNDEF_FUNC] Checking function call: {}", func_name);
+                    
+                    // Check if it's a user-defined function
+                    if let Some(&expected_param_count) = user_functions.get(func_name) {
+                        debug_println!("[DEBUG] [UNDEF_FUNC] Found user function: {} (expected {} params, got {})", 
+                            func_name, expected_param_count, args.len());
+                        
+                        // Validate argument count for user-defined functions
+                        if args.len() != expected_param_count {
+                            debug_println!("[DEBUG] [UNDEF_FUNC] Wrong argument count detected for '{}': expected {}, got {}", 
+                                func_name, expected_param_count, args.len());
+                            debug_println!("[DEBUG] [UNDEF_FUNC] Call span: {:?}", span.span);
+                            
+                            let message = format!(
+                                "Function '{}' expects {} argument(s), but {} were provided",
+                                func_name, expected_param_count, args.len()
+                            );
+                            let diag_span = tjlang_diagnostics::SourceSpan::new(file_id, span.span);
+                            
+                            let diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                                ErrorCode::AnalyzerWrongArgumentCount,
+                                codespan_reporting::diagnostic::Severity::Error,
+                                message,
+                                diag_span,
+                            );
+                            
+                            diagnostics.add(diagnostic);
+                            debug_println!("[DEBUG] [UNDEF_FUNC] Diagnostic added");
+                        }
+                    } else {
+                        // Not a user function - this would be an undefined function
+                        debug_println!("[DEBUG] [UNDEF_FUNC] Function '{}' not found in user functions", func_name);
+                        
+                        let message = format!("Function '{}' is called but never declared", func_name);
+                        let diag_span = tjlang_diagnostics::SourceSpan::new(file_id, span.span);
+                        
+                        let diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                            ErrorCode::AnalyzerWrongArgumentCount, // TODO: Should be UndefinedFunction
+                            codespan_reporting::diagnostic::Severity::Error,
+                            message,
+                            diag_span,
+                        ).with_note(format!("Function '{}' must be declared before use", func_name));
+                        
+                        diagnostics.add(diagnostic);
+                    }
+                }
+                Expression::Member { target, member, .. } => {
+                    // This is a method call like IO.println() or Module::function()
+                    // Extract the full qualified name
+                    if let Expression::Variable(module_name) = target.as_ref() {
+                        let full_name = format!("{}::{}", module_name, member);
+                        debug_println!("[DEBUG] [UNDEF_FUNC] Checking method call: {}", full_name);
+                        
+                        // Check if it's a stdlib function - stdlib functions handle their own argument validation
+                        if !stdlib_functions.contains(&full_name) {
+                            debug_println!("[DEBUG] [UNDEF_FUNC] Method '{}' not found in stdlib", full_name);
+                            
+                            // Check if it's a primitive method (e.g., vec.at(), str.to_string())
+                            // These are dynamically checked at runtime, so we skip them
+                            // We only report truly undefined module functions
+                            if !is_primitive_method(member) {
+                                let message = format!("Method '{}' does not exist on module '{}'", member, module_name);
+                                let diag_span = tjlang_diagnostics::SourceSpan::new(file_id, span.span);
+                                
+                                let diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                                    ErrorCode::AnalyzerMethodNotFoundStatic,
+                                    codespan_reporting::diagnostic::Severity::Error,
+                                    message,
+                                    diag_span,
+                                );
+                                
+                                diagnostics.add(diagnostic);
+                            }
+                        }
+                    }
+                    
+                    // Also check the target expression
+                    check_expr_for_function_calls(target, user_functions, stdlib_functions, diagnostics, file_id);
+                }
+                _ => {
+                    // For other callee types (e.g., lambda calls), just check the callee
+                    check_expr_for_function_calls(callee, user_functions, stdlib_functions, diagnostics, file_id);
+                }
+            }
+            
+            // Check all arguments
+            for arg in args {
+                check_expr_for_function_calls(arg, user_functions, stdlib_functions, diagnostics, file_id);
+            }
+        }
+        Expression::Binary { left, right, .. } => {
+            check_expr_for_function_calls(left, user_functions, stdlib_functions, diagnostics, file_id);
+            check_expr_for_function_calls(right, user_functions, stdlib_functions, diagnostics, file_id);
+        }
+        Expression::Unary { operand, .. } => {
+            check_expr_for_function_calls(operand, user_functions, stdlib_functions, diagnostics, file_id);
+        }
+        Expression::Member { target, .. } => {
+            check_expr_for_function_calls(target, user_functions, stdlib_functions, diagnostics, file_id);
+        }
+        Expression::Index { target, index, .. } => {
+            check_expr_for_function_calls(target, user_functions, stdlib_functions, diagnostics, file_id);
+            check_expr_for_function_calls(index, user_functions, stdlib_functions, diagnostics, file_id);
+        }
+        Expression::VecLiteral { elements, .. } => {
+            for elem in elements {
+                check_expr_for_function_calls(elem, user_functions, stdlib_functions, diagnostics, file_id);
+            }
+        }
+        Expression::If { condition, then_expr, else_expr, .. } => {
+            check_expr_for_function_calls(condition, user_functions, stdlib_functions, diagnostics, file_id);
+            check_expr_for_function_calls(then_expr, user_functions, stdlib_functions, diagnostics, file_id);
+            check_expr_for_function_calls(else_expr, user_functions, stdlib_functions, diagnostics, file_id);
+        }
+        // Other expression types
+        _ => {}
+    }
+}
+

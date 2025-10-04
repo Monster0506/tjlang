@@ -1,0 +1,11 @@
+# Test: Wrong argument count for user-defined function
+# Expected: error[A2803] at line 8 (expects 2 arguments, got 1)
+
+def add(a: int, b: int) -> int {
+    return a + b
+}
+
+result: int = add(5)  # Missing second argument
+IO.println(result.to_string())
+
+

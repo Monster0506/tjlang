@@ -8,6 +8,7 @@ members = [
     # "tjlang-codegen",
     "tjlang-runtime",
     "tjlang-diagnostics",
+    "tjlang-stdlib",
     "tjlang-cli",
 ]
 resolver = "2"

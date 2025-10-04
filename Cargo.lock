@@ -1026,6 +1026,7 @@ dependencies = [
  "tjlang-diagnostics",
  "tjlang-lexer",
  "tjlang-parser",
+ "tjlang-stdlib",
  "tjlang-tir",
 ]
 
@@ -1112,6 +1113,10 @@ dependencies = [
  "tjlang-parser",
  "url",
 ]
+
+[[package]]
+name = "tjlang-stdlib"
+version = "0.1.0"
 
 [[package]]
 name = "tjlang-tir"

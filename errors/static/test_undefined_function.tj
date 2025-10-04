@@ -1,0 +1,7 @@
+# Test: Call to undefined function
+# Expected: error[A2803] at line 5 for 'nonexistent_function'
+
+x: int = 10
+result: int = nonexistent_function(x)
+IO.println(result.to_string())
+
