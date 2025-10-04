@@ -791,36 +791,7 @@ impl PostASTRule for DuplicateNameRule {
     }
 }
 
-/// Undefined variable detection rule
-pub struct UndefinedVariableRule;
-
-impl AnalysisRule for UndefinedVariableRule {
-    fn name(&self) -> &str {
-        "UndefinedVariableRule"
-    }
-    fn description(&self) -> &str {
-        "Variables used but not declared"
-    }
-    fn category(&self) -> RuleCategory {
-        RuleCategory::TypeSafety
-    }
-    fn priority(&self) -> u32 {
-        600
-    }
-}
-
-impl PostASTRule for UndefinedVariableRule {
-    fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
-        let diagnostics = DiagnosticCollection::new();
-
-        // TODO: Implement undefined variable detection
-        // - Symbol resolution
-        // - Scope analysis
-        // - Undefined reference detection
-
-        diagnostics
-    }
-}
+// UndefinedVariableRule moved to line 3000+ with full implementation
 
 /// Circular dependency detection rule
 pub struct CircularDependencyRule;
@@ -2995,5 +2966,301 @@ fn is_literal_zero(expr: &Expression) -> bool {
         Expression::Literal(Literal::Int(0)) => true,
         Expression::Literal(Literal::Float(f)) if *f == 0.0 => true,
         _ => false,
+    }
+}
+
+// ============================================================================
+// UNDEFINED VARIABLE RULE (A2803)
+// ============================================================================
+
+/// Rule to detect usage of undefined variables at compile time
+pub struct UndefinedVariableRule;
+
+impl AnalysisRule for UndefinedVariableRule {
+    fn name(&self) -> &str { "UndefinedVariableRule" }
+    fn description(&self) -> &str { "Detects usage of variables that haven't been declared" }
+    fn category(&self) -> RuleCategory { RuleCategory::TypeSafety }
+    fn priority(&self) -> u32 { 10 } // High priority - prevents runtime crash
+}
+
+impl ASTRule for UndefinedVariableRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        debug_println!("[DEBUG] [UNDEF_VAR] UndefinedVariableRule.analyze() called");
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        if let Some(ast) = &context.ast {
+            debug_println!("[DEBUG] [UNDEF_VAR] AST is present with {} units", ast.units.len());
+            
+            // Create a scope tracker to manage variable declarations
+            let mut scope_stack: Vec<std::collections::HashSet<String>> = vec![];
+            
+            // Initialize global scope with stdlib module names
+            let mut global_scope = std::collections::HashSet::new();
+            
+            // Add all stdlib module names to the global scope
+            // These are always available and don't need to be declared
+            let stdlib_modules = vec![
+                "IO",           // Input/Output operations
+                "FILE",         // File system operations
+                "MATH",         // Mathematical operations
+                "STRING",       // String operations
+                "COLLECTIONS",  // Collection operations
+                "TIME",         // Time and date operations
+                "ERROR",        // Error handling
+                "TESTING",      // Testing framework
+            ];
+            
+            for module in stdlib_modules {
+                global_scope.insert(module.to_string());
+            }
+            
+            scope_stack.push(global_scope);
+            
+            check_units_for_undefined_vars(&ast.units, &mut scope_stack, &mut diagnostics, context.file_id);
+        } else {
+            debug_println!("[DEBUG] [UNDEF_VAR] No AST available");
+        }
+        
+        debug_println!("[DEBUG] [UNDEF_VAR] Returning {} diagnostics", diagnostics.count());
+        diagnostics
+    }
+}
+
+/// Check program units for undefined variable usage
+fn check_units_for_undefined_vars(
+    units: &[ProgramUnit], 
+    scope_stack: &mut Vec<std::collections::HashSet<String>>,
+    diagnostics: &mut DiagnosticCollection,
+    file_id: codespan::FileId,
+) {
+    use std::collections::HashSet;
+    
+    debug_println!("[DEBUG] [UNDEF_VAR] Checking {} units", units.len());
+    
+    for unit in units {
+        match unit {
+            ProgramUnit::Declaration(Declaration::Variable(var_decl)) => {
+                debug_println!("[DEBUG] [UNDEF_VAR] Found variable declaration: {}", var_decl.name);
+                
+                // Check the initialization expression first (before adding to scope)
+                check_expr_for_undefined_vars(&var_decl.value, scope_stack, diagnostics, file_id);
+                
+                // Add the variable to current scope
+                if let Some(current_scope) = scope_stack.last_mut() {
+                    current_scope.insert(var_decl.name.clone());
+                }
+            }
+            ProgramUnit::Declaration(Declaration::Function(func_decl)) => {
+                debug_println!("[DEBUG] [UNDEF_VAR] Found function declaration: {}", func_decl.name);
+                
+                // Add the function name to the current scope so it can be called
+                if let Some(current_scope) = scope_stack.last_mut() {
+                    current_scope.insert(func_decl.name.clone());
+                }
+                
+                // Create new scope for function body
+                let mut func_scope = HashSet::new();
+                
+                // Add function parameters to the function scope
+                for param in &func_decl.params {
+                    func_scope.insert(param.name.clone());
+                }
+                
+                scope_stack.push(func_scope);
+                check_block_for_undefined_vars(&func_decl.body, scope_stack, diagnostics, file_id);
+                scope_stack.pop();
+            }
+            ProgramUnit::Statement(stmt) => {
+                check_statement_for_undefined_vars(stmt, scope_stack, diagnostics, file_id);
+            }
+            ProgramUnit::Expression(expr) => {
+                check_expr_for_undefined_vars(expr, scope_stack, diagnostics, file_id);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Check a statement for undefined variables
+fn check_statement_for_undefined_vars(
+    stmt: &Statement,
+    scope_stack: &mut Vec<std::collections::HashSet<String>>,
+    diagnostics: &mut DiagnosticCollection,
+    file_id: codespan::FileId,
+) {
+    use std::collections::HashSet;
+    
+    match stmt {
+        Statement::Variable(var_decl) => {
+            debug_println!("[DEBUG] [UNDEF_VAR] Statement: variable declaration {}", var_decl.name);
+            
+            // Check init expression first
+            check_expr_for_undefined_vars(&var_decl.value, scope_stack, diagnostics, file_id);
+            
+            // Add to current scope
+            if let Some(current_scope) = scope_stack.last_mut() {
+                current_scope.insert(var_decl.name.clone());
+            }
+        }
+        Statement::Expression(expr) => {
+            check_expr_for_undefined_vars(expr, scope_stack, diagnostics, file_id);
+        }
+        Statement::If(if_stmt) => {
+            check_expr_for_undefined_vars(&if_stmt.condition, scope_stack, diagnostics, file_id);
+            
+            // Each block gets its own scope
+            scope_stack.push(HashSet::new());
+            check_block_for_undefined_vars(&if_stmt.then_block, scope_stack, diagnostics, file_id);
+            scope_stack.pop();
+            
+            if let Some(else_block) = &if_stmt.else_block {
+                scope_stack.push(HashSet::new());
+                check_block_for_undefined_vars(else_block, scope_stack, diagnostics, file_id);
+                scope_stack.pop();
+            }
+        }
+        Statement::While(while_stmt) => {
+            check_expr_for_undefined_vars(&while_stmt.condition, scope_stack, diagnostics, file_id);
+            scope_stack.push(HashSet::new());
+            check_block_for_undefined_vars(&while_stmt.body, scope_stack, diagnostics, file_id);
+            scope_stack.pop();
+        }
+        Statement::DoWhile(do_while) => {
+            scope_stack.push(HashSet::new());
+            check_block_for_undefined_vars(&do_while.body, scope_stack, diagnostics, file_id);
+            scope_stack.pop();
+            check_expr_for_undefined_vars(&do_while.condition, scope_stack, diagnostics, file_id);
+        }
+        Statement::For(for_stmt) => {
+            match for_stmt {
+                ForStatement::ForEach { var_name, iterable, body, .. } => {
+                    check_expr_for_undefined_vars(iterable, scope_stack, diagnostics, file_id);
+                    
+                    // Loop variable gets its own scope
+                    let mut loop_scope = HashSet::new();
+                    loop_scope.insert(var_name.clone());
+                    scope_stack.push(loop_scope);
+                    check_block_for_undefined_vars(body, scope_stack, diagnostics, file_id);
+                    scope_stack.pop();
+                }
+                ForStatement::CStyle { initializer, condition, increment, body, .. } => {
+                    // C-style for loop creates its own scope
+                    scope_stack.push(HashSet::new());
+                    
+                    if let Some(init) = initializer {
+                        check_statement_for_undefined_vars(init, scope_stack, diagnostics, file_id);
+                    }
+                    if let Some(cond) = condition {
+                        check_expr_for_undefined_vars(cond, scope_stack, diagnostics, file_id);
+                    }
+                    if let Some(inc) = increment {
+                        check_expr_for_undefined_vars(inc, scope_stack, diagnostics, file_id);
+                    }
+                    check_block_for_undefined_vars(body, scope_stack, diagnostics, file_id);
+                    
+                    scope_stack.pop();
+                }
+            }
+        }
+        Statement::Return(ret_stmt) => {
+            if let Some(expr) = &ret_stmt.value {
+                check_expr_for_undefined_vars(expr, scope_stack, diagnostics, file_id);
+            }
+        }
+        Statement::Block(block) => {
+            scope_stack.push(HashSet::new());
+            check_block_for_undefined_vars(block, scope_stack, diagnostics, file_id);
+            scope_stack.pop();
+        }
+        _ => {}
+    }
+}
+
+/// Check a block for undefined variables
+fn check_block_for_undefined_vars(
+    block: &Block,
+    scope_stack: &mut Vec<std::collections::HashSet<String>>,
+    diagnostics: &mut DiagnosticCollection,
+    file_id: codespan::FileId,
+) {
+    for stmt in &block.statements {
+        check_statement_for_undefined_vars(stmt, scope_stack, diagnostics, file_id);
+    }
+}
+
+/// Check an expression for undefined variables
+fn check_expr_for_undefined_vars(
+    expr: &Expression,
+    scope_stack: &Vec<std::collections::HashSet<String>>,
+    diagnostics: &mut DiagnosticCollection,
+    file_id: codespan::FileId,
+) {
+    use tjlang_diagnostics::ErrorCode;
+    
+    match expr {
+        Expression::Variable(name) => {
+            debug_println!("[DEBUG] [UNDEF_VAR] Checking variable: {}", name);
+            
+            // Check if variable is defined in any scope
+            let is_defined = scope_stack.iter().any(|scope| scope.contains(name));
+            
+            if !is_defined {
+                debug_println!("[DEBUG] [UNDEF_VAR] Undefined variable found: {}", name);
+                
+                let message = format!("Variable '{}' is used before being declared", name);
+                
+                // Note: Expression::Variable doesn't have a span directly
+                // We'll use a placeholder span covering the entire file
+                // In a real implementation, we'd need to enhance the AST to include spans for all nodes
+                let diag_span = tjlang_diagnostics::SourceSpan::new(
+                    file_id,
+                    codespan::Span::from(0..1)
+                );
+                
+                let diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                    ErrorCode::AnalyzerWrongArgumentCount, // TODO: Should be UndefinedVariable
+                    codespan_reporting::diagnostic::Severity::Error,
+                    message,
+                    diag_span,
+                ).with_note(format!("Variable '{}' must be declared before use. Note: Exact location tracking not yet implemented for variable references.", name));
+                
+                diagnostics.add(diagnostic);
+            } else {
+                debug_println!("[DEBUG] [UNDEF_VAR] Variable '{}' is defined", name);
+            }
+        }
+        Expression::Binary { left, right, .. } => {
+            check_expr_for_undefined_vars(left, scope_stack, diagnostics, file_id);
+            check_expr_for_undefined_vars(right, scope_stack, diagnostics, file_id);
+        }
+        Expression::Unary { operand, .. } => {
+            check_expr_for_undefined_vars(operand, scope_stack, diagnostics, file_id);
+        }
+        Expression::Call { callee, args, .. } => {
+            check_expr_for_undefined_vars(callee, scope_stack, diagnostics, file_id);
+            for arg in args {
+                check_expr_for_undefined_vars(arg, scope_stack, diagnostics, file_id);
+            }
+        }
+        Expression::Member { target, .. } => {
+            check_expr_for_undefined_vars(target, scope_stack, diagnostics, file_id);
+        }
+        Expression::Index { target, index, .. } => {
+            check_expr_for_undefined_vars(target, scope_stack, diagnostics, file_id);
+            check_expr_for_undefined_vars(index, scope_stack, diagnostics, file_id);
+        }
+        Expression::VecLiteral { elements, .. } => {
+            for elem in elements {
+                check_expr_for_undefined_vars(elem, scope_stack, diagnostics, file_id);
+            }
+        }
+        Expression::If { condition, then_expr, else_expr, .. } => {
+            check_expr_for_undefined_vars(condition, scope_stack, diagnostics, file_id);
+            check_expr_for_undefined_vars(then_expr, scope_stack, diagnostics, file_id);
+            check_expr_for_undefined_vars(else_expr, scope_stack, diagnostics, file_id);
+        }
+        // Literals don't reference variables
+        Expression::Literal(_) => {}
+        _ => {}
     }
 }

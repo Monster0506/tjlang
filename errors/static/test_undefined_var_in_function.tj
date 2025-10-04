@@ -1,0 +1,10 @@
+# Test: Use of undefined variable in function
+# Expected: error[A2803] at line 5
+
+def calculate(x: int) -> int {
+    y: int = x + undefined_param
+    return y
+}
+
+calculate(5)
+

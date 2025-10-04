@@ -129,15 +129,16 @@ impl Default for RuleConfig {
             // Only enable rules that prevent runtime crashes
             "LiteralIndexBoundsRule", // Prevents runtime crashes
             "LiteralDivisionByZeroRule", // Prevents runtime crashes
-
-                                      // Temporarily disabled warning rules:
-                                      // "TypeSafetyRule",
-                                      // "UnusedVariableRule",
-                                      // "DeadCodeRule",
-                                      // "NamingConventionRule",
-                                      // "FormattingConventionRule",
-                                      // "LineLengthRule",
-                                      // "MagicNumberRule",
+            "UndefinedVariableRule", // Prevents runtime crashes
+            
+            // Temporarily disabled warning rules:
+            // "TypeSafetyRule",
+            // "UnusedVariableRule", 
+            // "DeadCodeRule",
+            // "NamingConventionRule",
+            // "FormattingConventionRule",
+            // "LineLengthRule",
+            // "MagicNumberRule",
         ];
 
         for rule in critical_rules {

@@ -80,12 +80,13 @@ impl AnalysisPipeline {
         self.add_post_ast_rule(Box::new(DeadCodeRule));
         self.add_post_ast_rule(Box::new(UnusedParameterRule));
         self.add_post_ast_rule(Box::new(DuplicateNameRule));
-        self.add_post_ast_rule(Box::new(UndefinedVariableRule));
+        // UndefinedVariableRule is registered as an AST rule (line 89)
         self.add_post_ast_rule(Box::new(CircularDependencyRule));
 
         // Static semantic analysis rules (prevents runtime crashes)
         self.add_ast_rule(Box::new(LiteralIndexBoundsRule));
         self.add_ast_rule(Box::new(LiteralDivisionByZeroRule));
+        self.add_ast_rule(Box::new(UndefinedVariableRule));
 
         // High priority rules (Phase 2)
         self.add_post_ast_rule(Box::new(NamingConventionRule));

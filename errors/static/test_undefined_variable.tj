@@ -1,0 +1,6 @@
+# Test: Use of undefined variable
+# Expected: error[A2803] at line 4
+
+result: int = undefined_var + 10
+IO.println(result.to_string())
+
