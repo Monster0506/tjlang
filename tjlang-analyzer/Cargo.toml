@@ -15,4 +15,5 @@ tjlang-diagnostics = { path = "../tjlang-diagnostics" }
 tjlang-lexer = { path = "../tjlang-lexer" }
 tjlang-parser = { path = "../tjlang-parser" }
 tjlang-stdlib = { path = "../tjlang-stdlib" }
+tjlang-types = { path = "../tjlang-types" }
 tjlang-tir = { version = "0.1.0", path = "../tjlang-tir" }

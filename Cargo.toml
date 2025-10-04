@@ -4,6 +4,7 @@ members = [
     "tjlang-parser", 
     "tjlang-ast",
     "tjlang-analyzer",
+    "tjlang-types",
     # "tjlang-tir",
     # "tjlang-codegen",
     "tjlang-runtime",

@@ -125,13 +125,25 @@ impl AnalysisRule for TypeSafetyRule {
 }
 
 impl PostASTRule for TypeSafetyRule {
-    fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
-        let diagnostics = DiagnosticCollection::new();
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
 
-        // TODO: Implement type checking logic
-        // - Type inference
-        // - Type mismatch detection
-        // - Invalid operation detection
+        if let Some(ast) = &context.ast {
+                // Create simple type checker
+                let mut type_checker = crate::type_checker::TypeChecker::new();
+            
+            // Type check the program
+            match type_checker.check_program(ast) {
+                Ok(_) => {
+                    // Type checking succeeded, but we still need to collect any diagnostics
+                    diagnostics.merge(type_checker.get_diagnostics().clone());
+                },
+                Err(type_diagnostics) => {
+                    // Type checking failed, collect the diagnostics
+                    diagnostics.merge(type_diagnostics);
+                }
+            }
+        }
 
         diagnostics
     }
