@@ -6,4 +6,3 @@ authors = ["TJ"]
 license = "MIT"
 description = "TJLang Standard Library Registry"
 
-[dependencies]

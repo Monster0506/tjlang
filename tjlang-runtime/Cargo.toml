@@ -13,6 +13,7 @@ tjlang-ast = { version = "0.1.0", path = "../tjlang-ast" }
 tjlang-diagnostics = { version = "0.1.0", path = "../tjlang-diagnostics" }
 tjlang-parser = { version = "0.1.0", path = "../tjlang-parser" }
 codespan = "0.12.0"
+codespan-reporting = "0.12.0"
 chrono = { version = "0.4", features = ["serde"] }
 base64 = "0.21.0"
 url = "2.4.0"
@@ -23,3 +24,6 @@ rand = "0.8.0"
 atty = "0.2.14"
 dirs = "5.0.0"
 terminal_size = "0.4.3"
+
+
+

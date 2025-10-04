@@ -128,6 +128,13 @@ pub enum ErrorCode {
     RuntimeMemoryError,
     RuntimeTypeError,
     RuntimeValueError,
+    RuntimeIndexOutOfBounds,
+    RuntimeDivisionByZero,
+    RuntimeUndefinedVariable,
+    RuntimeUndefinedFunction,
+    RuntimeWrongArgumentCount,
+    RuntimeMethodNotFound,
+    RuntimeNullPointer,
 
     // File system errors (F5000-F5999)
     FileNotFound,
@@ -266,6 +273,13 @@ impl ErrorCode {
             ErrorCode::RuntimeMemoryError => "R4002",
             ErrorCode::RuntimeTypeError => "R4003",
             ErrorCode::RuntimeValueError => "R4004",
+            ErrorCode::RuntimeIndexOutOfBounds => "R4005",
+            ErrorCode::RuntimeDivisionByZero => "R4006",
+            ErrorCode::RuntimeUndefinedVariable => "R4007",
+            ErrorCode::RuntimeUndefinedFunction => "R4008",
+            ErrorCode::RuntimeWrongArgumentCount => "R4009",
+            ErrorCode::RuntimeMethodNotFound => "R4010",
+            ErrorCode::RuntimeNullPointer => "R4011",
 
             // File system errors
             ErrorCode::FileNotFound => "F5000",
@@ -382,7 +396,14 @@ impl ErrorCode {
             | ErrorCode::RuntimeTaskError
             | ErrorCode::RuntimeMemoryError
             | ErrorCode::RuntimeTypeError
-            | ErrorCode::RuntimeValueError => "Runtime",
+            | ErrorCode::RuntimeValueError
+            | ErrorCode::RuntimeIndexOutOfBounds
+            | ErrorCode::RuntimeDivisionByZero
+            | ErrorCode::RuntimeUndefinedVariable
+            | ErrorCode::RuntimeUndefinedFunction
+            | ErrorCode::RuntimeWrongArgumentCount
+            | ErrorCode::RuntimeMethodNotFound
+            | ErrorCode::RuntimeNullPointer => "Runtime",
 
             ErrorCode::FileNotFound
             | ErrorCode::FilePermissionDenied

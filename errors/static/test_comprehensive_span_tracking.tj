@@ -1,0 +1,185 @@
+# Test: Comprehensive span tracking for static analysis
+# This file tests various static analysis rules to ensure proper span tracking
+
+# Test 1: Undefined variable in simple expression
+result1: int = undefined_var1 + 10
+
+# Test 2: Undefined variable in function call
+def test_function(x: int) -> int {
+    return x + undefined_var2
+}
+
+# Test 3: Undefined variable in complex expression
+def complex_calculation(a: int, b: int) -> int {
+    temp: int = a * b + undefined_var3
+    return temp / 2
+}
+
+# Test 4: Literal array index out of bounds
+arr: [int] = [1, 2, 3]
+value: int = arr.at(10)  # Should point to .at(10)
+
+# Test 5: Literal division by zero
+div_result: int = 100 / 0  # Should point to / 0
+
+# Test 6: Undefined function call
+result2: int = nonexistent_function(5, 10)
+
+# Test 7: Wrong argument count
+def add(a: int, b: int) -> int {
+    return a + b
+}
+wrong_args: int = add(5)  # Should point to add(5)
+
+# Test 8: Undefined module method
+IO.nonexistent_method("test")
+
+# Test 9: Multiple errors in one expression
+complex_error: int = undefined_var4 + [1, 2, 3].at(5) + 10 / 0
+
+# Test 10: Function calls with errors
+def outer_func(x: int) -> int {
+    return x + undefined_var5
+}
+
+def call_with_error() -> int {
+    return outer_func(undefined_var6)
+}
+
+
+# Test 1: Undefined variable in simple expression
+result1: int = undefined_var1 + 10
+
+# Test 2: Undefined variable in function call
+def test_function(x: int) -> int {
+    return x + undefined_var2
+}
+
+# Test 3: Undefined variable in complex expression
+def complex_calculation(a: int, b: int) -> int {
+    temp: int = a * b + undefined_var3
+    return temp / 2
+}
+
+# Test 4: Literal array index out of bounds
+arr: [int] = [1, 2, 3]
+value: int = arr.at(10)  # Should point to .at(10)
+
+# Test 5: Literal division by zero
+div_result: int = 100 / 0  # Should point to / 0
+
+# Test 6: Undefined function call
+result2: int = nonexistent_function(5, 10)
+
+# Test 7: Wrong argument count
+def add(a: int, b: int) -> int {
+    return a + b
+}
+wrong_args: int = add(5)  # Should point to add(5)
+
+# Test 8: Undefined module method
+IO.nonexistent_method("test")
+
+# Test 9: Multiple errors in one expression
+complex_error: int = undefined_var4 + [1, 2, 3].at(5) + 10 / 0
+
+# Test 10: Function calls with errors
+def outer_func(x: int) -> int {
+    return x + undefined_var5
+}
+
+def call_with_error() -> int {
+    return outer_func(undefined_var6)
+}
+
+
+# Test 1: Undefined variable in simple expression
+result1: int = undefined_var1 + 10
+
+# Test 2: Undefined variable in function call
+def test_function(x: int) -> int {
+    return x + undefined_var2
+}
+
+# Test 3: Undefined variable in complex expression
+def complex_calculation(a: int, b: int) -> int {
+    temp: int = a * b + undefined_var3
+    return temp / 2
+}
+
+# Test 4: Literal array index out of bounds
+arr: [int] = [1, 2, 3]
+value: int = arr.at(10)  # Should point to .at(10)
+
+# Test 5: Literal division by zero
+div_result: int = 100 / 0  # Should point to / 0
+
+# Test 6: Undefined function call
+result2: int = nonexistent_function(5, 10)
+
+# Test 7: Wrong argument count
+def add(a: int, b: int) -> int {
+    return a + b
+}
+wrong_args: int = add(5)  # Should point to add(5)
+
+# Test 8: Undefined module method
+IO.nonexistent_method("test")
+
+# Test 9: Multiple errors in one expression
+complex_error: int = undefined_var4 + [1, 2, 3].at(5) + 10 / 0
+
+# Test 10: Function calls with errors
+def outer_func(x: int) -> int {
+    return x + undefined_var5
+}
+
+def call_with_error() -> int {
+    return outer_func(undefined_var6)
+}
+
+
+# Test 1: Undefined variable in simple expression
+result1: int = undefined_var1 + 10
+
+# Test 2: Undefined variable in function call
+def test_function(x: int) -> int {
+    return x + undefined_var2
+}
+
+# Test 3: Undefined variable in complex expression
+def complex_calculation(a: int, b: int) -> int {
+    temp: int = a * b + undefined_var3
+    return temp / 2
+}
+
+# Test 4: Literal array index out of bounds
+arr: [int] = [1, 2, 3]
+value: int = arr.at(10)  # Should point to .at(10)
+
+# Test 5: Literal division by zero
+div_result: int = 100 / 0  # Should point to / 0
+
+# Test 6: Undefined function call
+result2: int = nonexistent_function(5, 10)
+
+# Test 7: Wrong argument count
+def add(a: int, b: int) -> int {
+    return a + b
+}
+wrong_args: int = add(5)  # Should point to add(5)
+
+# Test 8: Undefined module method
+IO.nonexistent_method("test")
+
+# Test 9: Multiple errors in one expression
+complex_error: int = undefined_var4 + [1, 2, 3].at(5) + 10 / 0
+
+# Test 10: Function calls with errors
+def outer_func(x: int) -> int {
+    return x + undefined_var5
+}
+
+def call_with_error() -> int {
+    return outer_func(undefined_var6)
+}

@@ -1,0 +1,81 @@
+# Test: Function-specific span tracking
+# Tests span tracking within function definitions and calls
+
+# Test 1: Undefined variable in function body
+def test_function1(x: int) -> int {
+    local_var: int = 10
+    return x + local_var + undefined_in_function
+}
+
+# Test 2: Undefined variable in function parameter usage
+def test_function2(param: int) -> int {
+    return param + undefined_param_usage
+}
+
+# Test 3: Undefined variable in function body
+def outer_function(x: int) -> int {
+    return x + undefined_in_inner
+}
+
+# Test 4: Undefined variable in function call argument
+def process_value(value: int) -> int {
+    return value * 2
+}
+
+result: int = process_value(undefined_argument)
+
+# Test 5: Undefined variable in return statement
+def return_function() -> int {
+    return undefined_return_value
+}
+
+# Test 6: Undefined variable in conditional within function
+def conditional_function(x: int) -> int {
+    if undefined_condition {
+        return x
+    }
+    return 0
+}
+
+# Test 7: Undefined variable in loop within function
+def loop_function(x: int) -> int {
+    sum: int = 0
+    for (i: int; 0 $ x) {
+        sum = sum + undefined_in_loop
+    }
+    return sum
+}
+
+# Test 8: Undefined variable in complex expression within function
+def complex_function(a: int, b: int) -> int {
+    temp1: int = a + b
+    temp2: int = temp1 * undefined_multiplier
+    return temp2 / 2
+}
+
+# Test 9: Multiple undefined variables in one function
+def multiple_errors_function(x: int) -> int {
+    var1: int = undefined_var1
+    var2: int = undefined_var2
+    var3: int = undefined_var3
+    return var1 + var2 + var3
+}
+
+# Test 10: Undefined variable in function call chain
+def chain_function(x: int) -> int {
+    return x + undefined_in_chain
+}
+
+def call_chain() -> int {
+    return chain_function(undefined_in_call_chain)
+}
+
+# Test 11: Undefined variable in array access within function
+def array_function(arr: [int]) -> int {
+    return arr.at(undefined_index)
+}
+
+# Test 12: Undefined variable in method call within function
+def method_function(string: str) -> str {
+    return string.concat(undefined_string)
+}

@@ -1,0 +1,53 @@
+# Test: Edge cases for span tracking
+# These test unusual but valid scenarios
+
+# Test 1: Very long variable name
+very_long_undefined_variable_name_that_should_be_highlighted: int = 10
+
+# Test 2: Undefined variable at end of line
+short: int = undefined_end
+
+# Test 3: Undefined variable at start of line
+undefined_start: int = 5
+
+# Test 4: Undefined variable in parentheses
+parenthesized: int = (undefined_in_parens)
+
+# Test 5: Undefined variable in nested parentheses
+nested: int = ((undefined_nested))
+
+# Test 6: Undefined variable with unary operator
+unary: int = -undefined_unary
+
+# Test 7: Undefined variable in range expression
+range_test: int = 0
+for (i: int; undefined_range_start $ 10) {
+    range_test = range_test + i
+}
+
+# Test 8: Undefined variable in function call
+def lambda_test(x: int) -> int {
+    return x + undefined_in_lambda
+}
+
+# Test 9: Undefined variable in array access
+arr: [int] = [1, 2, 3]
+value: int = arr.at(undefined_index)
+
+# Test 10: Undefined variable in string interpolation (if supported)
+# str: string = "Value: " + undefined_in_string
+
+# Test 11: Multiple errors on same line
+same_line: int = var1 + var2 + var3 + var4
+
+# Test 12: Undefined variable in array index
+arr: [int] = [1, 2, 3]
+indexed: int = arr.at(undefined_index)
+
+# Test 13: Undefined variable in function parameter default (if supported)
+# def func_with_default(x: int = undefined_default) -> int {
+#     return x
+# }
+
+# Test 14: Undefined variable in complex mathematical expression
+math: int = (undefined_a + undefined_b) * (undefined_c - undefined_d) / undefined_e

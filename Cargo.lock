@@ -1015,7 +1015,6 @@ dependencies = [
 name = "tjlang-analyzer"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "codespan",
  "codespan-reporting",
  "indexmap",
@@ -1101,6 +1100,7 @@ dependencies = [
  "base64",
  "chrono",
  "codespan",
+ "codespan-reporting",
  "dirs",
  "md5",
  "rand",

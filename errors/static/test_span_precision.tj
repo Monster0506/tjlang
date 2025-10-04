@@ -1,0 +1,185 @@
+# Test: Span precision for different error types
+# Each error should point to the exact problematic location
+
+# Test 1: Variable in binary expression - should point to the variable
+x: int = 5
+y: int = undefined_var + x
+
+# Test 2: Variable in function call argument - should point to the variable
+def process(value: int) -> int {
+    return value * 2
+}
+result: int = process(undefined_param)
+
+# Test 3: Variable in array access - should point to the variable
+arr: [int] = [1, 2, 3]
+index: int = undefined_index
+value: int = arr.at(index)
+
+# Test 4: Variable in complex nested expression - should point to the variable
+def complex_expr(a: int, b: int, c: int) -> int {
+    return a + b * c + undefined_var_nested
+}
+
+# Test 5: Multiple undefined variables in one line - should point to each
+multi_error: int = var1 + var2 + var3
+
+# Test 6: Undefined variable in conditional
+if undefined_condition {
+    IO.println("This won't execute")
+}
+
+# Test 7: Undefined variable in loop
+while undefined_loop_var < 10 {
+    IO.println("Loop")
+}
+
+# Test 8: Undefined variable in return statement
+def return_undefined() -> int {
+    return undefined_return_var
+}
+
+# Test 9: Undefined variable in array literal
+arr_with_undefined: [int] = [1, undefined_in_array, 3]
+
+# Test 10: Undefined variable in method call
+str_var: str = "hello"
+result: str = str_var.concat(undefined_string)
+
+
+# Test 1: Variable in binary expression - should point to the variable
+x: int = 5
+y: int = undefined_var + x
+
+# Test 2: Variable in function call argument - should point to the variable
+def process(value: int) -> int {
+    return value * 2
+}
+result: int = process(undefined_param)
+
+# Test 3: Variable in array access - should point to the variable
+arr: [int] = [1, 2, 3]
+index: int = undefined_index
+value: int = arr.at(index)
+
+# Test 4: Variable in complex nested expression - should point to the variable
+def complex_expr(a: int, b: int, c: int) -> int {
+    return a + b * c + undefined_var_nested
+}
+
+# Test 5: Multiple undefined variables in one line - should point to each
+multi_error: int = var1 + var2 + var3
+
+# Test 6: Undefined variable in conditional
+if undefined_condition {
+    IO.println("This won't execute")
+}
+
+# Test 7: Undefined variable in loop
+while undefined_loop_var < 10 {
+    IO.println("Loop")
+}
+
+# Test 8: Undefined variable in return statement
+def return_undefined() -> int {
+    return undefined_return_var
+}
+
+# Test 9: Undefined variable in array literal
+arr_with_undefined: [int] = [1, undefined_in_array, 3]
+
+# Test 10: Undefined variable in method call
+str_var: str = "hello"
+result: str = str_var.concat(undefined_string)
+
+
+# Test 1: Variable in binary expression - should point to the variable
+x: int = 5
+y: int = undefined_var + x
+
+# Test 2: Variable in function call argument - should point to the variable
+def process(value: int) -> int {
+    return value * 2
+}
+result: int = process(undefined_param)
+
+# Test 3: Variable in array access - should point to the variable
+arr: [int] = [1, 2, 3]
+index: int = undefined_index
+value: int = arr.at(index)
+
+# Test 4: Variable in complex nested expression - should point to the variable
+def complex_expr(a: int, b: int, c: int) -> int {
+    return a + b * c + undefined_var_nested
+}
+
+# Test 5: Multiple undefined variables in one line - should point to each
+multi_error: int = var1 + var2 + var3
+
+# Test 6: Undefined variable in conditional
+if undefined_condition {
+    IO.println("This won't execute")
+}
+
+# Test 7: Undefined variable in loop
+while undefined_loop_var < 10 {
+    IO.println("Loop")
+}
+
+# Test 8: Undefined variable in return statement
+def return_undefined() -> int {
+    return undefined_return_var
+}
+
+# Test 9: Undefined variable in array literal
+arr_with_undefined: [int] = [1, undefined_in_array, 3]
+
+# Test 10: Undefined variable in method call
+str_var: str = "hello"
+result: str = str_var.concat(undefined_string)
+
+
+# Test 1: Variable in binary expression - should point to the variable
+x: int = 5
+y: int = undefined_var + x
+
+# Test 2: Variable in function call argument - should point to the variable
+def process(value: int) -> int {
+    return value * 2
+}
+result: int = process(undefined_param)
+
+# Test 3: Variable in array access - should point to the variable
+arr: [int] = [1, 2, 3]
+index: int = undefined_index
+value: int = arr.at(index)
+
+# Test 4: Variable in complex nested expression - should point to the variable
+def complex_expr(a: int, b: int, c: int) -> int {
+    return a + b * c + undefined_var_nested
+}
+
+# Test 5: Multiple undefined variables in one line - should point to each
+multi_error: int = var1 + var2 + var3
+
+# Test 6: Undefined variable in conditional
+if undefined_condition {
+    IO.println("This won't execute")
+}
+
+# Test 7: Undefined variable in loop
+while undefined_loop_var < 10 {
+    IO.println("Loop")
+}
+
+# Test 8: Undefined variable in return statement
+def return_undefined() -> int {
+    return undefined_return_var
+}
+
+# Test 9: Undefined variable in array literal
+arr_with_undefined: [int] = [1, undefined_in_array, 3]
+
+# Test 10: Undefined variable in method call
+str_var: str = "hello"
+result: str = str_var.concat(undefined_string)
