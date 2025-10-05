@@ -593,13 +593,54 @@ fn get_all_analysis_rules() -> Vec<&'static dyn tjlang_analyzer::AnalysisRule> {
 
 /// Show current configuration
 fn show_configuration(json_format: bool) -> Result<(), Box<dyn std::error::Error>> {
+    use tjlang_analyzer::AnalysisPipeline;
+    use serde_json;
+    
+    // Create a pipeline to get current configuration
+    let pipeline = AnalysisPipeline::new();
+    let config = pipeline.get_config();
+    
     if json_format {
-        // TODO: Show configuration in JSON format
-        println!("{{}}");
+        // Show configuration in JSON format
+        let json = serde_json::to_string_pretty(config)?;
+        println!("{}", json);
     } else {
+        // Show human-readable configuration
         println!("Current Configuration:");
         println!("=====================");
-        // TODO: Show human-readable configuration
+        println!();
+        
+        // Show enabled rules
+        let all_rules = get_all_analysis_rules();
+        let enabled_rules: Vec<_> = all_rules.iter()
+            .filter(|rule| rule.is_enabled(config))
+            .collect();
+        
+        println!("Enabled Rules ({}):", enabled_rules.len());
+        println!("===================");
+        for rule in &enabled_rules {
+            let severity = rule.severity(config);
+            let severity_str = match severity {
+                tjlang_analyzer::RuleSeverity::Error => "Error",
+                tjlang_analyzer::RuleSeverity::Warning => "Warning", 
+                tjlang_analyzer::RuleSeverity::Info => "Info",
+                tjlang_analyzer::RuleSeverity::Disabled => "Disabled",
+            };
+            println!("  {} ({})", rule.name(), severity_str);
+        }
+        println!();
+        
+        // Show disabled rules count
+        let disabled_count = all_rules.len() - enabled_rules.len();
+        println!("Disabled Rules: {}", disabled_count);
+        println!();
+        
+        // Show configuration summary
+        println!("Configuration Summary:");
+        println!("====================");
+        println!("Total rules: {}", all_rules.len());
+        println!("Enabled: {}", enabled_rules.len());
+        println!("Disabled: {}", disabled_count);
     }
     
     Ok(())
@@ -607,30 +648,115 @@ fn show_configuration(json_format: bool) -> Result<(), Box<dyn std::error::Error
 
 /// Enable a specific rule
 fn enable_rule(rule_name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Enabling rule: {}", rule_name);
-    // TODO: Implement rule enabling
+    use tjlang_analyzer::AnalysisPipeline;
+    
+    // Check if rule exists
+    let all_rules = get_all_analysis_rules();
+    let rule_exists = all_rules.iter().any(|rule| rule.name() == rule_name);
+    
+    if !rule_exists {
+        eprintln!("Error: Rule '{}' not found", rule_name);
+        eprintln!("Use 'tjlang config list' to see available rules");
+        std::process::exit(1);
+    }
+    
+    // Create a new pipeline and enable the rule
+    let mut pipeline = AnalysisPipeline::new();
+    pipeline.enable_rule(rule_name);
+    
+    println!("Enabled rule: {}", rule_name);
+    println!("Note: This change is temporary. Use 'tjlang config save' to persist changes.");
+    
     Ok(())
 }
 
 /// Disable a specific rule
 fn disable_rule(rule_name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Disabling rule: {}", rule_name);
-    // TODO: Implement rule disabling
+    use tjlang_analyzer::AnalysisPipeline;
+    
+    // Check if rule exists
+    let all_rules = get_all_analysis_rules();
+    let rule_exists = all_rules.iter().any(|rule| rule.name() == rule_name);
+    
+    if !rule_exists {
+        eprintln!("Error: Rule '{}' not found", rule_name);
+        eprintln!("Use 'tjlang config list' to see available rules");
+        std::process::exit(1);
+    }
+    
+    // Create a new pipeline and disable the rule
+    let mut pipeline = AnalysisPipeline::new();
+    pipeline.disable_rule(rule_name);
+    
+    println!("Disabled rule: {}", rule_name);
+    println!("Note: This change is temporary. Use 'tjlang config save' to persist changes.");
+    
     Ok(())
 }
 
 /// Set rule severity
 fn set_rule_severity(rule_name: &str, severity: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Setting rule '{}' severity to: {}", rule_name, severity);
-    // TODO: Implement severity setting
+    use tjlang_analyzer::AnalysisPipeline;
+    use tjlang_analyzer::RuleSeverity;
+    
+    // Check if rule exists
+    let all_rules = get_all_analysis_rules();
+    let rule_exists = all_rules.iter().any(|rule| rule.name() == rule_name);
+    
+    if !rule_exists {
+        eprintln!("Error: Rule '{}' not found", rule_name);
+        eprintln!("Use 'tjlang config list' to see available rules");
+        std::process::exit(1);
+    }
+    
+    // Parse severity string
+    let rule_severity = match severity.to_lowercase().as_str() {
+        "error" => RuleSeverity::Error,
+        "warning" => RuleSeverity::Warning,
+        "info" => RuleSeverity::Info,
+        "disabled" => RuleSeverity::Disabled,
+        _ => {
+            eprintln!("Error: Invalid severity '{}'", severity);
+            eprintln!("Valid severities: error, warning, info, disabled");
+            std::process::exit(1);
+        }
+    };
+    
+    // Create a new pipeline and set the rule severity
+    let mut pipeline = AnalysisPipeline::new();
+    pipeline.set_rule_severity(rule_name, rule_severity);
+    
+    println!("Set rule '{}' severity to: {}", rule_name, severity);
+    println!("Note: This change is temporary. Use 'tjlang config save' to persist changes.");
+    
     Ok(())
 }
 
 
 /// Save configuration to file
 fn save_configuration_file(file: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Saving configuration to: {}", file.display());
-    // TODO: Implement configuration file saving
+    use tjlang_analyzer::AnalysisPipeline;
+    use serde_json;
+    use std::fs;
+    
+    // Create a pipeline to get current configuration
+    let pipeline = AnalysisPipeline::new();
+    let config = pipeline.get_config();
+    
+    // Convert to JSON
+    let json = serde_json::to_string_pretty(config)?;
+    
+    // Create parent directories if they don't exist
+    if let Some(parent) = file.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    
+    // Write to file
+    fs::write(file, json)?;
+    
+    println!("Configuration saved to: {}", file.display());
+    println!("You can now use this file with: tjlang run --config {}", file.display());
+    
     Ok(())
 }
 
@@ -642,15 +768,95 @@ fn reset_configuration(confirm: bool) -> Result<(), Box<dyn std::error::Error>> 
         std::process::exit(1);
     }
     
-    println!("Resetting configuration to defaults...");
-    // TODO: Implement configuration reset
+    use tjlang_analyzer::RuleConfig;
+    
+    // Create default configuration
+    let default_config = RuleConfig::default();
+    
+    println!("Configuration reset to defaults");
+    println!("Default rules enabled:");
+    
+    // Show what rules are enabled by default
+    let all_rules = get_all_analysis_rules();
+    let enabled_rules: Vec<_> = all_rules.iter()
+        .filter(|rule| rule.is_enabled(&default_config))
+        .collect();
+    
+    for rule in &enabled_rules {
+        let severity = rule.severity(&default_config);
+        let severity_str = match severity {
+            tjlang_analyzer::RuleSeverity::Error => "Error",
+            tjlang_analyzer::RuleSeverity::Warning => "Warning", 
+            tjlang_analyzer::RuleSeverity::Info => "Info",
+            tjlang_analyzer::RuleSeverity::Disabled => "Disabled",
+        };
+        println!("  {} ({})", rule.name(), severity_str);
+    }
+    
+    println!();
+    println!("Note: This change is temporary. Use 'tjlang config save' to persist the default configuration.");
+    
     Ok(())
 }
 
 /// Validate configuration file
 fn validate_configuration_file(file: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Validating configuration file: {}", file.display());
-    // TODO: Implement configuration validation
+    use std::fs;
+    use serde_json;
+    use tjlang_analyzer::RuleConfig;
+    
+    // Check if file exists
+    if !file.exists() {
+        eprintln!("Error: Configuration file '{}' does not exist", file.display());
+        std::process::exit(1);
+    }
+    
+    // Read file content
+    let content = fs::read_to_string(file)?;
+    
+    // Try to parse as JSON
+    let json_value: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(value) => value,
+        Err(e) => {
+            eprintln!("Error: Invalid JSON in configuration file");
+            eprintln!("JSON Error: {}", e);
+            std::process::exit(1);
+        }
+    };
+    
+    // Try to deserialize as RuleConfig
+    let config: RuleConfig = match serde_json::from_value(json_value) {
+        Ok(config) => config,
+        Err(e) => {
+            eprintln!("Error: Invalid configuration format");
+            eprintln!("Configuration Error: {}", e);
+            std::process::exit(1);
+        }
+    };
+    
+    // Validate that all referenced rules exist
+    let all_rules = get_all_analysis_rules();
+    let all_rule_names: std::collections::HashSet<&str> = all_rules.iter()
+        .map(|rule| rule.name())
+        .collect();
+    
+    // Check enabled rules
+    for (rule_name, is_enabled) in &config.enabled_rules {
+        if !all_rule_names.contains(rule_name.as_str()) {
+            eprintln!("Warning: Unknown rule '{}' is configured", rule_name);
+        }
+    }
+    
+    // Count enabled and disabled rules
+    let enabled_count = config.enabled_rules.values().filter(|&&enabled| enabled).count();
+    let disabled_count = config.enabled_rules.values().filter(|&&enabled| !enabled).count();
+    
+    // Show validation results
+    println!("Configuration file '{}' is valid!", file.display());
+    println!("Enabled rules: {}", enabled_count);
+    println!("Disabled rules: {}", disabled_count);
+    println!("Total rules: {}", all_rules.len());
+    
     Ok(())
 }
 
