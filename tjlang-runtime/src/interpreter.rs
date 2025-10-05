@@ -6,6 +6,29 @@ use crate::values::Value;
 use std::collections::HashMap;
 use tjlang_ast::*;
 use tjlang_diagnostics::debug_println;
+use codespan::{FileId, Span};
+
+/// Runtime error with location information
+#[derive(Debug, Clone)]
+pub struct RuntimeError {
+    pub message: String,
+    pub file_id: FileId,
+    pub span: Span,
+}
+
+impl RuntimeError {
+    pub fn new(message: String, file_id: FileId, span: Span) -> Self {
+        Self { message, file_id, span }
+    }
+}
+
+impl std::fmt::Display for RuntimeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for RuntimeError {}
 
 /// Runtime environment for variable storage
 #[derive(Debug, Clone)]
@@ -60,6 +83,8 @@ pub struct Interpreter {
     environment: Environment,
     functions: HashMap<String, FunctionDecl>,
     stdlib: StdlibRegistry,
+    current_file_id: Option<FileId>,
+    current_span: Option<Span>,
 }
 
 impl Interpreter {
@@ -74,11 +99,30 @@ impl Interpreter {
             environment,
             functions,
             stdlib,
+            current_file_id: None,
+            current_span: None,
         };
         interpreter.register_stdlib_functions();
         debug_println!("[DEBUG] Interpreter created successfully (stdlib enabled)");
 
         interpreter
+    }
+
+    /// Set the current execution context for error tracking
+    pub fn set_execution_context(&mut self, file_id: FileId, span: Span) {
+        self.current_file_id = Some(file_id);
+        self.current_span = Some(span);
+    }
+
+    /// Create a runtime error with current execution context
+    fn runtime_error(&self, message: String) -> RuntimeError {
+        let file_id = self.current_file_id.unwrap_or_else(|| {
+            // Fallback to a dummy file ID if no context is set
+            let mut files = codespan::Files::new();
+            files.add("unknown", "")
+        });
+        let span = self.current_span.unwrap_or_else(|| Span::new(0, 0));
+        RuntimeError::new(message, file_id, span)
     }
 
     /// Register all stdlib functions in the environment
@@ -131,7 +175,7 @@ impl Interpreter {
     }
 
     /// Interpret a complete program
-    pub fn interpret_program(&mut self, program: &Program) -> Result<Value, String> {
+    pub fn interpret_program(&mut self, program: &Program) -> Result<Value, RuntimeError> {
         debug_println!("[DEBUG] Starting program interpretation...");
         debug_println!(" Program has {} units", program.units.len());
 
@@ -151,6 +195,10 @@ impl Interpreter {
         let mut result = Value::None;
         for (i, unit) in program.units.iter().enumerate() {
             debug_println!("  Executing unit {}: {:?}", i, std::mem::discriminant(unit));
+            
+            // Set execution context for error tracking
+            self.set_execution_context(program.span.file_id, program.span.span);
+            
             match unit {
                 ProgramUnit::Declaration(decl) => {
                     debug_println!(
@@ -187,7 +235,7 @@ impl Interpreter {
     }
 
     /// Interpret a declaration
-    fn interpret_declaration(&mut self, decl: &Declaration) -> Result<Value, String> {
+    fn interpret_declaration(&mut self, decl: &Declaration) -> Result<Value, RuntimeError> {
         debug_println!(
             "      [DEBUG] Interpreting declaration: {:?}",
             std::mem::discriminant(decl)
@@ -230,11 +278,31 @@ impl Interpreter {
     }
 
     /// Interpret an expression
-    pub fn interpret_expression(&mut self, expr: &Expression) -> Result<Value, String> {
+    pub fn interpret_expression(&mut self, expr: &Expression) -> Result<Value, RuntimeError> {
         debug_println!(
             "        [DEBUG] Interpreting expression: {:?}",
             std::mem::discriminant(expr)
         );
+        
+        // Set execution context for error tracking
+        let span = match expr {
+            Expression::Binary { span, .. } => span,
+            Expression::Unary { span, .. } => span,
+            Expression::Call { span, .. } => span,
+            Expression::Index { span, .. } => span,
+            Expression::Member { span, .. } => span,
+            Expression::If { span, .. } => span,
+            Expression::Match { span, .. } => span,
+            Expression::Lambda { span, .. } => span,
+            _ => {
+                // For expressions without explicit spans, use a default
+                let mut files = codespan::Files::new();
+                let file_id = files.add("unknown", "");
+                &SourceSpan { file_id, span: codespan::Span::new(0, 0) }
+            }
+        };
+        self.set_execution_context(span.file_id, span.span);
+        
         match expr {
             Expression::Literal(literal) => {
                 debug_println!("           Literal: {:?}", literal);
@@ -245,7 +313,7 @@ impl Interpreter {
                 self.environment
                     .get(name)
                     .cloned()
-                    .ok_or_else(|| format!("Undefined variable: {}", name))
+                    .ok_or_else(|| self.runtime_error(format!("Undefined variable: {}", name)))
             }
             Expression::Binary {
                 left,
@@ -264,7 +332,7 @@ impl Interpreter {
                         self.environment.define(var_name.clone(), value.clone());
                         return Ok(value);
                     } else {
-                        return Err("Left side of assignment must be a variable".to_string());
+                        return Err(self.runtime_error("Left side of assignment must be a variable".to_string()));
                     }
                 }
 
@@ -358,7 +426,7 @@ impl Interpreter {
                                     let result = crate::primitive_methods::get_primitive_method(
                                         &target_val,
                                         member,
-                                    )?;
+                                    ).map_err(|e| self.runtime_error(e))?;
                                     // If the target is a simple variable reference, update it in the environment
                                     if let Expression::Variable(var_name) = &**target {
                                         debug_println!(
@@ -372,7 +440,7 @@ impl Interpreter {
                                     return crate::primitive_methods::get_primitive_method(
                                         &target_val,
                                         member,
-                                    );
+                                    ).map_err(|e| self.runtime_error(e));
                                 }
                             }
                             "sort" => {
@@ -381,7 +449,7 @@ impl Interpreter {
                                     let result = crate::primitive_methods::get_primitive_method(
                                         &target_val,
                                         member,
-                                    )?;
+                                    ).map_err(|e| self.runtime_error(e))?;
                                     // If the target is a simple variable reference, update it in the environment
                                     if let Expression::Variable(var_name) = &**target {
                                         debug_println!(
@@ -395,7 +463,7 @@ impl Interpreter {
                                     return crate::primitive_methods::get_primitive_method(
                                         &target_val,
                                         member,
-                                    );
+                                    ).map_err(|e| self.runtime_error(e));
                                 }
                             }
                             _ => {
@@ -403,7 +471,7 @@ impl Interpreter {
                                 return crate::primitive_methods::get_primitive_method(
                                     &target_val,
                                     member,
-                                );
+                                ).map_err(|e| self.runtime_error(e));
                             }
                         }
                     } else if is_primitive {
@@ -432,7 +500,7 @@ impl Interpreter {
                                 &target_val,
                                 member,
                                 &arg_values,
-                            )?;
+                            ).map_err(|e| self.runtime_error(e))?;
 
                             // If the target is a simple variable reference, update it in the environment
                             if let Expression::Variable(var_name) = &**target {
@@ -453,7 +521,7 @@ impl Interpreter {
                                 &target_val,
                                 member,
                                 &arg_values,
-                            )?;
+                            ).map_err(|e| self.runtime_error(e))?;
 
                             // If the target is a simple variable reference, update it in the environment
                             if let Expression::Variable(var_name) = &**target {
@@ -473,7 +541,7 @@ impl Interpreter {
                                 &target_val,
                                 member,
                                 &arg_values,
-                            )?;
+                            ).map_err(|e| self.runtime_error(e))?;
 
                             // If the target is a simple variable reference, update it in the environment
                             if let Expression::Variable(var_name) = &**target {
@@ -491,7 +559,7 @@ impl Interpreter {
                             &target_val,
                             member,
                             &arg_values,
-                        );
+                        ).map_err(|e| self.runtime_error(e));
                     }
                 }
 
@@ -595,15 +663,15 @@ impl Interpreter {
                     };
                     Ok(Value::Vec(vec))
                 } else {
-                    Err("Range bounds must be integers".to_string())
+                    Err(self.runtime_error("Range bounds must be integers".to_string()))
                 }
             }
-            _ => Err("Unsupported expression type".to_string()),
+            _ => Err(self.runtime_error("Unsupported expression type".to_string())),
         }
     }
 
     /// Interpret a literal
-    fn interpret_literal(&mut self, literal: &Literal) -> Result<Value, String> {
+    fn interpret_literal(&mut self, literal: &Literal) -> Result<Value, RuntimeError> {
         match literal {
             Literal::Int(value) => Ok(Value::Int(*value)),
             Literal::Float(value) => Ok(Value::Float(*value)),
@@ -633,7 +701,7 @@ impl Interpreter {
         left: &Value,
         op: &BinaryOperator,
         right: &Value,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, RuntimeError> {
         debug_println!(
             "[DEBUG] interpret_binary_operation: left={:?}, op={:?}, right={:?}",
             left,
@@ -654,7 +722,7 @@ impl Interpreter {
             BinaryOperator::GreaterThanEqual => self.compare_values(left, right, |a, b| a >= b),
             BinaryOperator::And => Ok(Value::Bool(self.is_truthy(left) && self.is_truthy(right))),
             BinaryOperator::Or => Ok(Value::Bool(self.is_truthy(left) || self.is_truthy(right))),
-            _ => Err("Unsupported binary operator".to_string()),
+            _ => Err(self.runtime_error("Unsupported binary operator".to_string())),
         };
         debug_println!("[DEBUG] interpret_binary_operation result: {:?}", result);
         result
@@ -665,16 +733,16 @@ impl Interpreter {
         &self,
         op: &UnaryOperator,
         operand: &Value,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, RuntimeError> {
         match op {
             UnaryOperator::Not => Ok(Value::Bool(!self.is_truthy(operand))),
             UnaryOperator::Negate => self.negate_value(operand),
-            UnaryOperator::BitNot => Err("Bitwise operations not implemented".to_string()),
+            UnaryOperator::BitNot => Err(self.runtime_error("Bitwise operations not implemented".to_string())),
         }
     }
 
     /// Interpret a function call
-    pub fn interpret_call(&mut self, callee: &Value, args: &[Value]) -> Result<Value, String> {
+    pub fn interpret_call(&mut self, callee: &Value, args: &[Value]) -> Result<Value, RuntimeError> {
         debug_println!(
             "            [DEBUG] interpret_call: {:?}",
             std::mem::discriminant(callee)
@@ -697,7 +765,7 @@ impl Interpreter {
                         &Value::None,
                         method_name,
                         args,
-                    );
+                    ).map_err(|e| self.runtime_error(e));
                     debug_println!(
                         "              [DEBUG] Primitive method call result: {:?}",
                         result
@@ -712,9 +780,9 @@ impl Interpreter {
                         name,
                         args
                     );
-                    let result = native_func(self, args);
+                    let result = native_func(self, args).map_err(|e| self.runtime_error(e))?;
                     debug_println!("              [DEBUG] Stdlib function result: {:?}", result);
-                    return result;
+                    return Ok(result);
                 }
 
                 debug_println!("              [DEBUG] Looking up user function: {}", name);
@@ -762,7 +830,7 @@ impl Interpreter {
                         "               Available functions: {:?}",
                         self.functions.keys().collect::<Vec<_>>()
                     );
-                    Err(format!("Function '{}' not found", name))
+                    Err(self.runtime_error(format!("Function '{}' not found", name)))
                 }
             }
             Value::Closure { params, body, .. } => {
@@ -781,13 +849,13 @@ impl Interpreter {
             }
             _ => {
                 debug_println!("             Cannot call non-function value: {:?}", callee);
-                Err("Cannot call non-function value".to_string())
+                Err(self.runtime_error("Cannot call non-function value".to_string()))
             }
         }
     }
 
     /// Interpret member access
-    fn interpret_member_access(&self, target: &Value, member: &str) -> Result<Value, String> {
+    fn interpret_member_access(&self, target: &Value, member: &str) -> Result<Value, RuntimeError> {
         debug_println!(
             "[DEBUG] DEBUG: interpret_member_access called: target={:?}, member={}",
             target,
@@ -813,7 +881,7 @@ impl Interpreter {
                         member,
                         name
                     );
-                    Err(format!("No field '{}' found", member))
+                    Err(self.runtime_error(format!("No field '{}' found", member)))
                 }
             }
             // Handle method calls on primitive values
@@ -825,7 +893,7 @@ impl Interpreter {
     }
 
     /// Get a method for a primitive value
-    fn get_primitive_method(&self, target: &Value, method: &str) -> Result<Value, String> {
+    fn get_primitive_method(&self, target: &Value, method: &str) -> Result<Value, RuntimeError> {
         debug_println!(
             " get_primitive_method called: target={:?}, method={}",
             std::mem::discriminant(target),
@@ -853,7 +921,7 @@ impl Interpreter {
                 target,
             ))),
             // Type-specific methods
-            _ => crate::primitive_methods::get_primitive_method(target, method),
+                _ => crate::primitive_methods::get_primitive_method(target, method).map_err(|e| self.runtime_error(e)),
         }
     }
 
@@ -882,34 +950,34 @@ impl Interpreter {
     }
 
     /// Interpret index access
-    fn interpret_index_access(&self, target: &Value, index: &Value) -> Result<Value, String> {
+    fn interpret_index_access(&self, target: &Value, index: &Value) -> Result<Value, RuntimeError> {
         match (target, index) {
             (Value::Vec(vec), Value::Int(idx)) => {
                 if *idx >= 0 && (*idx as usize) < vec.len() {
                     Ok(vec[*idx as usize].clone())
                 } else {
-                    Err("Index out of bounds".to_string())
+                    Err(self.runtime_error("Index out of bounds".to_string()))
                 }
             }
             (Value::Tuple(tuple), Value::Int(idx)) => {
                 if *idx >= 0 && (*idx as usize) < tuple.len() {
                     Ok(tuple[*idx as usize].clone())
                 } else {
-                    Err("Index out of bounds".to_string())
+                    Err(self.runtime_error("Index out of bounds".to_string()))
                 }
             }
-            _ => Err("Cannot index non-vector/tuple value or invalid index type".to_string()),
+            _ => Err(self.runtime_error("Cannot index non-vector/tuple value or invalid index type".to_string())),
         }
     }
 
     /// Interpret a match expression
-    fn interpret_match(&mut self, value: &Value, arms: &[MatchArm]) -> Result<Value, String> {
+    fn interpret_match(&mut self, value: &Value, arms: &[MatchArm]) -> Result<Value, RuntimeError> {
         for arm in arms {
             if self.pattern_matches(value, &arm.pattern) {
                 return self.interpret_block(&arm.body);
             }
         }
-        Err("No matching pattern found".to_string())
+        Err(self.runtime_error("No matching pattern found".to_string()))
     }
 
     /// Check if a pattern matches a value
@@ -946,7 +1014,7 @@ impl Interpreter {
     }
 
     /// Interpret a block
-    fn interpret_block(&mut self, block: &Block) -> Result<Value, String> {
+    fn interpret_block(&mut self, block: &Block) -> Result<Value, RuntimeError> {
         debug_println!(
             "                 interpret_block: {} statements",
             block.statements.len()
@@ -975,7 +1043,7 @@ impl Interpreter {
     }
 
     /// Interpret a statement
-    fn interpret_statement(&mut self, stmt: &Statement) -> Result<Value, String> {
+    fn interpret_statement(&mut self, stmt: &Statement) -> Result<Value, RuntimeError> {
         debug_println!(
             "                    [DEBUG] interpret_statement: {:?}",
             std::mem::discriminant(stmt)
@@ -1100,7 +1168,7 @@ impl Interpreter {
                                 };
                                 Value::Vec(vec)
                             } else {
-                                return Err("Range bounds must be integers".to_string());
+                                return Err(self.runtime_error("Range bounds must be integers".to_string()));
                             }
                         } else {
                             debug_println!(
@@ -1122,10 +1190,10 @@ impl Interpreter {
                                 self.interpret_block(body)?;
                             }
                         } else {
-                            return Err(format!(
+                    return Err(self.runtime_error(format!(
                                 "Cannot iterate over value of type: {:?}",
                                 iter_val
-                            ));
+                    )));
                         }
                     }
                     ForStatement::CStyle {
@@ -1170,7 +1238,7 @@ impl Interpreter {
     }
 
     /// Helper methods for operations
-    fn add_values(&self, left: &Value, right: &Value) -> Result<Value, String> {
+    fn add_values(&self, left: &Value, right: &Value) -> Result<Value, RuntimeError> {
         // Handle union types by unwrapping them
         let left_unwrapped = left.unwrap_union();
         let right_unwrapped = right.unwrap_union();
@@ -1181,11 +1249,11 @@ impl Interpreter {
             (Value::Int(a), Value::Float(b)) => Ok(Value::Float(*a as f64 + b)),
             (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a + *b as f64)),
             (Value::String(a), Value::String(b)) => Ok(Value::String(format!("{}{}", a, b))),
-            _ => Err("Cannot add these types".to_string()),
+            _ => Err(self.runtime_error("Cannot add these types".to_string())),
         }
     }
 
-    fn subtract_values(&self, left: &Value, right: &Value) -> Result<Value, String> {
+    fn subtract_values(&self, left: &Value, right: &Value) -> Result<Value, RuntimeError> {
         // Handle union types by unwrapping them
         let left_unwrapped = left.unwrap_union();
         let right_unwrapped = right.unwrap_union();
@@ -1195,11 +1263,11 @@ impl Interpreter {
             (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a - b)),
             (Value::Int(a), Value::Float(b)) => Ok(Value::Float(*a as f64 - b)),
             (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a - *b as f64)),
-            _ => Err("Cannot subtract these types".to_string()),
+            _ => Err(self.runtime_error("Cannot subtract these types".to_string())),
         }
     }
 
-    fn multiply_values(&self, left: &Value, right: &Value) -> Result<Value, String> {
+    fn multiply_values(&self, left: &Value, right: &Value) -> Result<Value, RuntimeError> {
         // Handle union types by unwrapping them
         let left_unwrapped = left.unwrap_union();
         let right_unwrapped = right.unwrap_union();
@@ -1209,11 +1277,11 @@ impl Interpreter {
             (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a * b)),
             (Value::Int(a), Value::Float(b)) => Ok(Value::Float(*a as f64 * b)),
             (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a * *b as f64)),
-            _ => Err("Cannot multiply these types".to_string()),
+            _ => Err(self.runtime_error("Cannot multiply these types".to_string())),
         }
     }
 
-    fn divide_values(&self, left: &Value, right: &Value) -> Result<Value, String> {
+    fn divide_values(&self, left: &Value, right: &Value) -> Result<Value, RuntimeError> {
         // Handle union types by unwrapping them
         let left_unwrapped = left.unwrap_union();
         let right_unwrapped = right.unwrap_union();
@@ -1221,37 +1289,37 @@ impl Interpreter {
         match (left_unwrapped, right_unwrapped) {
             (Value::Int(a), Value::Int(b)) => {
                 if *b == 0 {
-                    Err("Division by zero".to_string())
+                    Err(self.runtime_error("Division by zero".to_string()))
                 } else {
                     Ok(Value::Int(a / b))
                 }
             }
             (Value::Float(a), Value::Float(b)) => {
                 if *b == 0.0 {
-                    Err("Division by zero".to_string())
+                    Err(self.runtime_error("Division by zero".to_string()))
                 } else {
                     Ok(Value::Float(a / b))
                 }
             }
             (Value::Int(a), Value::Float(b)) => {
                 if *b == 0.0 {
-                    Err("Division by zero".to_string())
+                    Err(self.runtime_error("Division by zero".to_string()))
                 } else {
                     Ok(Value::Float(*a as f64 / b))
                 }
             }
             (Value::Float(a), Value::Int(b)) => {
                 if *b == 0 {
-                    Err("Division by zero".to_string())
+                    Err(self.runtime_error("Division by zero".to_string()))
                 } else {
                     Ok(Value::Float(a / *b as f64))
                 }
             }
-            _ => Err("Cannot divide these types".to_string()),
+            _ => Err(self.runtime_error("Cannot divide these types".to_string())),
         }
     }
 
-    fn modulo_values(&self, left: &Value, right: &Value) -> Result<Value, String> {
+    fn modulo_values(&self, left: &Value, right: &Value) -> Result<Value, RuntimeError> {
         // Handle union types by unwrapping them
         let left_unwrapped = left.unwrap_union();
         let right_unwrapped = right.unwrap_union();
@@ -1259,16 +1327,16 @@ impl Interpreter {
         match (left_unwrapped, right_unwrapped) {
             (Value::Int(a), Value::Int(b)) => {
                 if *b == 0 {
-                    Err("Modulo by zero".to_string())
+                    Err(self.runtime_error("Modulo by zero".to_string()))
                 } else {
                     Ok(Value::Int(a % b))
                 }
             }
-            _ => Err("Cannot modulo these types".to_string()),
+            _ => Err(self.runtime_error("Cannot modulo these types".to_string())),
         }
     }
 
-    fn compare_values<F>(&self, left: &Value, right: &Value, cmp: F) -> Result<Value, String>
+    fn compare_values<F>(&self, left: &Value, right: &Value, cmp: F) -> Result<Value, RuntimeError>
     where
         F: FnOnce(f64, f64) -> bool,
     {
@@ -1281,15 +1349,15 @@ impl Interpreter {
             (Value::Float(a), Value::Float(b)) => Ok(Value::Bool(cmp(*a, *b))),
             (Value::Int(a), Value::Float(b)) => Ok(Value::Bool(cmp(*a as f64, *b))),
             (Value::Float(a), Value::Int(b)) => Ok(Value::Bool(cmp(*a, *b as f64))),
-            _ => Err("Cannot compare these types".to_string()),
+            _ => Err(self.runtime_error("Cannot compare these types".to_string())),
         }
     }
 
-    fn negate_value(&self, operand: &Value) -> Result<Value, String> {
+    fn negate_value(&self, operand: &Value) -> Result<Value, RuntimeError> {
         match operand {
             Value::Int(a) => Ok(Value::Int(-a)),
             Value::Float(a) => Ok(Value::Float(-a)),
-            _ => Err("Cannot negate this type".to_string()),
+            _ => Err(self.runtime_error("Cannot negate this type".to_string())),
         }
     }
 

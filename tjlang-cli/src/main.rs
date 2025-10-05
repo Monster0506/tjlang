@@ -252,25 +252,16 @@ fn run_program(
         Err(e) => {
             debug_println!(" Program execution failed: {}", e);
 
-            // Convert runtime error to diagnostic
-            use codespan::Span;
-
-            // Note: Currently we don't track exact source locations through the interpreter,
-            // so we show the whole file. This could be improved by threading span information
-            // through the interpreter or using a global error context.
-            let span = SourceSpan::new(file_id, Span::from(0..source.len() as u32));
+            // Convert runtime error to diagnostic with proper location tracking
+            let span = SourceSpan::new(e.file_id, e.span);
             let diagnostic = TJLangDiagnostic::new(
                 ErrorCode::RuntimeValueError,
                 Severity::Error,
-                format!("Runtime Error: {}", e),
+                format!("Runtime Error: {}", e.message),
                 span,
             )
             .with_note("The program failed during execution.".to_string())
-            .with_note("Run with --debug flag for more detailed information.".to_string())
-            .with_note(
-                "Note: Exact error location tracking is not yet implemented for runtime errors."
-                    .to_string(),
-            );
+            .with_note("Run with --debug flag for more detailed information.".to_string());
 
             let mut diagnostics = DiagnosticCollection::new();
             diagnostics.add(diagnostic);
