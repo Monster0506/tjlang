@@ -5,10 +5,11 @@
 
 use std::collections::HashMap;
 use tjlang_ast::*;
-use tjlang_diagnostics::{DiagnosticCollection, TJLangDiagnostic, ErrorCode, SourceSpan as DiagnosticSourceSpan};
+use tjlang_diagnostics::{debug_println, DiagnosticCollection, TJLangDiagnostic, ErrorCode, SourceSpan as DiagnosticSourceSpan};
 use codespan_reporting::diagnostic::Severity;
 use tjlang_types::{Type, TypeEnvironment};
 use codespan::{FileId, Files};
+use tjlang_stdlib;
 
 /// Comprehensive type checker for advanced type checking
 pub struct TypeChecker {
@@ -60,9 +61,52 @@ impl TypeChecker {
     }
     
     /// Type check a module
-    fn check_module(&mut self, _module: &ModuleDecl) -> Result<(), DiagnosticCollection> {
+    fn check_module(&mut self, module: &ModuleDecl) -> Result<(), DiagnosticCollection> {
         // ModuleDecl only has name and span, no declarations field
-        // TODO: Implement module-level type checking
+        // For now, we just validate the module name and add it to the type environment
+
+        debug_println!("[DEBUG] [TYPE_CHECKER] Checking module: '{}'", module.name);
+
+        // Check if module name is valid (basic validation)
+        if module.name.is_empty() {
+            debug_println!("[DEBUG] [TYPE_CHECKER] Module name is empty, adding error");
+            self.add_diagnostic(
+                ErrorCode::AnalyzerInvalidModule,
+                Severity::Error,
+                "Module name cannot be empty".to_string(),
+                self.convert_span(module.span.clone())
+            );
+            return Ok(());
+        }
+
+        // Check for valid module name characters (basic validation)
+        if !module.name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == ':') {
+            debug_println!("[DEBUG] [TYPE_CHECKER] Module name has invalid characters, adding error");
+            self.add_diagnostic(
+                ErrorCode::AnalyzerInvalidModule,
+                Severity::Error,
+                format!("Invalid module name '{}': module names can only contain alphanumeric characters, underscores, and colons", module.name),
+                self.convert_span(module.span.clone())
+            );
+            return Ok(());
+        }
+
+        // Check for reserved module names using stdlib registry
+        let stdlib_modules = tjlang_stdlib::get_stdlib_module_names();
+        if stdlib_modules.contains(&module.name) {
+            debug_println!("[DEBUG] [TYPE_CHECKER] Module name '{}' is reserved, adding error", module.name);
+            self.add_diagnostic(
+                ErrorCode::AnalyzerReservedModuleName,
+                Severity::Error,
+                format!("Module name '{}' conflicts with built-in module '{}'", module.name, module.name),
+                self.convert_span(module.span.clone())
+            );
+        }
+
+        // Store module in type environment for future reference
+        // This could be used for module-level type checking in the future
+        debug_println!("[DEBUG] [TYPE_CHECKER] Module declared: {}", module.name);
+
         Ok(())
     }
     
@@ -76,6 +120,7 @@ impl TypeChecker {
             Declaration::Enum(enum_decl) => self.check_enum_declaration(enum_decl)?,
             Declaration::Struct(struct_decl) => self.check_struct_declaration(struct_decl)?,
             Declaration::Implementation(impl_block) => self.check_impl_block(impl_block)?,
+            Declaration::Module(module_decl) => self.check_module(module_decl)?,
         }
         Ok(())
     }
@@ -198,6 +243,9 @@ impl TypeChecker {
             },
             Expression::TupleLiteral { elements, span } => {
                 self.check_tuple_literal(elements, span)
+            },
+            Expression::Member { target, member, span } => {
+                self.check_member_access_with_span(target, member, span)
             },
             _ => {
                 // Handle other expression types
@@ -812,14 +860,380 @@ impl TypeChecker {
     }
     
     /// Type check member access with span
-    fn check_member_access_with_span(&mut self, _target: &Expression, _member: &str, _span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
-        // TODO: Implement member access checking
-        Ok(Type::Int)
+    fn check_member_access_with_span(&mut self, target: &Expression, member: &str, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        // First, type check the target expression
+        let target_type = self.check_expression_with_span(target, Some(span))?;
+        
+        // Check if the member exists on the target type
+        match target_type {
+            Type::Int => self.check_int_member(member, span),
+            Type::Float => self.check_float_member(member, span),
+            Type::Bool => self.check_bool_member(member, span),
+            Type::Str => self.check_str_member(member, span),
+            Type::Vec(_) => self.check_vec_member(member, span),
+            Type::Set(_) => self.check_set_member(member, span),
+            Type::Map(_, _) => self.check_map_member(member, span),
+            Type::Tuple(_) => self.check_tuple_member(member, span),
+            Type::Any => Ok(Type::Any), // Any type can have any member
+            _ => {
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerTypeMismatch,
+                    Severity::Error,
+                    format!("Member access not supported for type: {}", target_type.to_string()),
+                    self.convert_span(span.clone())
+                );
+                Ok(Type::Int) // Fallback
+            }
+        }
     }
     
     /// Type check index access with span
     fn check_index_access_with_span(&mut self, _target: &Expression, _index: &Expression, _span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
         // TODO: Implement index access checking
         Ok(Type::Int)
+    }
+    
+    /// Check if a member exists on an integer type
+    fn check_int_member(&mut self, member: &str, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        match member {
+            // Common methods
+            "to_string" => Ok(Type::Str),
+            "clone" => Ok(Type::Int),
+            "type_name" => Ok(Type::Str),
+            "is_null" => Ok(Type::Bool),
+            "is_not_null" => Ok(Type::Bool),
+            "hash" => Ok(Type::Int),
+            "is_int" => Ok(Type::Bool),
+            "is_float" => Ok(Type::Bool),
+            "is_bool" => Ok(Type::Bool),
+            "is_str" => Ok(Type::Bool),
+            "is_none" => Ok(Type::Bool),
+            "is_tuple" => Ok(Type::Bool),
+            "debug_string" => Ok(Type::Str),
+            "pretty_string" => Ok(Type::Str),
+            // Integer-specific methods
+            "abs" => Ok(Type::Int),
+            "neg" => Ok(Type::Int),
+            "inc" => Ok(Type::Int),
+            "dec" => Ok(Type::Int),
+            "is_even" => Ok(Type::Bool),
+            "is_odd" => Ok(Type::Bool),
+            "is_positive" => Ok(Type::Bool),
+            "is_negative" => Ok(Type::Bool),
+            "is_zero" => Ok(Type::Bool),
+            // Conversion methods
+            "to_int" => Ok(Type::Int),
+            "to_float" => Ok(Type::Float),
+            "to_bool" => Ok(Type::Bool),
+            "to_str" => Ok(Type::Str),
+            _ => {
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerMethodNotFoundStatic,
+                    Severity::Error,
+                    format!("No method '{}' found on integer", member),
+                    self.convert_span(span.clone())
+                );
+                Ok(Type::Int) // Fallback
+            }
+        }
+    }
+    
+    /// Check if a member exists on a float type
+    fn check_float_member(&mut self, member: &str, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        match member {
+            // Common methods
+            "to_string" => Ok(Type::Str),
+            "clone" => Ok(Type::Float),
+            "type_name" => Ok(Type::Str),
+            "is_null" => Ok(Type::Bool),
+            "is_not_null" => Ok(Type::Bool),
+            "hash" => Ok(Type::Int),
+            "is_int" => Ok(Type::Bool),
+            "is_float" => Ok(Type::Bool),
+            "is_bool" => Ok(Type::Bool),
+            "is_str" => Ok(Type::Bool),
+            "is_none" => Ok(Type::Bool),
+            "is_tuple" => Ok(Type::Bool),
+            "debug_string" => Ok(Type::Str),
+            "pretty_string" => Ok(Type::Str),
+            // Float-specific methods
+            "abs" => Ok(Type::Float),
+            "neg" => Ok(Type::Float),
+            "floor" => Ok(Type::Float),
+            "ceil" => Ok(Type::Float),
+            "round" => Ok(Type::Float),
+            "is_positive" => Ok(Type::Bool),
+            "is_negative" => Ok(Type::Bool),
+            "is_zero" => Ok(Type::Bool),
+            "is_finite" => Ok(Type::Bool),
+            "is_infinite" => Ok(Type::Bool),
+            "is_nan" => Ok(Type::Bool),
+            // Conversion methods
+            "to_int" => Ok(Type::Int),
+            "to_float" => Ok(Type::Float),
+            "to_bool" => Ok(Type::Bool),
+            "to_str" => Ok(Type::Str),
+            _ => {
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerMethodNotFoundStatic,
+                    Severity::Error,
+                    format!("No method '{}' found on float", member),
+                    self.convert_span(span.clone())
+                );
+                Ok(Type::Float) // Fallback
+            }
+        }
+    }
+    
+    /// Check if a member exists on a boolean type
+    fn check_bool_member(&mut self, member: &str, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        match member {
+            // Common methods
+            "to_string" => Ok(Type::Str),
+            "clone" => Ok(Type::Bool),
+            "type_name" => Ok(Type::Str),
+            "is_null" => Ok(Type::Bool),
+            "is_not_null" => Ok(Type::Bool),
+            "hash" => Ok(Type::Int),
+            "is_int" => Ok(Type::Bool),
+            "is_float" => Ok(Type::Bool),
+            "is_bool" => Ok(Type::Bool),
+            "is_str" => Ok(Type::Bool),
+            "is_none" => Ok(Type::Bool),
+            "is_tuple" => Ok(Type::Bool),
+            "debug_string" => Ok(Type::Str),
+            "pretty_string" => Ok(Type::Str),
+            // Boolean-specific methods
+            "neg" => Ok(Type::Bool),
+            "and" => Ok(Type::Bool),
+            "or" => Ok(Type::Bool),
+            "xor" => Ok(Type::Bool),
+            // Conversion methods
+            "to_int" => Ok(Type::Int),
+            "to_float" => Ok(Type::Float),
+            "to_bool" => Ok(Type::Bool),
+            "to_str" => Ok(Type::Str),
+            _ => {
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerMethodNotFoundStatic,
+                    Severity::Error,
+                    format!("No method '{}' found on boolean", member),
+                    self.convert_span(span.clone())
+                );
+                Ok(Type::Bool) // Fallback
+            }
+        }
+    }
+    
+    /// Check if a member exists on a string type
+    fn check_str_member(&mut self, member: &str, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        match member {
+            // Common methods
+            "to_string" => Ok(Type::Str),
+            "clone" => Ok(Type::Str),
+            "type_name" => Ok(Type::Str),
+            "is_null" => Ok(Type::Bool),
+            "is_not_null" => Ok(Type::Bool),
+            "hash" => Ok(Type::Int),
+            "is_int" => Ok(Type::Bool),
+            "is_float" => Ok(Type::Bool),
+            "is_bool" => Ok(Type::Bool),
+            "is_str" => Ok(Type::Bool),
+            "is_none" => Ok(Type::Bool),
+            "is_tuple" => Ok(Type::Bool),
+            "debug_string" => Ok(Type::Str),
+            "pretty_string" => Ok(Type::Str),
+            // String-specific methods
+            "length" => Ok(Type::Int),
+            "is_empty" => Ok(Type::Bool),
+            "is_not_empty" => Ok(Type::Bool),
+            "trim" => Ok(Type::Str),
+            "upper" => Ok(Type::Str),
+            "lower" => Ok(Type::Str),
+            "capitalize" => Ok(Type::Str),
+            "reverse" => Ok(Type::Str),
+            // Conversion methods
+            "to_int" => Ok(Type::Int),
+            "to_float" => Ok(Type::Float),
+            "to_bool" => Ok(Type::Bool),
+            "to_str" => Ok(Type::Str),
+            _ => {
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerMethodNotFoundStatic,
+                    Severity::Error,
+                    format!("No method '{}' found on string", member),
+                    self.convert_span(span.clone())
+                );
+                Ok(Type::Str) // Fallback
+            }
+        }
+    }
+    
+    /// Check if a member exists on a vector type
+    fn check_vec_member(&mut self, member: &str, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        match member {
+            // Common methods
+            "to_string" => Ok(Type::Str),
+            "clone" => Ok(Type::Vec(Box::new(Type::Any))), // Will be refined based on element type
+            "type_name" => Ok(Type::Str),
+            "is_null" => Ok(Type::Bool),
+            "is_not_null" => Ok(Type::Bool),
+            "hash" => Ok(Type::Int),
+            "is_int" => Ok(Type::Bool),
+            "is_float" => Ok(Type::Bool),
+            "is_bool" => Ok(Type::Bool),
+            "is_str" => Ok(Type::Bool),
+            "is_none" => Ok(Type::Bool),
+            "is_tuple" => Ok(Type::Bool),
+            "debug_string" => Ok(Type::Str),
+            "pretty_string" => Ok(Type::Str),
+            // Vector-specific methods
+            "length" => Ok(Type::Int),
+            "is_empty" => Ok(Type::Bool),
+            "is_not_empty" => Ok(Type::Bool),
+            "at" => Ok(Type::Any), // Returns element type
+            "push" => Ok(Type::Any), // Returns void
+            "pop" => Ok(Type::Any), // Returns element type
+            "clear" => Ok(Type::Any), // Returns void
+            // Conversion methods
+            "to_int" => Ok(Type::Int),
+            "to_float" => Ok(Type::Float),
+            "to_bool" => Ok(Type::Bool),
+            "to_str" => Ok(Type::Str),
+            _ => {
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerMethodNotFoundStatic,
+                    Severity::Error,
+                    format!("No method '{}' found on vector", member),
+                    self.convert_span(span.clone())
+                );
+                Ok(Type::Vec(Box::new(Type::Any))) // Fallback
+            }
+        }
+    }
+    
+    /// Check if a member exists on a set type
+    fn check_set_member(&mut self, member: &str, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        match member {
+            // Common methods
+            "to_string" => Ok(Type::Str),
+            "clone" => Ok(Type::Set(Box::new(Type::Any))), // Will be refined based on element type
+            "type_name" => Ok(Type::Str),
+            "is_null" => Ok(Type::Bool),
+            "is_not_null" => Ok(Type::Bool),
+            "hash" => Ok(Type::Int),
+            "is_int" => Ok(Type::Bool),
+            "is_float" => Ok(Type::Bool),
+            "is_bool" => Ok(Type::Bool),
+            "is_str" => Ok(Type::Bool),
+            "is_none" => Ok(Type::Bool),
+            "is_tuple" => Ok(Type::Bool),
+            "debug_string" => Ok(Type::Str),
+            "pretty_string" => Ok(Type::Str),
+            // Set-specific methods
+            "length" => Ok(Type::Int),
+            "is_empty" => Ok(Type::Bool),
+            "is_not_empty" => Ok(Type::Bool),
+            "contains" => Ok(Type::Bool),
+            "add" => Ok(Type::Any), // Returns void
+            "remove" => Ok(Type::Any), // Returns void
+            "clear" => Ok(Type::Any), // Returns void
+            // Conversion methods
+            "to_int" => Ok(Type::Int),
+            "to_float" => Ok(Type::Float),
+            "to_bool" => Ok(Type::Bool),
+            "to_str" => Ok(Type::Str),
+            _ => {
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerMethodNotFoundStatic,
+                    Severity::Error,
+                    format!("No method '{}' found on set", member),
+                    self.convert_span(span.clone())
+                );
+                Ok(Type::Set(Box::new(Type::Any))) // Fallback
+            }
+        }
+    }
+    
+    /// Check if a member exists on a map type
+    fn check_map_member(&mut self, member: &str, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        match member {
+            // Common methods
+            "to_string" => Ok(Type::Str),
+            "clone" => Ok(Type::Map(Box::new(Type::Any), Box::new(Type::Any))), // Will be refined based on key/value types
+            "type_name" => Ok(Type::Str),
+            "is_null" => Ok(Type::Bool),
+            "is_not_null" => Ok(Type::Bool),
+            "hash" => Ok(Type::Int),
+            "is_int" => Ok(Type::Bool),
+            "is_float" => Ok(Type::Bool),
+            "is_bool" => Ok(Type::Bool),
+            "is_str" => Ok(Type::Bool),
+            "is_none" => Ok(Type::Bool),
+            "is_tuple" => Ok(Type::Bool),
+            "debug_string" => Ok(Type::Str),
+            "pretty_string" => Ok(Type::Str),
+            // Map-specific methods
+            "length" => Ok(Type::Int),
+            "is_empty" => Ok(Type::Bool),
+            "is_not_empty" => Ok(Type::Bool),
+            "at" => Ok(Type::Any), // Returns value type
+            "contains_key" => Ok(Type::Bool),
+            "insert" => Ok(Type::Any), // Returns void
+            "remove" => Ok(Type::Any), // Returns void
+            "clear" => Ok(Type::Any), // Returns void
+            // Conversion methods
+            "to_int" => Ok(Type::Int),
+            "to_float" => Ok(Type::Float),
+            "to_bool" => Ok(Type::Bool),
+            "to_str" => Ok(Type::Str),
+            _ => {
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerMethodNotFoundStatic,
+                    Severity::Error,
+                    format!("No method '{}' found on map", member),
+                    self.convert_span(span.clone())
+                );
+                Ok(Type::Map(Box::new(Type::Any), Box::new(Type::Any))) // Fallback
+            }
+        }
+    }
+    
+    /// Check if a member exists on a tuple type
+    fn check_tuple_member(&mut self, member: &str, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        match member {
+            // Common methods
+            "to_string" => Ok(Type::Str),
+            "clone" => Ok(Type::Tuple(vec![Type::Any])), // Will be refined based on element types
+            "type_name" => Ok(Type::Str),
+            "is_null" => Ok(Type::Bool),
+            "is_not_null" => Ok(Type::Bool),
+            "hash" => Ok(Type::Int),
+            "is_int" => Ok(Type::Bool),
+            "is_float" => Ok(Type::Bool),
+            "is_bool" => Ok(Type::Bool),
+            "is_str" => Ok(Type::Bool),
+            "is_none" => Ok(Type::Bool),
+            "is_tuple" => Ok(Type::Bool),
+            "debug_string" => Ok(Type::Str),
+            "pretty_string" => Ok(Type::Str),
+            // Tuple-specific methods
+            "length" => Ok(Type::Int),
+            "at" => Ok(Type::Any), // Returns element type
+            // Conversion methods
+            "to_int" => Ok(Type::Int),
+            "to_float" => Ok(Type::Float),
+            "to_bool" => Ok(Type::Bool),
+            "to_str" => Ok(Type::Str),
+            _ => {
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerMethodNotFoundStatic,
+                    Severity::Error,
+                    format!("No method '{}' found on tuple", member),
+                    self.convert_span(span.clone())
+                );
+                Ok(Type::Tuple(vec![Type::Any])) // Fallback
+            }
+        }
     }
 }

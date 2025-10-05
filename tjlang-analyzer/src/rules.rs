@@ -3504,7 +3504,7 @@ fn check_expr_for_function_calls(
                             // These are dynamically checked at runtime, so we skip them
                             // We only report truly undefined module functions
                             if !is_primitive_method(member) {
-                                let message = format!("Method '{}' does not exist on module '{}'", member, module_name);
+                                let message = format!("Method '{}' does not exist on '{}'", member, module_name);
                                 let diag_span = tjlang_diagnostics::SourceSpan::new(file_id, span.span);
                                 
                                 let diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(

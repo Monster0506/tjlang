@@ -40,6 +40,7 @@ pub enum ErrorCode {
     AnalyzerInvalidInterface,
     AnalyzerInvalidImplementation,
     AnalyzerInvalidModule,
+    AnalyzerReservedModuleName,
     AnalyzerInvalidImport,
     AnalyzerInvalidExport,
 
@@ -185,8 +186,9 @@ impl ErrorCode {
             ErrorCode::AnalyzerInvalidInterface => "A2010",
             ErrorCode::AnalyzerInvalidImplementation => "A2011",
             ErrorCode::AnalyzerInvalidModule => "A2012",
-            ErrorCode::AnalyzerInvalidImport => "A2013",
-            ErrorCode::AnalyzerInvalidExport => "A2014",
+            ErrorCode::AnalyzerReservedModuleName => "A2013",
+            ErrorCode::AnalyzerInvalidImport => "A2014",
+            ErrorCode::AnalyzerInvalidExport => "A2015",
 
             // Code Quality Rules (A2100-A2199)
             ErrorCode::AnalyzerNamingConvention => "A2100",
@@ -327,6 +329,7 @@ impl ErrorCode {
             | ErrorCode::AnalyzerInvalidInterface
             | ErrorCode::AnalyzerInvalidImplementation
             | ErrorCode::AnalyzerInvalidModule
+            | ErrorCode::AnalyzerReservedModuleName
             | ErrorCode::AnalyzerInvalidImport
             | ErrorCode::AnalyzerInvalidExport
             | ErrorCode::AnalyzerNamingConvention

@@ -239,7 +239,7 @@ keyword = { impl_kw | for_kw | "module" | "import" | "from" | "export" | "as" | 
 identifier = @{ !(keyword ~ !(ASCII_ALPHANUMERIC | "_")) ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHA | ASCII_DIGIT | "_")* }
 
 // Qualified names (for modules/imports)
-qualified_name = { identifier ~ ("." ~ identifier)* }
+qualified_name = @{ identifier ~ ("." ~ identifier)* }
 
 // Module/import/export declarations
 module_decl = { "module" ~ qualified_name }

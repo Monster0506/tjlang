@@ -294,16 +294,31 @@ impl AnalysisPipeline {
 
     /// Run post-AST analysis (semantic analysis)
     fn run_post_ast_analysis(&self, context: &AnalysisContext) -> AnalysisResult {
+        debug_println!(
+            "[DEBUG] [POST_AST] run_post_ast_analysis called with {} Post-AST rules",
+            self.post_ast_rules.len()
+        );
         let start_time = Instant::now();
         let mut diagnostics = DiagnosticCollection::new();
         let mut rule_results = Vec::new();
 
         // Run post-AST rules
         for rule in &self.post_ast_rules {
+            debug_println!(
+                "[DEBUG] [POST_AST] Checking Post-AST rule: {}, enabled={}",
+                rule.name(),
+                rule.is_enabled(&self.config)
+            );
             if rule.is_enabled(&self.config) {
+                debug_println!("[DEBUG] [POST_AST] Running Post-AST rule: {}", rule.name());
                 let rule_start = Instant::now();
                 let rule_diagnostics = rule.analyze(context);
                 let rule_time = rule_start.elapsed();
+                debug_println!(
+                    "[DEBUG] [POST_AST] Post-AST rule {} found {} diagnostics",
+                    rule.name(),
+                    rule_diagnostics.count()
+                );
 
                 diagnostics.merge(rule_diagnostics.clone());
 

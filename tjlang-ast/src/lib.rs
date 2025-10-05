@@ -80,6 +80,7 @@ pub enum Declaration {
     Struct(StructDecl),
     Variable(VariableDecl),
     Implementation(ImplBlock),
+    Module(ModuleDecl),
 }
 
 /// Function declaration

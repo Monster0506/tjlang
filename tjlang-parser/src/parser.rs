@@ -468,6 +468,16 @@ impl PestParser {
                                     parse_errors.push(e);
                                 }
                         },
+                        Rule::module_decl => match self.parse_module_decl(inner) {
+                                Ok(module_decl) => {
+                                units.push(ProgramUnit::Declaration(Declaration::Module(
+                                    module_decl,
+                                )));
+                                }
+                                Err(e) => {
+                                    parse_errors.push(e);
+                                }
+                        },
                         _ => {
                             self.add_parse_error(
                                 tjlang_diagnostics::ErrorCode::ParserInvalidStatement,
@@ -510,6 +520,32 @@ impl PestParser {
         };
         
         Ok(program)
+    }
+
+    /// Parse module declaration from pest pair
+    fn parse_module_decl(
+        &mut self,
+        pair: Pair<Rule>,
+    ) -> Result<ModuleDecl, Box<dyn std::error::Error>> {
+        let span = pair.as_span();
+        let mut inner = pair.into_inner();
+        
+        // Get the qualified name
+        let name_pair = inner.next().ok_or_else(|| {
+            self.add_parse_error(
+                tjlang_diagnostics::ErrorCode::ParserExpectedToken,
+                "expected module name".to_string(),
+                span,
+            );
+            "Missing module name"
+        })?;
+        
+        let name = name_pair.as_str().trim().to_string();
+        
+        Ok(ModuleDecl {
+            name,
+            span: self.create_span(span),
+        })
     }
 
     /// Parse statement from pest pair

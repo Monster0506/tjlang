@@ -131,9 +131,9 @@ impl Default for RuleConfig {
             "LiteralDivisionByZeroRule", // Prevents runtime crashes
             "UndefinedVariableRule", // Prevents runtime crashes
             "UndefinedFunctionRule", // Prevents runtime crashes
+            "TypeSafetyRule", // Type checking and module validation
             
             // Temporarily disabled warning rules:
-            // "TypeSafetyRule",
             // "UnusedVariableRule", 
             // "DeadCodeRule",
             // "NamingConventionRule",
