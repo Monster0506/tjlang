@@ -177,19 +177,11 @@ impl AnalysisPipeline {
         rule_results.extend(pre_ast_result.rule_results);
 
         // Phase 2: AST analysis (if parsing succeeds)
-        debug_println!("[DEBUG] [DIVZERO] Attempting to parse AST...");
         if let Some(ast) = self.parse_ast(source, file_id) {
-            debug_println!("[DEBUG] [DIVZERO] AST parsed successfully, running AST analysis");
             context = context.with_ast(ast);
             let ast_result = self.run_ast_analysis(&context);
-            debug_println!(
-                "[DEBUG] [DIVZERO] AST analysis complete: {} diagnostics",
-                ast_result.diagnostics_count
-            );
             all_diagnostics.merge(ast_result.diagnostics);
             rule_results.extend(ast_result.rule_results);
-        } else {
-            debug_println!("[DEBUG] [DIVZERO] AST parsing failed");
         }
 
         // Phase 3: Post-AST analysis (semantic analysis)

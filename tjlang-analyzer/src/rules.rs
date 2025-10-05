@@ -129,8 +129,8 @@ impl PostASTRule for TypeSafetyRule {
         let mut diagnostics = DiagnosticCollection::new();
 
         if let Some(ast) = &context.ast {
-                // Create simple type checker
-                let mut type_checker = crate::type_checker::TypeChecker::new();
+            // Create simple type checker
+            let mut type_checker = crate::type_checker::TypeChecker::new();
             
             // Type check the program
             match type_checker.check_program(ast) {
@@ -408,7 +408,7 @@ impl UnusedVariableRule {
         file_id: codespan::FileId,
     ) {
         match expr {
-            Expression::Variable(var_name) => {
+            Expression::Variable { name: var_name, .. } => {
                 // This is a variable usage
                 usage.insert(var_name.clone());
             }
@@ -3201,7 +3201,7 @@ fn check_expr_for_undefined_vars(
     use tjlang_diagnostics::ErrorCode;
     
     match expr {
-        Expression::Variable(name) => {
+        Expression::Variable { name, span } => {
             debug_println!("[DEBUG] [UNDEF_VAR] Checking variable: {}", name);
             
             // Check if variable is defined in any scope
@@ -3212,20 +3212,18 @@ fn check_expr_for_undefined_vars(
                 
                 let message = format!("Variable '{}' is used before being declared", name);
                 
-                // Note: Expression::Variable doesn't have a span directly
-                // We'll use a placeholder span covering the entire file
-                // In a real implementation, we'd need to enhance the AST to include spans for all nodes
+                // Use the actual span from the Expression::Variable node
                 let diag_span = tjlang_diagnostics::SourceSpan::new(
-                        file_id,
-                    codespan::Span::from(0..1)
+                    span.file_id,
+                    span.span
                 );
                 
                 let diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
-                    ErrorCode::AnalyzerWrongArgumentCount, // TODO: Should be UndefinedVariable
+                    ErrorCode::AnalyzerUndefinedVariable,
                     codespan_reporting::diagnostic::Severity::Error,
                     message,
                     diag_span,
-                ).with_note(format!("Variable '{}' must be declared before use. Note: Exact location tracking not yet implemented for variable references.", name));
+                ).with_note(format!("Variable '{}' must be declared before use.", name));
                 
                 diagnostics.add(diagnostic);
             } else {
@@ -3444,7 +3442,7 @@ fn check_expr_for_function_calls(
         Expression::Call { callee, args, span } => {
             // Check if this is a direct function call (Variable) or a method call (Member)
             match callee.as_ref() {
-                Expression::Variable(func_name) => {
+                Expression::Variable { name: func_name, .. } => {
                     debug_println!("[DEBUG] [UNDEF_FUNC] Checking function call: {}", func_name);
                     
                     // Check if it's a user-defined function
@@ -3494,7 +3492,7 @@ fn check_expr_for_function_calls(
                 Expression::Member { target, member, .. } => {
                     // This is a method call like IO.println() or Module::function()
                     // Extract the full qualified name
-                    if let Expression::Variable(module_name) = target.as_ref() {
+                    if let Expression::Variable { name: module_name, .. } = target.as_ref() {
                         let full_name = format!("{}::{}", module_name, member);
                         debug_println!("[DEBUG] [UNDEF_FUNC] Checking method call: {}", full_name);
                         

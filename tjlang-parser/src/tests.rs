@@ -35,7 +35,7 @@ mod tests {
                 assert_eq!(program.units.len(), 1);
 
                 // The parser creates an expression for simple identifiers
-                if let ProgramUnit::Expression(Expression::Variable(name)) = &program.units[0] {
+                if let ProgramUnit::Expression(Expression::Variable { name, .. }) = &program.units[0] {
                     assert_eq!(name, "x");
                 } else {
                     panic!("Expected variable expression, got: {:?}", program.units[0]);
@@ -213,7 +213,7 @@ mod tests {
                     ..
                 }) = &program.units[0]
                 {
-                    if let Expression::Variable(name) = left.as_ref() {
+                    if let Expression::Variable { name, .. } = left.as_ref() {
                         assert_eq!(name, "i");
                     } else {
                         panic!(
@@ -257,7 +257,7 @@ mod tests {
                 assert_eq!(program.units.len(), 1);
 
                 // The parser should create a variable expression
-                if let ProgramUnit::Expression(Expression::Variable(name)) = &program.units[0] {
+                if let ProgramUnit::Expression(Expression::Variable { name, .. }) = &program.units[0] {
                     assert_eq!(name, "i");
                 } else {
                     panic!("Expected variable expression, got: {:?}", program.units[0]);
@@ -2154,7 +2154,7 @@ mod tests {
                             panic!("Expected text part, got: {:?}", parts[0]);
                         }
                         if let FStringPart::Expression(expr) = &parts[1] {
-                            if let Expression::Variable(name) = expr.as_ref() {
+                            if let Expression::Variable { name, .. } = expr.as_ref() {
                                 assert_eq!(name, "name");
                             } else {
                                 panic!("Expected variable expression, got: {:?}", expr);
@@ -2198,7 +2198,7 @@ mod tests {
                             // The actual structure might be different than expected
                             assert!(matches!(
                                 expr.as_ref(),
-                                Expression::Variable(_) | Expression::Binary { .. }
+                                Expression::Variable { .. } | Expression::Binary { .. }
                             ));
                         } else {
                             panic!("Expected expression part, got: {:?}", parts[1]);
@@ -2238,7 +2238,7 @@ mod tests {
                         }
                         // Check first expression
                         if let FStringPart::Expression(expr) = &parts[1] {
-                            if let Expression::Variable(name) = expr.as_ref() {
+                            if let Expression::Variable { name, .. } = expr.as_ref() {
                                 assert_eq!(name, "name");
                             } else {
                                 panic!("Expected variable name, got: {:?}", expr);
@@ -2254,7 +2254,7 @@ mod tests {
                         }
                         // Check second expression
                         if let FStringPart::Expression(expr) = &parts[3] {
-                            if let Expression::Variable(name) = expr.as_ref() {
+                            if let Expression::Variable { name, .. } = expr.as_ref() {
                                 assert_eq!(name, "age");
                             } else {
                                 panic!("Expected variable age, got: {:?}", expr);
@@ -2297,7 +2297,7 @@ mod tests {
                         assert_eq!(parts.len(), 2); // x, y
                                                     // Check first expression
                         if let FStringPart::Expression(expr) = &parts[0] {
-                            if let Expression::Variable(name) = expr.as_ref() {
+                            if let Expression::Variable { name, .. } = expr.as_ref() {
                                 assert_eq!(name, "x");
                             } else {
                                 panic!("Expected variable x, got: {:?}", expr);
@@ -2307,7 +2307,7 @@ mod tests {
                         }
                         // Check second expression
                         if let FStringPart::Expression(expr) = &parts[1] {
-                            if let Expression::Variable(name) = expr.as_ref() {
+                            if let Expression::Variable { name, .. } = expr.as_ref() {
                                 assert_eq!(name, "y");
                             } else {
                                 panic!("Expected variable y, got: {:?}", expr);

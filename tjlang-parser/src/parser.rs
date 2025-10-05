@@ -32,14 +32,25 @@ struct ErrorContext {
 /// Main parser struct using pest
 pub struct PestParser {
     pub diagnostics: DiagnosticCollection,
+    pub current_file_id: codespan::FileId,
 }
 
 impl PestParser {
     /// Create a new pest parser
     pub fn new() -> Self {
+        let mut files = codespan::Files::new();
+        let file_id = files.add("unknown", "");
         Self {
             diagnostics: DiagnosticCollection::new(),
+            current_file_id: file_id,
         }
+    }
+
+    /// Convert pest span to codespan span
+    fn convert_span(&self, pest_span: pest::Span) -> codespan::Span {
+        let start = pest_span.start() as u32;
+        let end = pest_span.end() as u32;
+        codespan::Span::new(start, end)
     }
 
     /// Add a parse error with context
@@ -141,6 +152,9 @@ impl PestParser {
         source: &str,
         file_id: codespan::FileId,
     ) -> Result<Program, Box<dyn std::error::Error>> {
+        // Store the file_id for span conversion
+        self.current_file_id = file_id;
+        
         // Parse using pest
         let pairs = TJLangPestParser::parse(Rule::program, source).map_err(|e| {
             // Convert pest errors to our diagnostic format with rich context
@@ -1479,7 +1493,13 @@ impl PestParser {
                                 Ok(Expression::Literal(literal))
                             }
                             Rule::identifier => {
-                                Ok(Expression::Variable(primary_inner.as_str().to_string()))
+                                Ok(Expression::Variable {
+                                    name: primary_inner.as_str().to_string(),
+                                    span: SourceSpan {
+                                        file_id: self.current_file_id,
+                                        span: self.convert_span(primary_inner.as_span()),
+                                    },
+                                })
                             }
                             _ => Ok(Expression::Literal(Literal::Int(0))),
                         }
@@ -1522,7 +1542,13 @@ impl PestParser {
                     }
                     Rule::identifier => {
                         let name = inner.as_str().to_string();
-                        Ok(Expression::Variable(name))
+                        Ok(Expression::Variable {
+                            name,
+                            span: SourceSpan {
+                                file_id: self.current_file_id,
+                                span: self.convert_span(inner.as_span()),
+                            },
+                        })
                     }
                     Rule::expression => {
                         // Parenthesized expression - avoid recursion for now
@@ -2139,7 +2165,13 @@ impl PestParser {
                     }
                     Rule::identifier => {
                         let name = inner.as_str().to_string();
-                        Ok(Expression::Variable(name))
+                        Ok(Expression::Variable {
+                            name,
+                            span: SourceSpan {
+                                file_id: self.current_file_id,
+                                span: self.convert_span(inner.as_span()),
+                            },
+                        })
                     }
                     Rule::collection_literal => self.parse_collection_literal(inner),
                     Rule::lambda_expr => self.parse_lambda_expr(inner),
@@ -3058,7 +3090,13 @@ impl PestParser {
                 let literal = self.parse_literal(pair)?;
                 Ok(Expression::Literal(literal))
             }
-            Rule::identifier => Ok(Expression::Variable(pair.as_str().to_string())),
+            Rule::identifier => Ok(Expression::Variable {
+                name: pair.as_str().to_string(),
+                span: SourceSpan {
+                    file_id: self.current_file_id,
+                    span: self.convert_span(pair.as_span()),
+                },
+            }),
             Rule::collection_literal => self.parse_collection_literal(pair),
             Rule::lambda_expr => self.parse_lambda_expr(pair),
             Rule::expression => {
@@ -3310,7 +3348,13 @@ impl PestParser {
                 let literal = self.parse_literal(first)?;
                 Ok(Expression::Literal(literal))
             }
-            Rule::identifier => Ok(Expression::Variable(first.as_str().to_string())),
+            Rule::identifier => Ok(Expression::Variable {
+                name: first.as_str().to_string(),
+                span: SourceSpan {
+                    file_id: self.current_file_id,
+                    span: self.convert_span(first.as_span()),
+                },
+            }),
             Rule::collection_literal => self.parse_collection_literal(first),
             Rule::expression => {
                 // Parenthesized expression

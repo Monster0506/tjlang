@@ -6,7 +6,10 @@ use super::*;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Literal(Literal),
-    Variable(String),
+    Variable {
+        name: String,
+        span: SourceSpan,
+    },
     Binary {
         left: Box<Expression>,
         operator: BinaryOperator,

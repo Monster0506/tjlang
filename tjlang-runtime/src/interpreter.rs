@@ -289,7 +289,7 @@ impl Interpreter {
                 debug_println!("           Literal: {:?}", literal);
                 self.interpret_literal(literal)
             }
-            Expression::Variable(name) => {
+            Expression::Variable { name, .. } => {
                 debug_println!("          [DEBUG] Variable: {}", name);
                 self.environment
                     .get(name)
@@ -311,7 +311,7 @@ impl Interpreter {
 
                 // Special handling for assignment
                 if *operator == BinaryOperator::Assign {
-                    if let Expression::Variable(var_name) = left.as_ref() {
+                    if let Expression::Variable { name: var_name, .. } = left.as_ref() {
                         let value = self.interpret_expression(right)?;
                         self.environment.define(var_name.clone(), value.clone());
                         return Ok(value);
@@ -412,7 +412,7 @@ impl Interpreter {
                                         member,
                                     ).map_err(|e| self.runtime_error(e))?;
                                     // If the target is a simple variable reference, update it in the environment
-                                    if let Expression::Variable(var_name) = &**target {
+                                    if let Expression::Variable { name: var_name, .. } = &**target {
                                         debug_println!(
                                             "           Updating variable {} in-place",
                                             var_name
@@ -435,7 +435,7 @@ impl Interpreter {
                                         member,
                                     ).map_err(|e| self.runtime_error(e))?;
                                     // If the target is a simple variable reference, update it in the environment
-                                    if let Expression::Variable(var_name) = &**target {
+                                    if let Expression::Variable { name: var_name, .. } = &**target {
                                         debug_println!(
                                             "           Updating variable {} in-place",
                                             var_name
@@ -487,7 +487,7 @@ impl Interpreter {
                             ).map_err(|e| self.runtime_error(e))?;
 
                             // If the target is a simple variable reference, update it in the environment
-                            if let Expression::Variable(var_name) = &**target {
+                            if let Expression::Variable { name: var_name, .. } = &**target {
                                 // Fixed: &**target to dereference Box<Expression>
                                 debug_println!(
                                     "           Updating variable {} in-place",
@@ -508,7 +508,7 @@ impl Interpreter {
                             ).map_err(|e| self.runtime_error(e))?;
 
                             // If the target is a simple variable reference, update it in the environment
-                            if let Expression::Variable(var_name) = &**target {
+                            if let Expression::Variable { name: var_name, .. } = &**target {
                                 debug_println!(
                                     "           Updating variable {} in-place",
                                     var_name
@@ -528,7 +528,7 @@ impl Interpreter {
                             ).map_err(|e| self.runtime_error(e))?;
 
                             // If the target is a simple variable reference, update it in the environment
-                            if let Expression::Variable(var_name) = &**target {
+                            if let Expression::Variable { name: var_name, .. } = &**target {
                                 debug_println!(
                                     "           Updating variable {} in-place",
                                     var_name

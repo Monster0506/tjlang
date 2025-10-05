@@ -178,6 +178,11 @@ fn run_program(
         }
     };
 
+    // Enable debug mode if debug flag is set
+    if debug {
+        debug::enable();
+    }
+
     // Run static analysis
     if verbose {
         debug_println!(" Running static analysis...");
@@ -220,11 +225,6 @@ fn run_program(
     if debug {
         debug_println!(" AST:");
         debug_println!("{:#?}", ast);
-    }
-
-    // Enable debug mode if debug flag is set
-    if debug {
-        debug::enable();
     }
 
     // Interpret the program

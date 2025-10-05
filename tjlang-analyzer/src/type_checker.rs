@@ -166,13 +166,8 @@ impl TypeChecker {
     fn check_expression_with_span(&mut self, expr: &Expression, span_context: Option<&tjlang_ast::SourceSpan>) -> Result<Type, DiagnosticCollection> {
         match expr {
             Expression::Literal(lit) => self.check_literal(lit),
-            Expression::Variable(name) => {
-                // Use the span context if available, otherwise create a default span
-                let span = span_context.cloned().unwrap_or_else(|| tjlang_ast::SourceSpan {
-                    file_id: self.current_file_id,
-                    span: codespan::Span::new(0, 0)
-                });
-                self.check_variable_reference_with_span(name, &span)
+            Expression::Variable { name, span } => {
+                self.check_variable_reference_with_span(name, span)
             },
             Expression::Binary { left, operator, right, span } => {
                 self.check_binary_expression_with_span(left, operator, right, span)
