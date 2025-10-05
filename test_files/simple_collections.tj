@@ -1,0 +1,36 @@
+# Simple Collections Test
+
+IO.println("=== TJLang Simple Collections Test ===")
+
+# Test vector literals
+numbers: [int] = [1, 2, 3, 4, 5]
+strings: [str] = ["hello", "world", "test"]
+
+IO.println("Vector literals completed")
+
+# Test set literals
+unique_numbers: {int} = {1, 2, 3, 4, 5}
+unique_strings: {str} = {"hello", "world", "test"}
+
+IO.println("Set literals completed")
+
+# Test map literals
+scores: str<int, int> = {"alice": 95, "bob": 87, "charlie": 92}
+
+IO.println("Map literals completed")
+
+# Test tuple literals
+point: (int, int) = (10, 20)
+person: (str, int, bool) = ("Alice", 25, true)
+
+IO.println("Tuple literals completed")
+
+# Test type inference for collections
+inferred_vec: any = [1, 2, 3]
+inferred_set: any = {1, 2, 3}
+inferred_map: any = {"key": "value"}
+inferred_tuple: any = (1, 2, 3)
+
+IO.println("Type inference for collections completed")
+
+IO.println("=== Simple Collections Test Complete ===")

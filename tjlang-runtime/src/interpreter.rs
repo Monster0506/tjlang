@@ -629,6 +629,29 @@ impl Interpreter {
                 }
                 Ok(Value::Vec(vec))
             }
+            Expression::SetLiteral { elements, .. } => {
+                let mut set = std::collections::HashSet::new();
+                for element in elements {
+                    set.insert(self.interpret_expression(element)?);
+                }
+                Ok(Value::Set(set))
+            }
+            Expression::MapLiteral { entries, .. } => {
+                let mut map = std::collections::HashMap::new();
+                for entry in entries {
+                    let key = self.interpret_expression(&entry.key)?;
+                    let value = self.interpret_expression(&entry.value)?;
+                    map.insert(key, value);
+                }
+                Ok(Value::Map(map))
+            }
+            Expression::TupleLiteral { elements, .. } => {
+                let mut tuple = Vec::new();
+                for element in elements {
+                    tuple.push(self.interpret_expression(element)?);
+                }
+                Ok(Value::Tuple(tuple))
+            }
             Expression::Range {
                 start,
                 end,

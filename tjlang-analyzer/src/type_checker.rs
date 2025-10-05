@@ -161,7 +161,14 @@ impl TypeChecker {
     fn check_expression(&mut self, expr: &Expression) -> Result<Type, DiagnosticCollection> {
         match expr {
             Expression::Literal(lit) => self.check_literal(lit),
-            Expression::Variable(name) => self.check_variable_reference(name),
+            Expression::Variable(name) => {
+                // For variable references, we need to create a default span since Variable doesn't have one
+                let default_span = tjlang_ast::SourceSpan {
+                    file_id: self.current_file_id,
+                    span: codespan::Span::new(0, 0)
+                };
+                self.check_variable_reference_with_span(name, &default_span)
+            },
             Expression::Binary { left, operator, right, span } => {
                 self.check_binary_expression_with_span(left, operator, right, span)
             },
@@ -179,6 +186,18 @@ impl TypeChecker {
             },
             Expression::Lambda { params, body, span } => {
                 self.check_lambda_expression_with_span(params, body, span)
+            },
+            Expression::VecLiteral { elements, span } => {
+                self.check_vec_literal(elements, span)
+            },
+            Expression::SetLiteral { elements, span } => {
+                self.check_set_literal(elements, span)
+            },
+            Expression::MapLiteral { entries, span } => {
+                self.check_map_literal(entries, span)
+            },
+            Expression::TupleLiteral { elements, span } => {
+                self.check_tuple_literal(elements, span)
             },
             _ => {
                 // Handle other expression types
@@ -200,6 +219,160 @@ impl TypeChecker {
         }
     }
     
+    /// Type check a vector literal
+    fn check_vec_literal(&mut self, elements: &[Expression], span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        if elements.is_empty() {
+            // Empty vector - infer type from context or default to Vec<Int>
+            return Ok(Type::Vec(Box::new(Type::Int)));
+        }
+        
+        // Check all elements have compatible types
+        let first_type = self.check_expression(&elements[0])?;
+        let mut all_compatible = true;
+        
+        for element in elements.iter().skip(1) {
+            let element_type = self.check_expression(element)?;
+            if !self.is_type_compatible(&element_type, &first_type) {
+                all_compatible = false;
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerTypeMismatch,
+                    Severity::Error,
+                    format!("Vector elements have incompatible types: {:?} and {:?}", first_type, element_type),
+                    self.convert_span(span.clone())
+                );
+            }
+        }
+        
+        if all_compatible {
+            Ok(Type::Vec(Box::new(first_type)))
+        } else {
+            // Return union type for incompatible elements
+            let mut element_types = Vec::new();
+            for element in elements {
+                let element_type = self.check_expression(element)?;
+                if !element_types.contains(&element_type) {
+                    element_types.push(element_type);
+                }
+            }
+            Ok(Type::Vec(Box::new(Type::Sum(element_types))))
+        }
+    }
+    
+    /// Type check a set literal
+    fn check_set_literal(&mut self, elements: &[Expression], span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        if elements.is_empty() {
+            // Empty set - infer type from context or default to Set<Int>
+            return Ok(Type::Set(Box::new(Type::Int)));
+        }
+        
+        // Check all elements have compatible types
+        let first_type = self.check_expression(&elements[0])?;
+        let mut all_compatible = true;
+        
+        for element in elements.iter().skip(1) {
+            let element_type = self.check_expression(element)?;
+            if !self.is_type_compatible(&element_type, &first_type) {
+                all_compatible = false;
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerTypeMismatch,
+                    Severity::Error,
+                    format!("Set elements have incompatible types: {:?} and {:?}", first_type, element_type),
+                    self.convert_span(span.clone())
+                );
+            }
+        }
+        
+        if all_compatible {
+            Ok(Type::Set(Box::new(first_type)))
+        } else {
+            // Return union type for incompatible elements
+            let mut element_types = Vec::new();
+            for element in elements {
+                let element_type = self.check_expression(element)?;
+                if !element_types.contains(&element_type) {
+                    element_types.push(element_type);
+                }
+            }
+            Ok(Type::Set(Box::new(Type::Sum(element_types))))
+        }
+    }
+    
+    /// Type check a map literal
+    fn check_map_literal(&mut self, entries: &[MapEntry], span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        if entries.is_empty() {
+            // Empty map - infer type from context or default to Map<Str, Int>
+            return Ok(Type::Map(Box::new(Type::Str), Box::new(Type::Int)));
+        }
+        
+        // Check all keys and values have compatible types
+        let first_key_type = self.check_expression(&entries[0].key)?;
+        let first_value_type = self.check_expression(&entries[0].value)?;
+        let mut all_keys_compatible = true;
+        let mut all_values_compatible = true;
+        
+        for entry in entries.iter().skip(1) {
+            let key_type = self.check_expression(&entry.key)?;
+            let value_type = self.check_expression(&entry.value)?;
+            
+            if !self.is_type_compatible(&key_type, &first_key_type) {
+                all_keys_compatible = false;
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerTypeMismatch,
+                    Severity::Error,
+                    format!("Map keys have incompatible types: {:?} and {:?}", first_key_type, key_type),
+                    self.convert_span(span.clone())
+                );
+            }
+            
+            if !self.is_type_compatible(&value_type, &first_value_type) {
+                all_values_compatible = false;
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerTypeMismatch,
+                    Severity::Error,
+                    format!("Map values have incompatible types: {:?} and {:?}", first_value_type, value_type),
+                    self.convert_span(span.clone())
+                );
+            }
+        }
+        
+        if all_keys_compatible && all_values_compatible {
+            Ok(Type::Map(Box::new(first_key_type), Box::new(first_value_type)))
+        } else {
+            // Return union types for incompatible keys/values
+            let mut key_types = Vec::new();
+            let mut value_types = Vec::new();
+            
+            for entry in entries {
+                let key_type = self.check_expression(&entry.key)?;
+                let value_type = self.check_expression(&entry.value)?;
+                
+                if !key_types.contains(&key_type) {
+                    key_types.push(key_type);
+                }
+                if !value_types.contains(&value_type) {
+                    value_types.push(value_type);
+                }
+            }
+            
+            Ok(Type::Map(
+                Box::new(Type::Sum(key_types)),
+                Box::new(Type::Sum(value_types))
+            ))
+        }
+    }
+    
+    /// Type check a tuple literal
+    fn check_tuple_literal(&mut self, elements: &[Expression], span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        let mut element_types = Vec::new();
+        
+        for element in elements {
+            let element_type = self.check_expression(element)?;
+            element_types.push(element_type);
+        }
+        
+        Ok(Type::Tuple(element_types))
+    }
+    
     /// Type check a variable reference
     fn check_variable_reference(&mut self, name: &str) -> Result<Type, DiagnosticCollection> {
         if let Some(var_type) = self.type_map.get(name) {
@@ -213,6 +386,21 @@ impl TypeChecker {
                     file_id: self.current_file_id, 
                     span: codespan::Span::new(0, 0) 
                 })
+            );
+            Ok(Type::Int) // Default fallback
+        }
+    }
+    
+    /// Type check a variable reference with span
+    fn check_variable_reference_with_span(&mut self, name: &str, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        if let Some(var_type) = self.type_map.get(name) {
+            Ok(var_type.clone())
+        } else {
+            self.add_diagnostic(
+                ErrorCode::AnalyzerUndefinedVariable,
+                Severity::Error,
+                format!("Variable '{}' is used before being declared", name),
+                self.convert_span(span.clone())
             );
             Ok(Type::Int) // Default fallback
         }
