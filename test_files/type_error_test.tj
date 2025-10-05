@@ -1,0 +1,29 @@
+# Type Error Test - Demonstrates improved diagnostics
+
+IO.println("=== TJLang Type Error Test ===")
+
+# Test type mismatch in variable assignment
+x: int = "hello"  # This should cause a type error
+
+# Test type mismatch in arithmetic
+y: int = 5
+z: str = "world"
+result: int = y + z  # This should cause a type error
+
+# Test type mismatch in function call
+def add(a: int, b: int) -> int {
+    return a + b
+}
+
+# This should cause argument type mismatch
+sum: int = add("hello", "world")
+
+# Test type mismatch in if condition
+if "not a boolean" {
+    IO.println("This should not be reached")
+}
+
+# Test type mismatch in comparison
+comparison: bool = 5 == "hello"
+
+IO.println("=== Type Error Test Complete ===")

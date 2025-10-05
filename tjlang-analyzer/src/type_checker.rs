@@ -162,23 +162,23 @@ impl TypeChecker {
         match expr {
             Expression::Literal(lit) => self.check_literal(lit),
             Expression::Variable(name) => self.check_variable_reference(name),
-            Expression::Binary { left, operator, right, .. } => {
-                self.check_binary_expression(left, operator, right)
+            Expression::Binary { left, operator, right, span } => {
+                self.check_binary_expression_with_span(left, operator, right, span)
             },
-            Expression::Unary { operator, operand, .. } => {
-                self.check_unary_expression(operator, operand)
+            Expression::Unary { operator, operand, span } => {
+                self.check_unary_expression_with_span(operator, operand, span)
             },
-            Expression::Call { callee, args, .. } => {
-                self.check_function_call(callee, args)
+            Expression::Call { callee, args, span } => {
+                self.check_function_call_with_span(callee, args, span)
             },
-            Expression::If { condition, then_expr, else_expr, .. } => {
-                self.check_if_expression(condition, then_expr, else_expr)
+            Expression::If { condition, then_expr, else_expr, span } => {
+                self.check_if_expression_with_span(condition, then_expr, else_expr, span)
             },
-            Expression::Match { expression, arms, .. } => {
-                self.check_match_expression(expression, arms)
+            Expression::Match { expression, arms, span } => {
+                self.check_match_expression_with_span(expression, arms, span)
             },
-            Expression::Lambda { params, body, .. } => {
-                self.check_lambda_expression(params, body)
+            Expression::Lambda { params, body, span } => {
+                self.check_lambda_expression_with_span(params, body, span)
             },
             _ => {
                 // Handle other expression types
@@ -218,8 +218,8 @@ impl TypeChecker {
         }
     }
     
-    /// Type check a binary expression
-    fn check_binary_expression(&mut self, left: &Expression, operator: &BinaryOperator, right: &Expression) -> Result<Type, DiagnosticCollection> {
+    /// Type check a binary expression with span
+    fn check_binary_expression_with_span(&mut self, left: &Expression, operator: &BinaryOperator, right: &Expression, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
         let left_type = self.check_expression(left)?;
         let right_type = self.check_expression(right)?;
         
@@ -252,10 +252,7 @@ impl TypeChecker {
                             ErrorCode::AnalyzerTypeMismatch,
                             Severity::Error,
                             format!("Cannot perform arithmetic operation on {:?} and {:?}", left_type, right_type),
-                            self.convert_span(tjlang_ast::SourceSpan { 
-                                file_id: self.current_file_id, 
-                                span: codespan::Span::new(0, 0) 
-                            })
+                            self.convert_span(span.clone())
                         );
                         Ok(Type::Int)
                     } else {
@@ -267,10 +264,7 @@ impl TypeChecker {
                         ErrorCode::AnalyzerTypeMismatch,
                         Severity::Error,
                         format!("Cannot perform arithmetic operation on {:?} and {:?}", left_type, right_type),
-                        self.convert_span(tjlang_ast::SourceSpan { 
-                            file_id: self.current_file_id, 
-                            span: codespan::Span::new(0, 0) 
-                        })
+                        self.convert_span(span.clone())
                     );
                     Ok(Type::Int)
                 }
@@ -285,10 +279,7 @@ impl TypeChecker {
                         ErrorCode::AnalyzerTypeMismatch,
                         Severity::Error,
                         format!("Cannot compare {:?} and {:?}", left_type, right_type),
-                        self.convert_span(tjlang_ast::SourceSpan { 
-                            file_id: self.current_file_id, 
-                            span: codespan::Span::new(0, 0) 
-                        })
+                        self.convert_span(span.clone())
                     );
                     Ok(Type::Bool)
                 }
@@ -300,8 +291,8 @@ impl TypeChecker {
         }
     }
     
-    /// Type check a unary expression
-    fn check_unary_expression(&mut self, operator: &UnaryOperator, operand: &Expression) -> Result<Type, DiagnosticCollection> {
+    /// Type check a unary expression with span
+    fn check_unary_expression_with_span(&mut self, operator: &UnaryOperator, operand: &Expression, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
         let operand_type = self.check_expression(operand)?;
         
         match operator {
@@ -313,10 +304,7 @@ impl TypeChecker {
                         ErrorCode::AnalyzerTypeMismatch,
                         Severity::Error,
                         format!("Cannot negate {:?}", operand_type),
-                        self.convert_span(tjlang_ast::SourceSpan { 
-                            file_id: self.current_file_id, 
-                            span: codespan::Span::new(0, 0) 
-                        })
+                        self.convert_span(span.clone())
                     );
                     Ok(Type::Int)
                 }
@@ -329,10 +317,7 @@ impl TypeChecker {
                         ErrorCode::AnalyzerTypeMismatch,
                         Severity::Error,
                         format!("Cannot apply logical NOT to {:?}", operand_type),
-                        self.convert_span(tjlang_ast::SourceSpan { 
-                            file_id: self.current_file_id, 
-                            span: codespan::Span::new(0, 0) 
-                        })
+                        self.convert_span(span.clone())
                     );
                     Ok(Type::Bool)
                 }
@@ -341,8 +326,8 @@ impl TypeChecker {
         }
     }
     
-    /// Type check a function call
-    fn check_function_call(&mut self, callee: &Expression, args: &[Expression]) -> Result<Type, DiagnosticCollection> {
+    /// Type check a function call with span
+    fn check_function_call_with_span(&mut self, callee: &Expression, args: &[Expression], span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
         let callee_type = self.check_expression(callee)?;
         
         match callee_type {
@@ -352,10 +337,7 @@ impl TypeChecker {
                         ErrorCode::AnalyzerTypeMismatch,
                         Severity::Error,
                         format!("Expected {} arguments, found {}", params.len(), args.len()),
-                        self.convert_span(tjlang_ast::SourceSpan { 
-                            file_id: self.current_file_id, 
-                            span: codespan::Span::new(0, 0) 
-                        })
+                        self.convert_span(span.clone())
                     );
                     return Ok(Type::Int);
                 }
@@ -368,10 +350,7 @@ impl TypeChecker {
                             ErrorCode::AnalyzerTypeMismatch,
                             Severity::Error,
                             format!("Argument {}: expected {:?}, found {:?}", i + 1, param_type, arg_type),
-                            self.convert_span(tjlang_ast::SourceSpan { 
-                                file_id: self.current_file_id, 
-                                span: codespan::Span::new(0, 0) 
-                            })
+                            self.convert_span(span.clone())
                         );
                     }
                 }
@@ -383,28 +362,22 @@ impl TypeChecker {
                     ErrorCode::AnalyzerUndefinedFunction,
                     Severity::Error,
                     format!("Cannot call {:?} as a function", callee_type),
-                    self.convert_span(tjlang_ast::SourceSpan { 
-                        file_id: self.current_file_id, 
-                        span: codespan::Span::new(0, 0) 
-                    })
+                    self.convert_span(span.clone())
                 );
                 Ok(Type::Int)
             }
         }
     }
     
-    /// Type check an if expression
-    fn check_if_expression(&mut self, condition: &Expression, then_expr: &Expression, else_expr: &Expression) -> Result<Type, DiagnosticCollection> {
+    /// Type check an if expression with span
+    fn check_if_expression_with_span(&mut self, condition: &Expression, then_expr: &Expression, else_expr: &Expression, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
         let condition_type = self.check_expression(condition)?;
         if condition_type != Type::Bool {
             self.add_diagnostic(
                 ErrorCode::AnalyzerTypeMismatch,
                 Severity::Error,
                 format!("If condition must be boolean, found {:?}", condition_type),
-                self.convert_span(tjlang_ast::SourceSpan { 
-                    file_id: self.current_file_id, 
-                    span: codespan::Span::new(0, 0) 
-                })
+                self.convert_span(span.clone())
             );
         }
         
@@ -418,17 +391,14 @@ impl TypeChecker {
                 ErrorCode::AnalyzerTypeMismatch,
                 Severity::Error,
                 format!("If branches have incompatible types: {:?} and {:?}", then_type, else_type),
-                self.convert_span(tjlang_ast::SourceSpan { 
-                    file_id: self.current_file_id, 
-                    span: codespan::Span::new(0, 0) 
-                })
+                self.convert_span(span.clone())
             );
             Ok(then_type)
         }
     }
     
-    /// Type check a match expression
-    fn check_match_expression(&mut self, expression: &Expression, arms: &[MatchArm]) -> Result<Type, DiagnosticCollection> {
+    /// Type check a match expression with span
+    fn check_match_expression_with_span(&mut self, expression: &Expression, arms: &[MatchArm], span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
         let _expr_type = self.check_expression(expression)?;
         
         if arms.is_empty() {
@@ -436,10 +406,7 @@ impl TypeChecker {
                 ErrorCode::AnalyzerNonExhaustiveMatch,
                 Severity::Error,
                 "Match expression must have at least one arm".to_string(),
-                self.convert_span(tjlang_ast::SourceSpan { 
-                    file_id: self.current_file_id, 
-                    span: codespan::Span::new(0, 0) 
-                })
+                self.convert_span(span.clone())
             );
             return Ok(Type::Int);
         }
@@ -459,10 +426,7 @@ impl TypeChecker {
                     ErrorCode::AnalyzerTypeMismatch,
                     Severity::Error,
                     format!("Match arm {} has incompatible type {:?} with previous arms", i + 1, arm_type),
-                    self.convert_span(tjlang_ast::SourceSpan { 
-                        file_id: self.current_file_id, 
-                        span: codespan::Span::new(0, 0) 
-                    })
+                    self.convert_span(span.clone())
                 );
             }
         }
@@ -470,8 +434,8 @@ impl TypeChecker {
         Ok(first_type)
     }
     
-    /// Type check a lambda expression
-    fn check_lambda_expression(&mut self, params: &[Parameter], body: &Expression) -> Result<Type, DiagnosticCollection> {
+    /// Type check a lambda expression with span
+    fn check_lambda_expression_with_span(&mut self, params: &[Parameter], body: &Expression, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
         let mut param_types = Vec::new();
         for param in params {
             let param_type = self.ast_type_to_type(&param.param_type);
@@ -657,5 +621,17 @@ impl TypeChecker {
     fn add_diagnostic(&mut self, code: ErrorCode, severity: Severity, message: String, span: DiagnosticSourceSpan) {
         let diagnostic = TJLangDiagnostic::new(code, severity, message, span);
         self.diagnostics.add(diagnostic);
+    }
+    
+    /// Type check member access with span
+    fn check_member_access_with_span(&mut self, _target: &Expression, _member: &str, _span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        // TODO: Implement member access checking
+        Ok(Type::Int)
+    }
+    
+    /// Type check index access with span
+    fn check_index_access_with_span(&mut self, _target: &Expression, _index: &Expression, _span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
+        // TODO: Implement index access checking
+        Ok(Type::Int)
     }
 }
