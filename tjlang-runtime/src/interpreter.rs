@@ -284,25 +284,6 @@ impl Interpreter {
             std::mem::discriminant(expr)
         );
         
-        // Set execution context for error tracking
-        let span = match expr {
-            Expression::Binary { span, .. } => span,
-            Expression::Unary { span, .. } => span,
-            Expression::Call { span, .. } => span,
-            Expression::Index { span, .. } => span,
-            Expression::Member { span, .. } => span,
-            Expression::If { span, .. } => span,
-            Expression::Match { span, .. } => span,
-            Expression::Lambda { span, .. } => span,
-            _ => {
-                // For expressions without explicit spans, use a default
-                let mut files = codespan::Files::new();
-                let file_id = files.add("unknown", "");
-                &SourceSpan { file_id, span: codespan::Span::new(0, 0) }
-            }
-        };
-        self.set_execution_context(span.file_id, span.span);
-        
         match expr {
             Expression::Literal(literal) => {
                 debug_println!("           Literal: {:?}", literal);
@@ -319,11 +300,14 @@ impl Interpreter {
                 left,
                 operator,
                 right,
-                ..
+                span,
             } => {
                 debug_println!("           Binary operation: {:?}", operator);
                 debug_println!("           Left operand: {:?}", left);
                 debug_println!("           Right operand: {:?}", right);
+
+                // Set execution context for the binary operation
+                self.set_execution_context(span.file_id, span.span);
 
                 // Special handling for assignment
                 if *operator == BinaryOperator::Assign {

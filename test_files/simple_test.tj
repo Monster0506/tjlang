@@ -1,0 +1,22 @@
+x: int = 42
+y: float = 3.14
+z: bool = true
+s: str = "hello"
+
+def add(a: int, b: int) -> int {
+    return a + b
+}
+
+def greet(name: str) -> str {
+    return "hello " + name
+}
+
+result: int = add(5, 3)
+message: str = greet("world")
+
+IO.println("x = " + x.to_string())
+IO.println("y = " + y.to_string())
+IO.println("z = " + z.to_string())
+IO.println("s = " + s)
+IO.println("result = " + result.to_string())
+IO.println("message = " + message)

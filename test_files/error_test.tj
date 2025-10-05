@@ -1,0 +1,10 @@
+# Test Runtime Error Tracking
+
+IO.println("Testing runtime error tracking...")
+
+# This should cause a runtime error
+x: int = 10
+y: int = 0
+result: int = x / y  # Division by zero should cause runtime error
+
+IO.println("This should not be reached")
