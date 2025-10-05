@@ -22,6 +22,8 @@ tjlang-parser = { version = "0.1.0", path = "../tjlang-parser" }
 tjlang-runtime = { version = "0.1.0", path = "../tjlang-runtime" }
 tjlang-diagnostics = { version = "0.1.0", path = "../tjlang-diagnostics" }
 tjlang-analyzer = { version = "0.1.0", path = "../tjlang-analyzer" }
+toml = "0.9.7"
+dirs = "6.0.0"
 
 
 

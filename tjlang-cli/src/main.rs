@@ -15,6 +15,7 @@ use tjlang_diagnostics::{DiagnosticCollection, ErrorCode, SourceSpan, TJLangDiag
 use tjlang_lexer::lex;
 use tjlang_parser::parse;
 use tjlang_runtime::Interpreter;
+use tjlang_analyzer::{AnalysisPipeline, RuleConfig};
 
 /// TJLang - Advanced Programming Language Interpreter
 #[derive(Parser)]
@@ -38,6 +39,69 @@ enum Commands {
         /// Enable verbose output
         #[arg(short, long)]
         verbose: bool,
+        /// Use specific configuration file
+        #[arg(short, long)]
+        config: Option<PathBuf>,
+        /// Use strict analysis rules
+        #[arg(long)]
+        strict: bool,
+    },
+    /// Configure analysis rules and settings
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConfigCommands {
+    /// List all available rules and their status
+    List {
+        /// Show only enabled rules
+        #[arg(short, long)]
+        enabled: bool,
+        /// Show only disabled rules
+        #[arg(short, long)]
+        disabled: bool,
+    },
+    /// Show current configuration
+    Show {
+        /// Show configuration in JSON format
+        #[arg(short, long)]
+        json: bool,
+    },
+    /// Enable a specific rule
+    Enable {
+        /// Rule name to enable
+        rule: String,
+    },
+    /// Disable a specific rule
+    Disable {
+        /// Rule name to disable
+        rule: String,
+    },
+    /// Set rule severity level
+    SetSeverity {
+        /// Rule name
+        rule: String,
+        /// Severity level (Error, Warning, Info, Disabled)
+        severity: String,
+    },
+    /// Save current configuration to file
+    Save {
+        /// Path to save configuration file
+        file: PathBuf,
+    },
+    /// Reset to default configuration
+    Reset {
+        /// Confirm reset (required)
+        #[arg(long)]
+        confirm: bool,
+    },
+    /// Validate configuration file
+    Validate {
+        /// Path to configuration file to validate
+        file: PathBuf,
     },
 }
 
@@ -49,8 +113,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             file,
             debug,
             verbose,
+            config,
+            strict,
         } => {
-            run_program(&file, debug, verbose)?;
+            run_program(&file, debug, verbose, config, strict)?;
+        }
+        Commands::Config { command } => {
+            handle_config_command(command)?;
         }
     }
 
@@ -62,6 +131,8 @@ fn run_program(
     file: &PathBuf,
     debug: bool,
     verbose: bool,
+    config_file: Option<PathBuf>,
+    strict: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     debug_println!(" Running TJLang program: {}", file.display());
 
@@ -188,8 +259,9 @@ fn run_program(
         debug_println!(" Running static analysis...");
     }
 
-    use tjlang_analyzer::AnalysisPipeline;
-    let pipeline = AnalysisPipeline::new();
+    // Load configuration
+    let config = load_configuration(config_file, strict)?;
+    let pipeline = AnalysisPipeline::with_config(config);
 
     let analysis_result = pipeline.analyze(&source, file_id);
 
@@ -274,6 +346,311 @@ fn run_program(
 
     debug_println!("[DEBUG] After interpret_program call");
 
+    Ok(())
+}
+
+/// Handle configuration commands
+fn handle_config_command(command: ConfigCommands) -> Result<(), Box<dyn std::error::Error>> {
+    match command {
+        ConfigCommands::List { enabled, disabled } => {
+            list_rules(enabled, disabled)?;
+        }
+        ConfigCommands::Show { json } => {
+            show_configuration(json)?;
+        }
+        ConfigCommands::Enable { rule } => {
+            enable_rule(&rule)?;
+        }
+        ConfigCommands::Disable { rule } => {
+            disable_rule(&rule)?;
+        }
+        ConfigCommands::SetSeverity { rule, severity } => {
+            set_rule_severity(&rule, &severity)?;
+        }
+        ConfigCommands::Save { file } => {
+            save_configuration_file(&file)?;
+        }
+        ConfigCommands::Reset { confirm } => {
+            reset_configuration(confirm)?;
+        }
+        ConfigCommands::Validate { file } => {
+            validate_configuration_file(&file)?;
+        }
+    }
+    Ok(())
+}
+
+/// Load configuration for analysis
+fn load_configuration(
+    config_file: Option<PathBuf>,
+    strict: bool,
+) -> Result<RuleConfig, Box<dyn std::error::Error>> {
+    use std::fs;
+    use serde_json;
+    
+    // If explicit config file provided, use it
+    if let Some(file) = config_file {
+        if file.exists() {
+            let content = fs::read_to_string(&file)?;
+            let config: RuleConfig = serde_json::from_str(&content)?;
+            return Ok(config);
+        } else {
+            eprintln!("Warning: Configuration file {} not found, using default", file.display());
+        }
+    }
+    
+    // Try to find configuration file automatically
+    let config_paths = [
+        ".tjlang.json",
+        "tjlang.config.json", 
+        ".tjlang/tjlang.json",
+    ];
+    
+    for path in &config_paths {
+        if std::path::Path::new(path).exists() {
+            let content = fs::read_to_string(path)?;
+            let config: RuleConfig = serde_json::from_str(&content)?;
+            return Ok(config);
+        }
+    }
+    
+    // No config file found, use default with strict mode if requested
+    let mut config = RuleConfig::default();
+    
+    if strict {
+        // Enable additional rules for strict mode (code quality rules)
+        config.enable_rule("UnusedVariableRule");
+        config.enable_rule("DeadCodeRule");
+        config.enable_rule("FunctionLengthRule");
+        config.enable_rule("NestingDepthRule");
+        config.enable_rule("FunctionComplexityRule");
+        config.enable_rule("MagicNumberRule");
+        config.enable_rule("ParameterCountRule");
+        config.enable_rule("NamingConventionRule");
+    }
+    
+    Ok(config)
+}
+
+/// List all available rules
+fn list_rules(enabled_only: bool, disabled_only: bool) -> Result<(), Box<dyn std::error::Error>> {
+    use tjlang_analyzer::AnalysisPipeline;
+    
+    // Create a pipeline to get configuration
+    let pipeline = AnalysisPipeline::new();
+    let config = pipeline.get_config();
+    
+    println!("Available Analysis Rules:");
+    println!("========================");
+    println!();
+    
+    // Get all rules from the helper function
+    let all_rules = get_all_analysis_rules();
+    
+    if all_rules.is_empty() {
+        println!("No rules found in the analysis pipeline.");
+        return Ok(());
+    }
+    
+    // Group rules by category
+    let mut rules_by_category: std::collections::HashMap<tjlang_analyzer::RuleCategory, Vec<&dyn tjlang_analyzer::AnalysisRule>> = std::collections::HashMap::new();
+    
+    for rule in all_rules.iter() {
+        let category = rule.category();
+        rules_by_category.entry(category).or_insert_with(Vec::new).push(*rule);
+    }
+    
+    // Sort categories by priority
+    let mut categories: Vec<_> = rules_by_category.keys().collect();
+    categories.sort_by_key(|cat| match cat {
+        tjlang_analyzer::RuleCategory::TypeSafety => 0,
+        tjlang_analyzer::RuleCategory::Security => 1,
+        tjlang_analyzer::RuleCategory::Quality => 2,
+        tjlang_analyzer::RuleCategory::Performance => 3,
+        tjlang_analyzer::RuleCategory::Style => 4,
+        tjlang_analyzer::RuleCategory::Architecture => 5,
+        tjlang_analyzer::RuleCategory::Language => 6,
+        tjlang_analyzer::RuleCategory::DeadCode => 7,
+    });
+    
+    for category in categories {
+        let rules = &rules_by_category[category];
+        let category_name = match category {
+            tjlang_analyzer::RuleCategory::TypeSafety => "Type Safety",
+            tjlang_analyzer::RuleCategory::Security => "Security",
+            tjlang_analyzer::RuleCategory::Quality => "Code Quality",
+            tjlang_analyzer::RuleCategory::Performance => "Performance",
+            tjlang_analyzer::RuleCategory::Style => "Style",
+            tjlang_analyzer::RuleCategory::Architecture => "Architecture",
+            tjlang_analyzer::RuleCategory::Language => "Language",
+            tjlang_analyzer::RuleCategory::DeadCode => "Dead Code",
+        };
+        
+        println!("{} Rules:", category_name);
+        println!("{}", "=".repeat(category_name.len() + 8));
+        
+        for rule in rules {
+            let is_enabled = rule.is_enabled(config);
+            let severity = rule.severity(config);
+            
+            // Apply filters
+            if enabled_only && !is_enabled {
+                continue;
+            }
+            if disabled_only && is_enabled {
+                continue;
+            }
+            
+            let status = if is_enabled { "ENABLED" } else { "DISABLED" };
+            let severity_str = match severity {
+                tjlang_analyzer::RuleSeverity::Error => "Error",
+                tjlang_analyzer::RuleSeverity::Warning => "Warning", 
+                tjlang_analyzer::RuleSeverity::Info => "Info",
+                tjlang_analyzer::RuleSeverity::Disabled => "Disabled",
+            };
+            
+            println!("  {} {} ({})", status, rule.name(), severity_str);
+            println!("    {}", rule.description());
+            println!();
+        }
+        println!();
+    }
+    
+    // Summary
+    let total_rules = all_rules.len();
+    let enabled_count = all_rules.iter().filter(|r| r.is_enabled(config)).count();
+    let disabled_count = total_rules - enabled_count;
+    
+    println!("Summary:");
+    println!("========");
+    println!("Total rules: {}", total_rules);
+    println!("Enabled: {}", enabled_count);
+    println!("Disabled: {}", disabled_count);
+    
+    Ok(())
+}
+
+/// Get all available rules from the analyzer
+fn get_all_analysis_rules() -> Vec<&'static dyn tjlang_analyzer::AnalysisRule> {
+    use tjlang_analyzer::rules::*;
+    
+    vec![
+        &TypeSafetyRule,
+        &NullPointerRule,
+        &BufferOverflowRule,
+        &UnsafeOperationRule,
+        &UnusedVariableRule,
+        &DeadCodeRule,
+        &UnusedParameterRule,
+        &DuplicateNameRule,
+        &CircularDependencyRule,
+        &LiteralIndexBoundsRule,
+        &LiteralDivisionByZeroRule,
+        &UndefinedVariableRule,
+        &UndefinedFunctionRule,
+        &NamingConventionRule,
+        &FunctionComplexityRule,
+        &MagicNumberRule,
+        &ParameterCountRule,
+        &InefficientLoopRule,
+        &MemoryAllocationRule,
+        &StringConcatenationRule,
+        &LargeFileRule,
+        &TooManyImportsRule,
+        &GlobalVariableRule,
+        &FormattingConventionRule,
+        &IndentationRule,
+        &TrailingWhitespaceRule,
+        &LineLengthRule,
+        &CommentCoverageRule,
+        &FunctionLengthRule,
+        &NestingDepthRule,
+        &EmptyFunctionRule,
+        &UnreachableCodeRule,
+        &RecursionDepthRule,
+        &ResourceLeakRule,
+        &AsyncAwaitRule,
+        &ErrorHandlingRule,
+        &PatternMatchingRule,
+        &GenericConstraintRule,
+        &CommentStyleRule,
+        &SemicolonRule,
+        &BracketMatchingRule,
+        &ImportOrderRule,
+        &CacheEfficiencyRule,
+        &BranchPredictionRule,
+        &VectorizationRule,
+        &ConcurrencyRule,
+        &MemoryLeakRule,
+        &RaceConditionRule,
+        &InputValidationRule,
+        &HardcodedCredentialsRule,
+        &SQLInjectionRule,
+        &CouplingRule,
+        &CohesionRule,
+    ]
+}
+
+/// Show current configuration
+fn show_configuration(json_format: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if json_format {
+        // TODO: Show configuration in JSON format
+        println!("{{}}");
+    } else {
+        println!("Current Configuration:");
+        println!("=====================");
+        // TODO: Show human-readable configuration
+    }
+    
+    Ok(())
+}
+
+/// Enable a specific rule
+fn enable_rule(rule_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Enabling rule: {}", rule_name);
+    // TODO: Implement rule enabling
+    Ok(())
+}
+
+/// Disable a specific rule
+fn disable_rule(rule_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Disabling rule: {}", rule_name);
+    // TODO: Implement rule disabling
+    Ok(())
+}
+
+/// Set rule severity
+fn set_rule_severity(rule_name: &str, severity: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Setting rule '{}' severity to: {}", rule_name, severity);
+    // TODO: Implement severity setting
+    Ok(())
+}
+
+
+/// Save configuration to file
+fn save_configuration_file(file: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Saving configuration to: {}", file.display());
+    // TODO: Implement configuration file saving
+    Ok(())
+}
+
+/// Reset configuration to defaults
+fn reset_configuration(confirm: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if !confirm {
+        eprintln!("Error: --confirm flag required for reset operation");
+        eprintln!("Use: tjlang config reset --confirm");
+        std::process::exit(1);
+    }
+    
+    println!("Resetting configuration to defaults...");
+    // TODO: Implement configuration reset
+    Ok(())
+}
+
+/// Validate configuration file
+fn validate_configuration_file(file: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Validating configuration file: {}", file.display());
+    // TODO: Implement configuration validation
     Ok(())
 }
 
