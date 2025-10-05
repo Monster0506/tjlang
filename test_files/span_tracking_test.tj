@@ -1,0 +1,21 @@
+# Span Tracking Test
+
+IO.println("=== TJLang Span Tracking Test ===")
+
+# Test that we can detect undefined variables in different contexts
+# This should show proper error locations
+
+# Test 1: Simple undefined variable
+x: int = undefined_var
+
+# Test 2: Undefined variable in arithmetic
+y: int = 5 + undefined_math
+
+# Test 3: Undefined variable in function call
+def test_func(a: int) -> int {
+    return a
+}
+
+result: int = test_func(undefined_arg)
+
+IO.println("=== Span Tracking Test Complete ===")

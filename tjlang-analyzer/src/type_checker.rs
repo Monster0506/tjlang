@@ -159,15 +159,20 @@ impl TypeChecker {
     
     /// Type check an expression
     fn check_expression(&mut self, expr: &Expression) -> Result<Type, DiagnosticCollection> {
+        self.check_expression_with_span(expr, None)
+    }
+    
+    /// Type check an expression with optional span context
+    fn check_expression_with_span(&mut self, expr: &Expression, span_context: Option<&tjlang_ast::SourceSpan>) -> Result<Type, DiagnosticCollection> {
         match expr {
             Expression::Literal(lit) => self.check_literal(lit),
             Expression::Variable(name) => {
-                // For variable references, we need to create a default span since Variable doesn't have one
-                let default_span = tjlang_ast::SourceSpan {
+                // Use the span context if available, otherwise create a default span
+                let span = span_context.cloned().unwrap_or_else(|| tjlang_ast::SourceSpan {
                     file_id: self.current_file_id,
                     span: codespan::Span::new(0, 0)
-                };
-                self.check_variable_reference_with_span(name, &default_span)
+                });
+                self.check_variable_reference_with_span(name, &span)
             },
             Expression::Binary { left, operator, right, span } => {
                 self.check_binary_expression_with_span(left, operator, right, span)
@@ -227,11 +232,11 @@ impl TypeChecker {
         }
         
         // Check all elements have compatible types
-        let first_type = self.check_expression(&elements[0])?;
+        let first_type = self.check_expression_with_span(&elements[0], Some(span))?;
         let mut all_compatible = true;
         
         for element in elements.iter().skip(1) {
-            let element_type = self.check_expression(element)?;
+            let element_type = self.check_expression_with_span(element, Some(span))?;
             if !self.is_type_compatible(&element_type, &first_type) {
                 all_compatible = false;
                 self.add_diagnostic(
@@ -249,7 +254,7 @@ impl TypeChecker {
             // Return union type for incompatible elements
             let mut element_types = Vec::new();
             for element in elements {
-                let element_type = self.check_expression(element)?;
+                let element_type = self.check_expression_with_span(element, Some(span))?;
                 if !element_types.contains(&element_type) {
                     element_types.push(element_type);
                 }
@@ -266,11 +271,11 @@ impl TypeChecker {
         }
         
         // Check all elements have compatible types
-        let first_type = self.check_expression(&elements[0])?;
+        let first_type = self.check_expression_with_span(&elements[0], Some(span))?;
         let mut all_compatible = true;
         
         for element in elements.iter().skip(1) {
-            let element_type = self.check_expression(element)?;
+            let element_type = self.check_expression_with_span(element, Some(span))?;
             if !self.is_type_compatible(&element_type, &first_type) {
                 all_compatible = false;
                 self.add_diagnostic(
@@ -288,7 +293,7 @@ impl TypeChecker {
             // Return union type for incompatible elements
             let mut element_types = Vec::new();
             for element in elements {
-                let element_type = self.check_expression(element)?;
+                let element_type = self.check_expression_with_span(element, Some(span))?;
                 if !element_types.contains(&element_type) {
                     element_types.push(element_type);
                 }
@@ -305,14 +310,14 @@ impl TypeChecker {
         }
         
         // Check all keys and values have compatible types
-        let first_key_type = self.check_expression(&entries[0].key)?;
-        let first_value_type = self.check_expression(&entries[0].value)?;
+        let first_key_type = self.check_expression_with_span(&entries[0].key, Some(span))?;
+        let first_value_type = self.check_expression_with_span(&entries[0].value, Some(span))?;
         let mut all_keys_compatible = true;
         let mut all_values_compatible = true;
         
         for entry in entries.iter().skip(1) {
-            let key_type = self.check_expression(&entry.key)?;
-            let value_type = self.check_expression(&entry.value)?;
+            let key_type = self.check_expression_with_span(&entry.key, Some(span))?;
+            let value_type = self.check_expression_with_span(&entry.value, Some(span))?;
             
             if !self.is_type_compatible(&key_type, &first_key_type) {
                 all_keys_compatible = false;
@@ -343,8 +348,8 @@ impl TypeChecker {
             let mut value_types = Vec::new();
             
             for entry in entries {
-                let key_type = self.check_expression(&entry.key)?;
-                let value_type = self.check_expression(&entry.value)?;
+                let key_type = self.check_expression_with_span(&entry.key, Some(span))?;
+                let value_type = self.check_expression_with_span(&entry.value, Some(span))?;
                 
                 if !key_types.contains(&key_type) {
                     key_types.push(key_type);
@@ -366,7 +371,7 @@ impl TypeChecker {
         let mut element_types = Vec::new();
         
         for element in elements {
-            let element_type = self.check_expression(element)?;
+            let element_type = self.check_expression_with_span(element, Some(span))?;
             element_types.push(element_type);
         }
         
@@ -408,8 +413,8 @@ impl TypeChecker {
     
     /// Type check a binary expression with span
     fn check_binary_expression_with_span(&mut self, left: &Expression, operator: &BinaryOperator, right: &Expression, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
-        let left_type = self.check_expression(left)?;
-        let right_type = self.check_expression(right)?;
+        let left_type = self.check_expression_with_span(left, Some(span))?;
+        let right_type = self.check_expression_with_span(right, Some(span))?;
         
         match operator {
             BinaryOperator::Add | BinaryOperator::Subtract | BinaryOperator::Multiply | BinaryOperator::Divide => {
@@ -481,7 +486,7 @@ impl TypeChecker {
     
     /// Type check a unary expression with span
     fn check_unary_expression_with_span(&mut self, operator: &UnaryOperator, operand: &Expression, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
-        let operand_type = self.check_expression(operand)?;
+        let operand_type = self.check_expression_with_span(operand, Some(span))?;
         
         match operator {
             UnaryOperator::Negate => {
@@ -516,7 +521,7 @@ impl TypeChecker {
     
     /// Type check a function call with span
     fn check_function_call_with_span(&mut self, callee: &Expression, args: &[Expression], span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
-        let callee_type = self.check_expression(callee)?;
+        let callee_type = self.check_expression_with_span(callee, Some(span))?;
         
         match callee_type {
             Type::Function(params, return_type) => {
@@ -532,7 +537,7 @@ impl TypeChecker {
                 
                 // Check argument types
                 for (i, (arg, param_type)) in args.iter().zip(params.iter()).enumerate() {
-                    let arg_type = self.check_expression(arg)?;
+                    let arg_type = self.check_expression_with_span(arg, Some(span))?;
                     if !self.is_type_compatible(&arg_type, param_type) {
                         self.add_diagnostic(
                             ErrorCode::AnalyzerTypeMismatch,
@@ -559,7 +564,7 @@ impl TypeChecker {
     
     /// Type check an if expression with span
     fn check_if_expression_with_span(&mut self, condition: &Expression, then_expr: &Expression, else_expr: &Expression, span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
-        let condition_type = self.check_expression(condition)?;
+        let condition_type = self.check_expression_with_span(condition, Some(span))?;
         if condition_type != Type::Bool {
             self.add_diagnostic(
                 ErrorCode::AnalyzerTypeMismatch,
@@ -568,9 +573,9 @@ impl TypeChecker {
                 self.convert_span(span.clone())
             );
         }
-        
-        let then_type = self.check_expression(then_expr)?;
-        let else_type = self.check_expression(else_expr)?;
+
+        let then_type = self.check_expression_with_span(then_expr, Some(span))?;
+        let else_type = self.check_expression_with_span(else_expr, Some(span))?;
         
         if self.is_type_compatible(&then_type, &else_type) {
             Ok(then_type)
@@ -587,7 +592,7 @@ impl TypeChecker {
     
     /// Type check a match expression with span
     fn check_match_expression_with_span(&mut self, expression: &Expression, arms: &[MatchArm], span: &tjlang_ast::SourceSpan) -> Result<Type, DiagnosticCollection> {
-        let _expr_type = self.check_expression(expression)?;
+        let _expr_type = self.check_expression_with_span(expression, Some(span))?;
         
         if arms.is_empty() {
             self.add_diagnostic(
@@ -629,8 +634,8 @@ impl TypeChecker {
             let param_type = self.ast_type_to_type(&param.param_type);
             param_types.push(param_type);
         }
-        
-        let return_type = self.check_expression(body)?;
+
+        let return_type = self.check_expression_with_span(body, Some(span))?;
         
         Ok(Type::Function(param_types, Box::new(return_type)))
     }
