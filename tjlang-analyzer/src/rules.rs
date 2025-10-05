@@ -3480,7 +3480,7 @@ fn check_expr_for_function_calls(
                         let diag_span = tjlang_diagnostics::SourceSpan::new(file_id, span.span);
                         
                         let diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
-                            ErrorCode::AnalyzerWrongArgumentCount, // TODO: Should be UndefinedFunction
+                            ErrorCode::AnalyzerUndefinedFunction,
                             codespan_reporting::diagnostic::Severity::Error,
                             message,
                             diag_span,
