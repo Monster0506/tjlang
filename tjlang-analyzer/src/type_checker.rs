@@ -99,18 +99,24 @@ impl TypeChecker {
         // Convert AST type to our type system
         let declared_type = self.ast_type_to_type(&var_decl.var_type);
         
-        // Check type compatibility
-        if !self.is_type_compatible(&value_type, &declared_type) {
-            self.add_diagnostic(
-                ErrorCode::AnalyzerTypeMismatch,
-                Severity::Error,
-                format!("Type mismatch: expected {:?}, found {:?}", declared_type, value_type),
-                self.convert_span(var_decl.span.clone())
-            );
+        // Check if this is type inference (declared type is Any)
+        if self.is_any_type(&var_decl.var_type) {
+            // Type inference: use the inferred type from the expression
+            self.type_map.insert(var_decl.name.clone(), value_type);
+        } else {
+            // Explicit type declaration: check compatibility
+            if !self.is_type_compatible(&value_type, &declared_type) {
+                self.add_diagnostic(
+                    ErrorCode::AnalyzerTypeMismatch,
+                    Severity::Error,
+                    format!("Type mismatch: expected {:?}, found {:?}", declared_type, value_type),
+                    self.convert_span(var_decl.span.clone())
+                );
+            }
+            
+            // Store declared type
+            self.type_map.insert(var_decl.name.clone(), declared_type);
         }
-        
-        // Store variable type
-        self.type_map.insert(var_decl.name.clone(), declared_type);
         Ok(())
     }
     
@@ -135,7 +141,13 @@ impl TypeChecker {
         }
         
         // Type check return type
-        let return_type = self.ast_type_to_type(&func_decl.return_type);
+        let return_type = if self.is_any_type(&func_decl.return_type) {
+            // Type inference: infer return type from function body
+            self.infer_function_return_type(func_decl)?
+        } else {
+            // Explicit return type
+            self.ast_type_to_type(&func_decl.return_type)
+        };
         
         // Create function type using tuple syntax
         let function_type = Type::Function(param_types, Box::new(return_type));
@@ -531,6 +543,54 @@ impl TypeChecker {
                 Type::Function(param_types, Box::new(self.ast_type_to_type(return_type)))
             },
             _ => Type::Int, // Default fallback
+        }
+    }
+    
+    /// Check if an AST type is the Any type (for type inference)
+    fn is_any_type(&self, ast_type: &tjlang_ast::Type) -> bool {
+        matches!(ast_type, tjlang_ast::Type::Primitive(tjlang_ast::PrimitiveType::Any))
+    }
+    
+    /// Infer function return type from function body
+    fn infer_function_return_type(&mut self, func_decl: &FunctionDecl) -> Result<Type, DiagnosticCollection> {
+        // Analyze the function body to determine return type
+        self.analyze_function_body(&func_decl.body)
+    }
+    
+    /// Analyze function body to determine return type
+    fn analyze_function_body(&mut self, body: &Block) -> Result<Type, DiagnosticCollection> {
+        // Look for return statements to infer return type
+        let mut return_types = Vec::new();
+        
+        for stmt in &body.statements {
+            if let Statement::Return(ret_stmt) = stmt {
+                if let Some(expr) = &ret_stmt.value {
+                    let return_type = self.check_expression(expr)?;
+                    return_types.push(return_type);
+                } else {
+                    // Return without value (void)
+                    return_types.push(Type::Int); // Default to Int for void
+                }
+            }
+        }
+        
+        if return_types.is_empty() {
+            // No return statements found, assume void
+            Ok(Type::Int) // Default to Int for void
+        } else if return_types.len() == 1 {
+            // Single return type
+            Ok(return_types[0].clone())
+        } else {
+            // Multiple return types - check if they're compatible
+            let first_type = &return_types[0];
+            let all_compatible = return_types.iter().all(|t| self.is_type_compatible(t, first_type));
+            
+            if all_compatible {
+                Ok(first_type.clone())
+            } else {
+                // Return union type for incompatible return types
+                Ok(Type::Sum(return_types))
+            }
         }
     }
     

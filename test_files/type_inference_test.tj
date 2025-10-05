@@ -1,0 +1,49 @@
+# Type Inference Test
+
+IO.println("=== TJLang Type Inference Test ===")
+
+# Variable type inference (using any for inference)
+inferred_int: any = 42
+inferred_float: any = 3.14
+inferred_bool: any = true
+inferred_str: any = "hello"
+
+IO.println("Variable type inference completed")
+
+# Function with inferred return type (using Any for inference)
+def add(a: int, b: int) -> any {
+    return a + b
+}
+
+def greet(name: str) -> any {
+    return "Hello " + name
+}
+
+def get_number() -> any {
+    return 100
+}
+
+IO.println("Function return type inference completed")
+
+# Test the inferred functions
+result1: int = add(5, 3)
+result2: str = greet("world")
+result3: int = get_number()
+
+IO.println("Function calls with inferred types completed")
+
+# Complex type inference
+def process_value(x: int | str) -> any {
+    if x > 0 {
+        return "positive"
+    } else {
+        return "zero or negative"
+    }
+}
+
+# This should infer return type as str
+result4: str = process_value(10)
+
+IO.println("Complex type inference completed")
+
+IO.println("=== Type Inference Test Complete ===")
