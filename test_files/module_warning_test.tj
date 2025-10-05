@@ -1,0 +1,8 @@
+# Module Warning Test
+
+IO.println("=== TJLang Module Warning Test ===")
+
+# This should trigger a warning about reserved module name
+module IO
+
+IO.println("=== Module Warning Test Complete ===")

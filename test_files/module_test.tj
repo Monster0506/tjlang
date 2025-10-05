@@ -1,0 +1,20 @@
+# Module Test
+
+IO.println("=== TJLang Module Test ===")
+
+# Test valid module declaration
+module MyModule
+
+# Test invalid module name (should cause error)
+# module 
+
+# Test invalid module name with special characters (should cause error)
+module invalid_module_name
+
+# Test reserved module name (should cause warning)
+module IO
+
+# Test another valid module
+module AnotherModule
+
+IO.println("=== Module Test Complete ===")

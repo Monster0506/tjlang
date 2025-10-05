@@ -1,0 +1,4 @@
+# Debug span tracking
+
+# This should show an error at line 3, column 15 (the 'x' in 'undefined_x')
+test: int = undefined_x

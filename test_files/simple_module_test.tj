@@ -1,0 +1,10 @@
+# Simple Module Test
+
+IO.println("=== TJLang Simple Module Test ===")
+
+module MyModule
+
+# Test another valid module
+module AnotherModule
+
+IO.println("=== Simple Module Test Complete ===")

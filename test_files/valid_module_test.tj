@@ -1,0 +1,10 @@
+# Test valid module names
+
+IO.println("=== Testing valid module names ===")
+
+# These should be allowed (not stdlib modules)
+module MyCustomModule
+module AnotherModule
+module UserDefinedModule
+
+IO.println("=== Valid module test complete ===")

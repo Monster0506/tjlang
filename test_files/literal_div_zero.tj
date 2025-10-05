@@ -1,0 +1,10 @@
+# Test Literal Division by Zero (should be caught by static analysis)
+
+IO.println("Testing literal division by zero...")
+
+# This should be caught by static analysis
+x: int = 10
+result: int = x / 0  # Literal division by zero
+
+IO.println("This should not be reached")
+

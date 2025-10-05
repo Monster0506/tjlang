@@ -1,0 +1,24 @@
+# Type Checker Test
+
+IO.println("=== TJLang Type Checker Test ===")
+
+# Test basic type checking
+x: int = 42
+y: str = "hello"
+z: bool = true
+
+# Test type inference
+inferred_int: any = 100
+inferred_str: any = "world"
+
+# Test function with type checking
+def add_numbers(a: int, b: int) -> int {
+    return a + b
+}
+
+# Test function call
+result: int = add_numbers(10, 20)
+
+IO.println("Result: " + result.to_string())
+
+IO.println("=== Type Checker Test Complete ===")

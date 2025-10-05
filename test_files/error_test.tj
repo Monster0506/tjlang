@@ -8,3 +8,4 @@ y: int = 0
 result: int = x / y  # Division by zero should cause runtime error
 
 IO.println("This should not be reached")
+

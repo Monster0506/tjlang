@@ -1,0 +1,24 @@
+# Member Access Test
+
+IO.println("=== TJLang Member Access Test ===")
+
+# Test integer methods
+x: int = 42
+result1: int = x.abs()
+result2: bool = x.is_even()
+result3: str = x.to_string()
+
+IO.println("Integer methods completed")
+
+# Test string methods
+text: str = "Hello World"
+length: int = text.length()
+upper: str = text.upper()
+trimmed: str = text.trim()
+
+IO.println("String methods completed")
+
+# Test invalid method (should cause static analysis error)
+invalid: int = x.invalid_method()
+
+IO.println("=== Member Access Test Complete ===")

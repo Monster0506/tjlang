@@ -27,3 +27,4 @@ if "not a boolean" {
 comparison: bool = 5 == "hello"
 
 IO.println("=== Type Error Test Complete ===")
+

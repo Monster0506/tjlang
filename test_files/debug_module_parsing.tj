@@ -1,0 +1,7 @@
+# Debug Module Parsing
+
+IO.println("=== Debug Module Parsing ===")
+
+module IO
+
+IO.println("=== Debug Complete ===")

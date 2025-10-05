@@ -1,0 +1,18 @@
+# Test stdlib module names
+
+IO.println("=== Testing stdlib module names ===")
+
+# These should all be errors (reserved module names)
+module IO
+module FILE  
+module MATH
+module STRING
+module COLLECTIONS
+module TIME
+module ERROR
+module TESTING
+
+# This should be allowed (not a stdlib module)
+module MyCustomModule
+
+IO.println("=== Test complete ===")
