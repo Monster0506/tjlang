@@ -8,15 +8,15 @@ use tjlang_ast::*;
 use tjlang_diagnostics::debug_println;
 use codespan::{FileId, Span};
 
-/// Create a dummy SourceSpan for runtime values
-fn dummy_span() -> SourceSpan {
-    let mut files = codespan::Files::new();
-    let file_id = files.add("runtime", "");
-    SourceSpan {
-        file_id,
-        span: Span::new(0, 0),
+    /// Create a dummy SourceSpan for runtime values
+    fn dummy_span() -> SourceSpan {
+        let mut files = codespan::Files::new();
+        let file_id = files.add("runtime", "");
+        SourceSpan {
+            file_id,
+            span: Span::new(0, 0),
+        }
     }
-}
 
 /// Execution result that can represent normal values or control flow
 #[derive(Debug, Clone)]
@@ -144,6 +144,62 @@ impl Interpreter {
         RuntimeError::new(message, file_id, span)
     }
 
+    /// Validate function call parameters
+    fn validate_function_call(&self, func_name: &str, params: &[String], param_types: &[Type], args: &[Value]) -> Result<(), RuntimeError> {
+        // Check parameter count
+        if args.len() != params.len() {
+            return Err(self.runtime_error(format!(
+                "Function '{}' expects {} arguments, got {}",
+                func_name, params.len(), args.len()
+            )));
+        }
+
+        // Check parameter types
+        for (i, (arg, param_type)) in args.iter().zip(param_types.iter()).enumerate() {
+            if !self.is_type_compatible(arg, param_type) {
+                return Err(self.runtime_error(format!(
+                    "Function '{}' parameter '{}' (position {}) expects type {:?}, got {:?}",
+                    func_name, params[i], i + 1, param_type, self.get_value_type(arg)
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Check if a value is compatible with a type
+    fn is_type_compatible(&self, value: &Value, expected_type: &Type) -> bool {
+        match (value, expected_type) {
+            (Value::Int(_), Type::Primitive(PrimitiveType::Int)) => true,
+            (Value::Float(_), Type::Primitive(PrimitiveType::Float)) => true,
+            (Value::Bool(_), Type::Primitive(PrimitiveType::Bool)) => true,
+            (Value::String(_), Type::Primitive(PrimitiveType::Str)) => true,
+            (Value::None, Type::Primitive(PrimitiveType::Any)) => true,
+            // Allow int to float coercion
+            (Value::Int(_), Type::Primitive(PrimitiveType::Float)) => true,
+            (Value::Float(_), Type::Primitive(PrimitiveType::Int)) => true,
+            // Allow any type for Any
+            (_, Type::Primitive(PrimitiveType::Any)) => true,
+            _ => false,
+        }
+    }
+
+    /// Get the type name of a value for error messages
+    fn get_value_type(&self, value: &Value) -> &'static str {
+        match value {
+            Value::Int(_) => "int",
+            Value::Float(_) => "float",
+            Value::Bool(_) => "bool",
+            Value::String(_) => "str",
+            Value::None => "None",
+            Value::Vec(_) => "Vec",
+            Value::Struct { .. } => "Struct",
+            Value::Function { .. } => "Function",
+            Value::Closure { .. } => "Closure",
+            _ => "Unknown",
+        }
+    }
+
     /// Register all stdlib functions in the environment
     fn register_stdlib_functions(&mut self) {
         debug_println!("[DEBUG] DEBUG: register_stdlib_functions called");
@@ -161,6 +217,7 @@ impl Interpreter {
                 let func_value = Value::Function {
                     name: function_name.clone(),
                     params: vec![], // Native functions handle their own parameter validation
+                    param_types: vec![], // Native functions handle their own parameter validation
                     body: Block { statements: vec![], span: dummy_span() }, // Native functions don't have TJLang bodies
                     closure: HashMap::new(),
                 };
@@ -256,6 +313,7 @@ impl Interpreter {
             let main_value = Value::Function {
                 name: "main".to_string(),
                 params: main_func.params.iter().map(|p| p.name.clone()).collect(),
+                param_types: main_func.params.iter().map(|p| p.param_type.clone()).collect(),
                 body: main_func.body.clone(), // Store actual main function body
                 closure: HashMap::new(),
             };
@@ -284,6 +342,7 @@ impl Interpreter {
                 let func_value = Value::Function {
                     name: func.name.clone(),
                     params: func.params.iter().map(|p| p.name.clone()).collect(),
+                    param_types: func.params.iter().map(|p| p.param_type.clone()).collect(),
                     body: func.body.clone(), // Store actual function body
                     closure: HashMap::new(),
                 };
@@ -373,9 +432,12 @@ impl Interpreter {
                 debug_println!("[DEBUG] [UNARY] Result: {:?}", result);
                 result
             }
-            Expression::Call { callee, args, .. } => {
+            Expression::Call { callee, args, span } => {
                 debug_println!("           Function call with {} args", args.len());
                 debug_println!("          [DEBUG] Callee expression: {:?}", callee);
+                
+                // Set execution context for the function call
+                self.set_execution_context(span.file_id, span.span);
 
                 // Special handling for method calls on primitives
                 if let Expression::Member { target, member, .. } = callee.as_ref() {
@@ -790,7 +852,7 @@ impl Interpreter {
             std::mem::discriminant(callee)
         );
         match callee {
-            Value::Function { name, params, body, .. } => {
+            Value::Function { name, params, param_types, body, .. } => {
                 debug_println!("             Calling function: {}", name);
 
                 // Check if it's a primitive method call
@@ -835,13 +897,8 @@ impl Interpreter {
                 debug_println!("               Function params: {:?}", params);
                 debug_println!("               Function body: {:?}", body);
 
-                // Validate parameter count
-                if args.len() != params.len() {
-                    return Err(self.runtime_error(format!(
-                        "Function '{}' expects {} arguments, got {}",
-                        name, params.len(), args.len()
-                    )));
-                }
+                // Validate parameters (count and types)
+                self.validate_function_call(name, params, param_types, args)?;
 
                 debug_println!(
                     "               Creating new environment with {} params",

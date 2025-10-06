@@ -107,6 +107,7 @@ pub struct GenericParam {
 pub struct Parameter {
     pub name: String,
     pub param_type: Type,
+    pub default_value: Option<Expression>,
     pub span: SourceSpan,
 }
 

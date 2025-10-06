@@ -51,6 +51,7 @@ pub enum Value {
     Function {
         name: String,
         params: Vec<String>,
+        param_types: Vec<Type>,
         body: Block,
         closure: HashMap<String, Value>,
     },
@@ -105,11 +106,13 @@ impl Clone for Value {
             Value::Function {
                 name,
                 params,
+                param_types,
                 body,
                 closure,
             } => Value::Function {
                 name: name.clone(),
                 params: params.clone(),
+                param_types: param_types.clone(),
                 body: body.clone(),
                 closure: closure.clone(),
             },
