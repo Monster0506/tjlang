@@ -6,8 +6,7 @@ use codespan_reporting::diagnostic::Severity;
 use std::collections::HashMap;
 use std::time::Instant;
 use tjlang_ast::*;
-use tjlang_diagnostics::debug_println;
-use tjlang_diagnostics::DiagnosticCollection;
+use tjlang_diagnostics::{debug_println, DiagnosticCollection, TJLangDiagnostic, ErrorCode, SourceSpan as DiagnosticSourceSpan};
 use tjlang_lexer::Token;
 use tjlang_stdlib::{get_stdlib_function_names, get_stdlib_module_names, is_primitive_method};
 
@@ -106,48 +105,254 @@ pub fn run_rule<R: AnalysisRule + ?Sized>(
 // CRITICAL RULES (Phase 1) - Must Have
 // ============================================================================
 
-/// Type safety analysis rule
-pub struct TypeSafetyRule;
 
-impl AnalysisRule for TypeSafetyRule {
-    fn name(&self) -> &str {
-        "TypeSafetyRule"
-    }
-    fn description(&self) -> &str {
-        "Type checking, type mismatches, invalid operations"
-    }
-    fn category(&self) -> RuleCategory {
-        RuleCategory::TypeSafety
-    }
-    fn priority(&self) -> u32 {
-        1000
+// ============================================================================
+// GRANULAR MODULE VALIDATION RULES
+// ============================================================================
+
+/// Check for empty module names
+pub struct ModuleEmptyNameRule;
+
+impl AnalysisRule for ModuleEmptyNameRule {
+    fn name(&self) -> &str { "ModuleEmptyNameRule" }
+    fn description(&self) -> &str { "Detects empty module names" }
+    fn category(&self) -> RuleCategory { RuleCategory::TypeSafety }
+    fn priority(&self) -> u32 { 1000 }
+}
+
+impl ASTRule for ModuleEmptyNameRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        if let Some(ast) = &context.ast {
+            for unit in &ast.units {
+                if let ProgramUnit::Declaration(Declaration::Module(module)) = unit {
+                    if module.name.is_empty() {
+                        let span = DiagnosticSourceSpan::new(context.file_id, module.span.span);
+                        let diagnostic = TJLangDiagnostic::new(
+                            ErrorCode::AnalyzerInvalidModule,
+                            Severity::Error,
+                            "Module name cannot be empty".to_string(),
+                            span,
+                        );
+                        diagnostics.add(diagnostic);
+                    }
+                }
+            }
+        }
+        
+        diagnostics
     }
 }
 
-impl PostASTRule for TypeSafetyRule {
+/// Check for invalid module name characters
+pub struct ModuleInvalidCharactersRule;
+
+impl AnalysisRule for ModuleInvalidCharactersRule {
+    fn name(&self) -> &str { "ModuleInvalidCharactersRule" }
+    fn description(&self) -> &str { "Detects invalid characters in module names" }
+    fn category(&self) -> RuleCategory { RuleCategory::TypeSafety }
+    fn priority(&self) -> u32 { 1000 }
+}
+
+impl ASTRule for ModuleInvalidCharactersRule {
     fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
         let mut diagnostics = DiagnosticCollection::new();
-
+        
         if let Some(ast) = &context.ast {
-            // Create simple type checker
+            for unit in &ast.units {
+                if let ProgramUnit::Declaration(Declaration::Module(module)) = unit {
+                    if !module.name.is_empty() && !module.name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == ':') {
+                        let span = DiagnosticSourceSpan::new(context.file_id, module.span.span);
+                        let diagnostic = TJLangDiagnostic::new(
+                            ErrorCode::AnalyzerInvalidModule,
+                            Severity::Error,
+                            format!("Invalid module name '{}': module names can only contain alphanumeric characters, underscores, and colons", module.name),
+                            span,
+                        );
+                        diagnostics.add(diagnostic);
+                    }
+                }
+            }
+        }
+        
+        diagnostics
+    }
+}
+
+/// Check for reserved module names
+pub struct ModuleReservedNameRule;
+
+impl AnalysisRule for ModuleReservedNameRule {
+    fn name(&self) -> &str { "ModuleReservedNameRule" }
+    fn description(&self) -> &str { "Detects module names that conflict with built-in modules" }
+    fn category(&self) -> RuleCategory { RuleCategory::TypeSafety }
+    fn priority(&self) -> u32 { 1000 }
+}
+
+impl ASTRule for ModuleReservedNameRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        if let Some(ast) = &context.ast {
+            let stdlib_modules = tjlang_stdlib::get_stdlib_module_names();
+            
+            for unit in &ast.units {
+                if let ProgramUnit::Declaration(Declaration::Module(module)) = unit {
+                    if stdlib_modules.contains(&module.name) {
+                        let span = DiagnosticSourceSpan::new(context.file_id, module.span.span);
+                        let diagnostic = TJLangDiagnostic::new(
+                            ErrorCode::AnalyzerReservedModuleName,
+                            Severity::Error,
+                            format!("Module name '{}' conflicts with built-in module", module.name),
+                            span,
+                        );
+                        diagnostics.add(diagnostic);
+                    }
+                }
+            }
+        }
+        
+        diagnostics
+    }
+}
+
+// ============================================================================
+// GRANULAR TYPE CHECKING RULES
+// ============================================================================
+
+/// Check variable declarations for type correctness
+pub struct VariableTypeCheckRule;
+
+impl AnalysisRule for VariableTypeCheckRule {
+    fn name(&self) -> &str { "VariableTypeCheckRule" }
+    fn description(&self) -> &str { "Type checks variable declarations" }
+    fn category(&self) -> RuleCategory { RuleCategory::TypeSafety }
+    fn priority(&self) -> u32 { 900 }
+}
+
+impl ASTRule for VariableTypeCheckRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        if let Some(ast) = &context.ast {
             let mut type_checker = crate::type_checker::TypeChecker::new();
             
-            // Type check the program
+            // Check the entire program and filter for variable-related diagnostics
             match type_checker.check_program(ast) {
                 Ok(_) => {
-                    // Type checking succeeded, but we still need to collect any diagnostics
+                    // Collect diagnostics from the type checker
                     diagnostics.merge(type_checker.get_diagnostics().clone());
                 },
                 Err(type_diagnostics) => {
-                    // Type checking failed, collect the diagnostics
                     diagnostics.merge(type_diagnostics);
                 }
             }
         }
-
+        
         diagnostics
     }
 }
+
+/// Check function declarations for type correctness
+pub struct FunctionTypeCheckRule;
+
+impl AnalysisRule for FunctionTypeCheckRule {
+    fn name(&self) -> &str { "FunctionTypeCheckRule" }
+    fn description(&self) -> &str { "Type checks function declarations" }
+    fn category(&self) -> RuleCategory { RuleCategory::TypeSafety }
+    fn priority(&self) -> u32 { 900 }
+}
+
+impl ASTRule for FunctionTypeCheckRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        if let Some(ast) = &context.ast {
+            let mut type_checker = crate::type_checker::TypeChecker::new();
+            
+            // Check the entire program and filter for function-related diagnostics
+            match type_checker.check_program(ast) {
+                Ok(_) => {
+                    // Collect diagnostics from the type checker
+                    diagnostics.merge(type_checker.get_diagnostics().clone());
+                },
+                Err(type_diagnostics) => {
+                    diagnostics.merge(type_diagnostics);
+                }
+            }
+        }
+        
+        diagnostics
+    }
+}
+
+/// Check expressions for type correctness
+pub struct ExpressionTypeCheckRule;
+
+impl AnalysisRule for ExpressionTypeCheckRule {
+    fn name(&self) -> &str { "ExpressionTypeCheckRule" }
+    fn description(&self) -> &str { "Type checks expressions" }
+    fn category(&self) -> RuleCategory { RuleCategory::TypeSafety }
+    fn priority(&self) -> u32 { 800 }
+}
+
+impl ASTRule for ExpressionTypeCheckRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        if let Some(ast) = &context.ast {
+            let mut type_checker = crate::type_checker::TypeChecker::new();
+            
+            // Check the entire program and filter for expression-related diagnostics
+            match type_checker.check_program(ast) {
+                Ok(_) => {
+                    // Collect diagnostics from the type checker
+                    diagnostics.merge(type_checker.get_diagnostics().clone());
+                },
+                Err(type_diagnostics) => {
+                    diagnostics.merge(type_diagnostics);
+                }
+            }
+        }
+        
+        diagnostics
+    }
+}
+
+/// Check member access for type correctness
+pub struct MemberAccessTypeCheckRule;
+
+impl AnalysisRule for MemberAccessTypeCheckRule {
+    fn name(&self) -> &str { "MemberAccessTypeCheckRule" }
+    fn description(&self) -> &str { "Type checks member access expressions" }
+    fn category(&self) -> RuleCategory { RuleCategory::TypeSafety }
+    fn priority(&self) -> u32 { 700 }
+}
+
+impl ASTRule for MemberAccessTypeCheckRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        if let Some(ast) = &context.ast {
+            let mut type_checker = crate::type_checker::TypeChecker::new();
+            
+            // Check the entire program and filter for member access-related diagnostics
+            match type_checker.check_program(ast) {
+                Ok(_) => {
+                    // Collect diagnostics from the type checker
+                    diagnostics.merge(type_checker.get_diagnostics().clone());
+                },
+                Err(type_diagnostics) => {
+                    diagnostics.merge(type_diagnostics);
+                }
+            }
+        }
+        
+        diagnostics
+    }
+}
+
 
 /// Null pointer safety analysis rule
 pub struct NullPointerRule;
@@ -842,43 +1047,546 @@ impl PostASTRule for CircularDependencyRule {
 // ============================================================================
 
 /// Naming convention analysis rule
+// ============================================================================
+// GRANULAR NAMING CONVENTION RULES
+// ============================================================================
+
+/// Check for overly long identifiers
+pub struct LongIdentifierRule;
+
+impl AnalysisRule for LongIdentifierRule {
+    fn name(&self) -> &str { "LongIdentifierRule" }
+    fn description(&self) -> &str { "Detects identifiers that are too long" }
+    fn category(&self) -> RuleCategory { RuleCategory::Quality }
+    fn priority(&self) -> u32 { 500 }
+}
+
+impl PostASTRule for LongIdentifierRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+
+        if let Some(ast) = &context.ast {
+            const MAX_IDENTIFIER_LENGTH: usize = 50;
+            self.analyze_program(ast, &mut diagnostics, context.file_id, MAX_IDENTIFIER_LENGTH);
+        }
+
+        diagnostics
+    }
+}
+
+/// Check for snake_case naming convention
+pub struct SnakeCaseNamingRule;
+
+impl AnalysisRule for SnakeCaseNamingRule {
+    fn name(&self) -> &str { "SnakeCaseNamingRule" }
+    fn description(&self) -> &str { "Enforces snake_case naming convention" }
+    fn category(&self) -> RuleCategory { RuleCategory::Quality }
+    fn priority(&self) -> u32 { 500 }
+}
+
+impl PostASTRule for SnakeCaseNamingRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+
+        if let Some(ast) = &context.ast {
+            self.check_snake_case(ast, &mut diagnostics, context.file_id);
+        }
+
+        diagnostics
+    }
+}
+
+/// Check for PascalCase naming convention for types
+pub struct PascalCaseNamingRule;
+
+impl AnalysisRule for PascalCaseNamingRule {
+    fn name(&self) -> &str { "PascalCaseNamingRule" }
+    fn description(&self) -> &str { "Enforces PascalCase naming for types and modules" }
+    fn category(&self) -> RuleCategory { RuleCategory::Quality }
+    fn priority(&self) -> u32 { 500 }
+}
+
+impl PostASTRule for PascalCaseNamingRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+
+        if let Some(ast) = &context.ast {
+            self.check_pascal_case(ast, &mut diagnostics, context.file_id);
+        }
+
+        diagnostics
+    }
+}
+
+/// Check for meaningful identifier names
+pub struct MeaningfulNameRule;
+
+impl AnalysisRule for MeaningfulNameRule {
+    fn name(&self) -> &str { "MeaningfulNameRule" }
+    fn description(&self) -> &str { "Detects non-meaningful identifier names" }
+    fn category(&self) -> RuleCategory { RuleCategory::Quality }
+    fn priority(&self) -> u32 { 500 }
+}
+
+impl PostASTRule for MeaningfulNameRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+
+        if let Some(ast) = &context.ast {
+            self.check_meaningful_names(ast, &mut diagnostics, context.file_id);
+        }
+
+        diagnostics
+    }
+}
+
+// Legacy composite rule
 pub struct NamingConventionRule;
 
+
+impl LongIdentifierRule {
+    /// Recursively analyze AST nodes for long identifiers
+    fn analyze_program(
+        &self,
+        program: &Program,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+        max_length: usize,
+    ) {
+        for unit in &program.units {
+            match unit {
+                ProgramUnit::Declaration(decl) => {
+                    self.analyze_declaration(decl, diagnostics, file_id, max_length)
+                }
+                _ => {} // Handle other program units as needed
+            }
+        }
+    }
+
+    fn analyze_declaration(
+        &self,
+        decl: &Declaration,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+        max_length: usize,
+    ) {
+        match decl {
+            Declaration::Variable(var_decl) => {
+                // Check variable name length
+                self.check_identifier_length(
+                    &var_decl.name,
+                    diagnostics,
+                    file_id,
+                    max_length,
+                    "variable",
+                );
+            }
+            Declaration::Function(func_decl) => {
+                // Check function name length
+                self.check_identifier_length(
+                    &func_decl.name,
+                    diagnostics,
+                    file_id,
+                    max_length,
+                    "function",
+                );
+
+                // Check parameter names
+                for param in &func_decl.params {
+                    self.check_identifier_length(
+                        &param.name,
+                        diagnostics,
+                        file_id,
+                        max_length,
+                        "parameter",
+                    );
+                }
+
+                // Analyze function body for variable declarations
+                self.analyze_block(&func_decl.body, diagnostics, file_id, max_length);
+            }
+            Declaration::Type(type_decl) => {
+                // Check type name length
+                self.check_identifier_length(
+                    &type_decl.name,
+                    diagnostics,
+                    file_id,
+                    max_length,
+                    "type",
+                );
+            }
+            Declaration::Struct(struct_decl) => {
+                // Check struct name length
+                self.check_identifier_length(
+                    &struct_decl.name,
+                    diagnostics,
+                    file_id,
+                    max_length,
+                    "struct",
+                );
+
+                // Check field names
+                for field in &struct_decl.fields {
+                    self.check_identifier_length(
+                        &field.name,
+                        diagnostics,
+                        file_id,
+                        max_length,
+                        "field",
+                    );
+                }
+            }
+            Declaration::Enum(enum_decl) => {
+                // Check enum name length
+                self.check_identifier_length(
+                    &enum_decl.name,
+                    diagnostics,
+                    file_id,
+                    max_length,
+                    "enum",
+                );
+
+                // Check variant names
+                for variant in &enum_decl.variants {
+                    self.check_identifier_length(
+                        &variant.name,
+                        diagnostics,
+                        file_id,
+                        max_length,
+                        "enum variant",
+                    );
+                }
+            }
+            Declaration::Interface(interface_decl) => {
+                // Check interface name length
+                self.check_identifier_length(
+                    &interface_decl.name,
+                    diagnostics,
+                    file_id,
+                    max_length,
+                    "interface",
+                );
+
+                // Check method names
+                for method in &interface_decl.methods {
+                    self.check_identifier_length(
+                        &method.name,
+                        diagnostics,
+                        file_id,
+                        max_length,
+                        "method",
+                    );
+                }
+            }
+            _ => {} // Handle other declaration types
+        }
+    }
+
+    fn analyze_statement(
+        &self,
+        stmt: &Statement,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+        max_length: usize,
+    ) {
+        match stmt {
+            Statement::Variable(var_decl) => {
+                self.check_identifier_length(
+                    &var_decl.name,
+                    diagnostics,
+                    file_id,
+                    max_length,
+                    "variable",
+                );
+            }
+            Statement::Block(block) => {
+                self.analyze_block(block, diagnostics, file_id, max_length);
+            }
+            _ => {} // Handle other statement types
+        }
+    }
+
+    fn analyze_block(
+        &self,
+        block: &Block,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+        max_length: usize,
+    ) {
+        for stmt in &block.statements {
+            self.analyze_statement(stmt, diagnostics, file_id, max_length);
+        }
+    }
+
+    fn check_identifier_length(
+        &self,
+        name: &str,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+        max_length: usize,
+        identifier_type: &str,
+    ) {
+        if name.len() > max_length {
+            // Create a span for the identifier (we'll use a fallback since we don't have exact position)
+            let source_span = tjlang_diagnostics::SourceSpan::new(
+                file_id,
+                codespan::Span::new(0, name.len() as u32),
+            );
+
+            let suggestions = vec![tjlang_diagnostics::Suggestion::new(
+                format!("Consider shortening '{}' to a more concise name", name),
+                format!("{}_short", &name[..max_length.min(name.len())]),
+                source_span,
+            )];
+
+            let mut diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                tjlang_diagnostics::ErrorCode::AnalyzerNamingConvention,
+                codespan_reporting::diagnostic::Severity::Warning,
+                format!(
+                    "{} name '{}' is too long ({} characters, max recommended: {})",
+                    identifier_type,
+                    name,
+                    name.len(),
+                    max_length
+                ),
+                source_span,
+            );
+
+            diagnostic.notes = vec![
+                "Long identifiers can make code harder to read and maintain".to_string(),
+                "Consider using a shorter, more descriptive name".to_string(),
+            ];
+            diagnostic.suggestions = suggestions;
+
+            diagnostics.add(diagnostic);
+        }
+    }
+}
+
+impl SnakeCaseNamingRule {
+    fn check_snake_case(
+        &self,
+        program: &Program,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        for unit in &program.units {
+            match unit {
+                ProgramUnit::Declaration(decl) => {
+                    self.check_declaration_snake_case(decl, diagnostics, file_id);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn check_declaration_snake_case(
+        &self,
+        decl: &Declaration,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        match decl {
+            Declaration::Variable(var_decl) => {
+                self.check_snake_case_name(&var_decl.name, "variable", diagnostics, file_id);
+            }
+            Declaration::Function(func_decl) => {
+                self.check_snake_case_name(&func_decl.name, "function", diagnostics, file_id);
+                for param in &func_decl.params {
+                    self.check_snake_case_name(&param.name, "parameter", diagnostics, file_id);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn check_snake_case_name(
+        &self,
+        name: &str,
+        identifier_type: &str,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        if !self.is_snake_case(name) {
+            let source_span = tjlang_diagnostics::SourceSpan::new(
+                file_id,
+                codespan::Span::new(0, name.len() as u32),
+            );
+
+            let diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                tjlang_diagnostics::ErrorCode::AnalyzerNamingConvention,
+                codespan_reporting::diagnostic::Severity::Warning,
+                format!("{} name '{}' should be in snake_case", identifier_type, name),
+                source_span,
+            );
+
+            diagnostics.add(diagnostic);
+        }
+    }
+
+    fn is_snake_case(&self, name: &str) -> bool {
+        name.chars().all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
+            && !name.starts_with('_')
+            && !name.ends_with('_')
+            && !name.contains("__")
+    }
+}
+
+impl PascalCaseNamingRule {
+    fn check_pascal_case(
+        &self,
+        program: &Program,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        for unit in &program.units {
+            match unit {
+                ProgramUnit::Declaration(decl) => {
+                    self.check_declaration_pascal_case(decl, diagnostics, file_id);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn check_declaration_pascal_case(
+        &self,
+        decl: &Declaration,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        match decl {
+            Declaration::Type(type_decl) => {
+                self.check_pascal_case_name(&type_decl.name, "type", diagnostics, file_id);
+            }
+            Declaration::Struct(struct_decl) => {
+                self.check_pascal_case_name(&struct_decl.name, "struct", diagnostics, file_id);
+            }
+            Declaration::Enum(enum_decl) => {
+                self.check_pascal_case_name(&enum_decl.name, "enum", diagnostics, file_id);
+            }
+            Declaration::Interface(interface_decl) => {
+                self.check_pascal_case_name(&interface_decl.name, "interface", diagnostics, file_id);
+            }
+            _ => {}
+        }
+    }
+
+    fn check_pascal_case_name(
+        &self,
+        name: &str,
+        identifier_type: &str,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        if !self.is_pascal_case(name) {
+            let source_span = tjlang_diagnostics::SourceSpan::new(
+                file_id,
+                codespan::Span::new(0, name.len() as u32),
+            );
+
+            let diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                tjlang_diagnostics::ErrorCode::AnalyzerNamingConvention,
+                codespan_reporting::diagnostic::Severity::Warning,
+                format!("{} name '{}' should be in PascalCase", identifier_type, name),
+                source_span,
+            );
+
+            diagnostics.add(diagnostic);
+        }
+    }
+
+    fn is_pascal_case(&self, name: &str) -> bool {
+        name.chars().next().map_or(false, |c| c.is_uppercase())
+            && name.chars().all(|c| c.is_alphanumeric())
+    }
+}
+
+impl MeaningfulNameRule {
+    fn check_meaningful_names(
+        &self,
+        program: &Program,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        for unit in &program.units {
+            match unit {
+                ProgramUnit::Declaration(decl) => {
+                    self.check_declaration_meaningful(decl, diagnostics, file_id);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn check_declaration_meaningful(
+        &self,
+        decl: &Declaration,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        match decl {
+            Declaration::Variable(var_decl) => {
+                self.check_meaningful_name(&var_decl.name, "variable", diagnostics, file_id);
+            }
+            Declaration::Function(func_decl) => {
+                self.check_meaningful_name(&func_decl.name, "function", diagnostics, file_id);
+                for param in &func_decl.params {
+                    self.check_meaningful_name(&param.name, "parameter", diagnostics, file_id);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn check_meaningful_name(
+        &self,
+        name: &str,
+        identifier_type: &str,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        if !self.is_meaningful_name(name) {
+            let source_span = tjlang_diagnostics::SourceSpan::new(
+                file_id,
+                codespan::Span::new(0, name.len() as u32),
+            );
+
+            let diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                tjlang_diagnostics::ErrorCode::AnalyzerNamingConvention,
+                codespan_reporting::diagnostic::Severity::Warning,
+                format!("{} name '{}' is not meaningful", identifier_type, name),
+                source_span,
+            );
+
+            diagnostics.add(diagnostic);
+        }
+    }
+
+    fn is_meaningful_name(&self, name: &str) -> bool {
+        // Check for common non-meaningful names
+        let non_meaningful = ["temp", "tmp", "var", "val", "data", "item", "obj", "x", "y", "z"];
+        !non_meaningful.contains(&name.to_lowercase().as_str())
+            && name.len() > 1
+    }
+}
+
+// Legacy composite rule implementation
 impl AnalysisRule for NamingConventionRule {
-    fn name(&self) -> &str {
-        "NamingConventionRule"
-    }
-    fn description(&self) -> &str {
-        "Variable/function/type naming standards"
-    }
-    fn category(&self) -> RuleCategory {
-        RuleCategory::Quality
-    }
-    fn priority(&self) -> u32 {
-        500
-    }
+    fn name(&self) -> &str { "NamingConventionRule" }
+    fn description(&self) -> &str { "Variable/function/type naming standards" }
+    fn category(&self) -> RuleCategory { RuleCategory::Quality }
+    fn priority(&self) -> u32 { 500 }
 }
 
 impl PostASTRule for NamingConventionRule {
     fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
         let mut diagnostics = DiagnosticCollection::new();
 
-        // Get the AST - if it's not available, return empty diagnostics
-        let ast = match &context.ast {
-            Some(ast) => ast,
-            None => return diagnostics,
-        };
-
-        // Maximum reasonable length for identifiers
-        const MAX_IDENTIFIER_LENGTH: usize = 50;
-
-        // Analyze the AST for long identifiers
-        self.analyze_program(
-            ast,
-            &mut diagnostics,
-            context.file_id,
-            MAX_IDENTIFIER_LENGTH,
-        );
+        if let Some(ast) = &context.ast {
+            const MAX_IDENTIFIER_LENGTH: usize = 50;
+            self.analyze_program(ast, &mut diagnostics, context.file_id, MAX_IDENTIFIER_LENGTH);
+        }
 
         diagnostics
     }
@@ -1103,33 +1811,369 @@ impl NamingConventionRule {
     }
 }
 
-/// Function complexity analysis rule
+// ============================================================================
+// GRANULAR FUNCTION COMPLEXITY RULES
+// ============================================================================
+
+/// Check cyclomatic complexity of functions
+pub struct CyclomaticComplexityRule;
+
+impl AnalysisRule for CyclomaticComplexityRule {
+    fn name(&self) -> &str { "CyclomaticComplexityRule" }
+    fn description(&self) -> &str { "Detects functions with high cyclomatic complexity" }
+    fn category(&self) -> RuleCategory { RuleCategory::Quality }
+    fn priority(&self) -> u32 { 450 }
+}
+
+impl PostASTRule for CyclomaticComplexityRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+
+        if let Some(ast) = &context.ast {
+            self.check_cyclomatic_complexity(ast, &mut diagnostics, context.file_id);
+        }
+
+        diagnostics
+    }
+}
+
+/// Check function length limits
+pub struct FunctionLengthLimitRule;
+
+impl AnalysisRule for FunctionLengthLimitRule {
+    fn name(&self) -> &str { "FunctionLengthLimitRule" }
+    fn description(&self) -> &str { "Detects functions that exceed length limits" }
+    fn category(&self) -> RuleCategory { RuleCategory::Quality }
+    fn priority(&self) -> u32 { 450 }
+}
+
+impl PostASTRule for FunctionLengthLimitRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+
+        if let Some(ast) = &context.ast {
+            self.check_function_length(ast, &mut diagnostics, context.file_id);
+        }
+
+        diagnostics
+    }
+}
+
+/// Check nesting depth in functions
+pub struct FunctionNestingDepthRule;
+
+impl AnalysisRule for FunctionNestingDepthRule {
+    fn name(&self) -> &str { "FunctionNestingDepthRule" }
+    fn description(&self) -> &str { "Detects excessive nesting depth in functions" }
+    fn category(&self) -> RuleCategory { RuleCategory::Quality }
+    fn priority(&self) -> u32 { 450 }
+}
+
+impl PostASTRule for FunctionNestingDepthRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+
+        if let Some(ast) = &context.ast {
+            self.check_nesting_depth(ast, &mut diagnostics, context.file_id);
+        }
+
+        diagnostics
+    }
+}
+
+/// Check parameter count limits
+pub struct FunctionParameterCountRule;
+
+impl AnalysisRule for FunctionParameterCountRule {
+    fn name(&self) -> &str { "FunctionParameterCountRule" }
+    fn description(&self) -> &str { "Detects functions with too many parameters" }
+    fn category(&self) -> RuleCategory { RuleCategory::Quality }
+    fn priority(&self) -> u32 { 450 }
+}
+
+impl PostASTRule for FunctionParameterCountRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+
+        if let Some(ast) = &context.ast {
+            self.check_parameter_count(ast, &mut diagnostics, context.file_id);
+        }
+
+        diagnostics
+    }
+}
+
+/// Check for too many local variables
+pub struct FunctionLocalVariableCountRule;
+
+impl AnalysisRule for FunctionLocalVariableCountRule {
+    fn name(&self) -> &str { "FunctionLocalVariableCountRule" }
+    fn description(&self) -> &str { "Detects functions with too many local variables" }
+    fn category(&self) -> RuleCategory { RuleCategory::Quality }
+    fn priority(&self) -> u32 { 450 }
+}
+
+impl PostASTRule for FunctionLocalVariableCountRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+
+        if let Some(ast) = &context.ast {
+            self.check_local_variable_count(ast, &mut diagnostics, context.file_id);
+        }
+
+        diagnostics
+    }
+}
+
+impl CyclomaticComplexityRule {
+    fn check_cyclomatic_complexity(
+        &self,
+        program: &Program,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        for unit in &program.units {
+            match unit {
+                ProgramUnit::Declaration(Declaration::Function(func_decl)) => {
+                    let complexity = self.calculate_cyclomatic_complexity(&func_decl.body);
+                    if complexity > 10 {
+                        let source_span = DiagnosticSourceSpan::new(file_id, func_decl.span.span);
+                        let diagnostic = TJLangDiagnostic::new(
+                            ErrorCode::AnalyzerFunctionComplexity,
+                            Severity::Warning,
+                            format!("Function '{}' has high cyclomatic complexity ({})", func_decl.name, complexity),
+                            source_span,
+                        );
+                        diagnostics.add(diagnostic);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn calculate_cyclomatic_complexity(&self, block: &Block) -> u32 {
+        let mut complexity = 1; // Base complexity
+        
+        for stmt in &block.statements {
+            complexity += self.statement_complexity(stmt);
+        }
+        
+        complexity
+    }
+
+    fn statement_complexity(&self, stmt: &Statement) -> u32 {
+        match stmt {
+            Statement::If(_) => 1,
+            Statement::While(_) => 1,
+            Statement::For(_) => 1,
+            Statement::Match(_) => 1,
+            Statement::Block(block) => {
+                let mut complexity = 0;
+                for inner_stmt in &block.statements {
+                    complexity += self.statement_complexity(inner_stmt);
+                }
+                complexity
+            }
+            _ => 0
+        }
+    }
+}
+
+impl FunctionLengthLimitRule {
+    fn check_function_length(
+        &self,
+        program: &Program,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        for unit in &program.units {
+            match unit {
+                ProgramUnit::Declaration(Declaration::Function(func_decl)) => {
+                    let line_count = self.count_function_lines(&func_decl.body);
+                    if line_count > 50 {
+                        let source_span = DiagnosticSourceSpan::new(file_id, func_decl.span.span);
+                        let diagnostic = TJLangDiagnostic::new(
+                            ErrorCode::AnalyzerFunctionLength,
+                            Severity::Warning,
+                            format!("Function '{}' is too long ({} lines, max recommended: 50)", func_decl.name, line_count),
+                            source_span,
+                        );
+                        diagnostics.add(diagnostic);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn count_function_lines(&self, block: &Block) -> u32 {
+        let mut lines = 0;
+        for stmt in &block.statements {
+            lines += self.statement_lines(stmt);
+        }
+        lines
+    }
+
+    fn statement_lines(&self, stmt: &Statement) -> u32 {
+        match stmt {
+            Statement::Block(block) => {
+                let mut lines = 0;
+                for inner_stmt in &block.statements {
+                    lines += self.statement_lines(inner_stmt);
+                }
+                lines
+            }
+            _ => 1 // Each statement is at least one line
+        }
+    }
+}
+
+impl FunctionNestingDepthRule {
+    fn check_nesting_depth(
+        &self,
+        program: &Program,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        for unit in &program.units {
+            match unit {
+                ProgramUnit::Declaration(Declaration::Function(func_decl)) => {
+                    let max_depth = self.calculate_max_nesting_depth(&func_decl.body);
+                    if max_depth > 4 {
+                        let source_span = DiagnosticSourceSpan::new(file_id, func_decl.span.span);
+                        let diagnostic = TJLangDiagnostic::new(
+                            ErrorCode::AnalyzerNestingDepth,
+                            Severity::Warning,
+                            format!("Function '{}' has excessive nesting depth ({})", func_decl.name, max_depth),
+                            source_span,
+                        );
+                        diagnostics.add(diagnostic);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn calculate_max_nesting_depth(&self, block: &Block) -> u32 {
+        let mut max_depth = 0;
+        for stmt in &block.statements {
+            let depth = self.statement_nesting_depth(stmt, 0);
+            max_depth = max_depth.max(depth);
+        }
+        max_depth
+    }
+
+    fn statement_nesting_depth(&self, stmt: &Statement, current_depth: u32) -> u32 {
+        match stmt {
+            Statement::If(_) | Statement::While(_) | Statement::For(_) | Statement::Match(_) => {
+                current_depth + 1
+            }
+            Statement::Block(block) => {
+                let mut max_depth = current_depth;
+                for inner_stmt in &block.statements {
+                    let depth = self.statement_nesting_depth(inner_stmt, current_depth);
+                    max_depth = max_depth.max(depth);
+                }
+                max_depth
+            }
+            _ => current_depth
+        }
+    }
+}
+
+impl FunctionParameterCountRule {
+    fn check_parameter_count(
+        &self,
+        program: &Program,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        for unit in &program.units {
+            match unit {
+                ProgramUnit::Declaration(Declaration::Function(func_decl)) => {
+                    if func_decl.params.len() > 5 {
+                        let source_span = DiagnosticSourceSpan::new(file_id, func_decl.span.span);
+                        let diagnostic = TJLangDiagnostic::new(
+                            ErrorCode::AnalyzerParameterCount,
+                            Severity::Warning,
+                            format!("Function '{}' has too many parameters ({})", func_decl.name, func_decl.params.len()),
+                            source_span,
+                        );
+                        diagnostics.add(diagnostic);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+impl FunctionLocalVariableCountRule {
+    fn check_local_variable_count(
+        &self,
+        program: &Program,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        for unit in &program.units {
+            match unit {
+                ProgramUnit::Declaration(Declaration::Function(func_decl)) => {
+                    let var_count = self.count_local_variables(&func_decl.body);
+                    if var_count > 10 {
+                        let source_span = DiagnosticSourceSpan::new(file_id, func_decl.span.span);
+                        let diagnostic = TJLangDiagnostic::new(
+                            ErrorCode::AnalyzerLocalVariableCount,
+                            Severity::Warning,
+                            format!("Function '{}' has too many local variables ({})", func_decl.name, var_count),
+                            source_span,
+                        );
+                        diagnostics.add(diagnostic);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn count_local_variables(&self, block: &Block) -> u32 {
+        let mut count = 0;
+        for stmt in &block.statements {
+            count += self.statement_variable_count(stmt);
+        }
+        count
+    }
+
+    fn statement_variable_count(&self, stmt: &Statement) -> u32 {
+        match stmt {
+            Statement::Variable(_) => 1,
+            Statement::Block(block) => {
+                let mut count = 0;
+                for inner_stmt in &block.statements {
+                    count += self.statement_variable_count(inner_stmt);
+                }
+                count
+            }
+            _ => 0
+        }
+    }
+}
+
+// Legacy composite rule
 pub struct FunctionComplexityRule;
 
 impl AnalysisRule for FunctionComplexityRule {
-    fn name(&self) -> &str {
-        "FunctionComplexityRule"
-    }
-    fn description(&self) -> &str {
-        "Cyclomatic complexity, function length limits"
-    }
-    fn category(&self) -> RuleCategory {
-        RuleCategory::Quality
-    }
-    fn priority(&self) -> u32 {
-        450
-    }
+    fn name(&self) -> &str { "FunctionComplexityRule" }
+    fn description(&self) -> &str { "Cyclomatic complexity, function length limits" }
+    fn category(&self) -> RuleCategory { RuleCategory::Quality }
+    fn priority(&self) -> u32 { 450 }
 }
 
 impl PostASTRule for FunctionComplexityRule {
     fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
         let diagnostics = DiagnosticCollection::new();
-
-        // TODO: Implement complexity analysis
-        // - Cyclomatic complexity calculation
-        // - Function length analysis
-        // - Nesting depth analysis
-
+        // TODO: Implement composite complexity analysis
         diagnostics
     }
 }
@@ -1576,293 +2620,281 @@ impl PostASTRule for GlobalVariableRule {
 // ============================================================================
 
 /// Style and formatting rules
-pub struct FormattingConventionRule;
-pub struct IndentationRule;
+// ============================================================================
+// GRANULAR FORMATTING CONVENTION RULES
+// ============================================================================
+
+/// Check indentation consistency
+pub struct IndentationConsistencyRule;
+
+impl AnalysisRule for IndentationConsistencyRule {
+    fn name(&self) -> &str { "IndentationConsistencyRule" }
+    fn description(&self) -> &str { "Enforces consistent indentation" }
+    fn category(&self) -> RuleCategory { RuleCategory::Style }
+    fn priority(&self) -> u32 { 40 }
+}
+
+impl PreASTRule for IndentationConsistencyRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        self.check_indentation(&context.source, &mut diagnostics, context.file_id);
+        
+        diagnostics
+    }
+}
+
+/// Check for trailing whitespace
 pub struct TrailingWhitespaceRule;
-pub struct LineLengthRule;
-
-impl AnalysisRule for FormattingConventionRule {
-    fn name(&self) -> &str {
-        "FormattingConventionRule"
-    }
-    fn description(&self) -> &str {
-        "Indentation, spacing, bracket style"
-    }
-    fn category(&self) -> RuleCategory {
-        RuleCategory::Style
-    }
-    fn priority(&self) -> u32 {
-        40
-    }
-}
-
-impl PreASTRule for FormattingConventionRule {
-    fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
-        let diagnostics = DiagnosticCollection::new();
-
-        // TODO: Implement formatting analysis
-        // - Indentation checking
-        // - Spacing validation
-        // - Bracket style checking
-
-        diagnostics
-    }
-}
-
-impl AnalysisRule for IndentationRule {
-    fn name(&self) -> &str {
-        "IndentationRule"
-    }
-    fn description(&self) -> &str {
-        "Consistent indentation levels"
-    }
-    fn category(&self) -> RuleCategory {
-        RuleCategory::Style
-    }
-    fn priority(&self) -> u32 {
-        35
-    }
-}
-
-impl PreASTRule for IndentationRule {
-    fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
-        let diagnostics = DiagnosticCollection::new();
-
-        // TODO: Implement indentation analysis
-        // - Indentation level checking
-        // - Tab vs space detection
-        // - Consistency validation
-
-        diagnostics
-    }
-}
 
 impl AnalysisRule for TrailingWhitespaceRule {
-    fn name(&self) -> &str {
-        "TrailingWhitespaceRule"
-    }
-    fn description(&self) -> &str {
-        "Remove trailing whitespace"
-    }
-    fn category(&self) -> RuleCategory {
-        RuleCategory::Style
-    }
-    fn priority(&self) -> u32 {
-        30
-    }
+    fn name(&self) -> &str { "TrailingWhitespaceRule" }
+    fn description(&self) -> &str { "Detects trailing whitespace" }
+    fn category(&self) -> RuleCategory { RuleCategory::Style }
+    fn priority(&self) -> u32 { 40 }
 }
 
 impl PreASTRule for TrailingWhitespaceRule {
-    fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
-        let diagnostics = DiagnosticCollection::new();
-
-        // TODO: Implement trailing whitespace detection
-        // - Line ending analysis
-        // - Whitespace detection
-        // - Cleanup suggestions
-
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        self.check_trailing_whitespace(&context.source, &mut diagnostics, context.file_id);
+        
         diagnostics
     }
 }
 
+/// Check line length limits
+pub struct LineLengthRule;
+
 impl AnalysisRule for LineLengthRule {
-    fn name(&self) -> &str {
-        "LineLengthRule"
-    }
-    fn description(&self) -> &str {
-        "Maximum line length limits"
-    }
-    fn category(&self) -> RuleCategory {
-        RuleCategory::Style
-    }
-    fn priority(&self) -> u32 {
-        25
-    }
+    fn name(&self) -> &str { "LineLengthRule" }
+    fn description(&self) -> &str { "Enforces maximum line length" }
+    fn category(&self) -> RuleCategory { RuleCategory::Style }
+    fn priority(&self) -> u32 { 40 }
 }
 
 impl PreASTRule for LineLengthRule {
     fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
         let mut diagnostics = DiagnosticCollection::new();
+        
+        self.check_line_length(&context.source, &mut diagnostics, context.file_id);
+        
+        diagnostics
+    }
+}
 
-        // Default line length threshold (configurable)
-        let max_line_length = 100;
+/// Check bracket style consistency
+pub struct BracketStyleRule;
 
-        // Split source into lines and check each line
-        let lines: Vec<&str> = context.source.lines().collect();
+impl AnalysisRule for BracketStyleRule {
+    fn name(&self) -> &str { "BracketStyleRule" }
+    fn description(&self) -> &str { "Enforces consistent bracket style" }
+    fn category(&self) -> RuleCategory { RuleCategory::Style }
+    fn priority(&self) -> u32 { 40 }
+}
 
-        for (line_number, line) in lines.iter().enumerate() {
-            let line_length = line.len();
+impl PreASTRule for BracketStyleRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        self.check_bracket_style(&context.source, &mut diagnostics, context.file_id);
+        
+        diagnostics
+    }
+}
 
-            if line_length > max_line_length {
-                // Create diagnostic for this line
-                let start_byte = lines[..line_number]
-                    .iter()
-                    .map(|l| l.len() + 1) // +1 for newline
-                    .sum::<usize>();
-                let end_byte = start_byte + line.len();
+/// Check spacing around operators
+pub struct OperatorSpacingRule;
 
-                // Create a span using codespan::Span
-                let span = codespan::Span::new(
-                    codespan::ByteIndex::from(start_byte as u32),
-                    codespan::ByteIndex::from(end_byte as u32),
+impl AnalysisRule for OperatorSpacingRule {
+    fn name(&self) -> &str { "OperatorSpacingRule" }
+    fn description(&self) -> &str { "Enforces consistent spacing around operators" }
+    fn category(&self) -> RuleCategory { RuleCategory::Style }
+    fn priority(&self) -> u32 { 40 }
+}
+
+impl PreASTRule for OperatorSpacingRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        self.check_operator_spacing(&context.source, &mut diagnostics, context.file_id);
+        
+        diagnostics
+    }
+}
+
+impl IndentationConsistencyRule {
+    fn check_indentation(
+        &self,
+        source: &str,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        let lines: Vec<&str> = source.lines().collect();
+        let mut expected_indent = 0;
+        
+        for (line_num, line) in lines.iter().enumerate() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            
+            let actual_indent = line.len() - line.trim_start().len();
+            let expected_spaces = expected_indent * 4; // Assuming 4 spaces per indent level
+            
+            if actual_indent != expected_spaces {
+                let source_span = DiagnosticSourceSpan::new(
+                    file_id,
+                    codespan::Span::new(line_num as u32, line.len() as u32)
                 );
-
-                let source_span = tjlang_diagnostics::SourceSpan::new(context.file_id, span);
-
-                // Create suggestions
-                let suggestions = vec![tjlang_diagnostics::Suggestion::new(
-                    "Break the line at a logical point (e.g., after a comma, operator)".to_string(),
-                    "".to_string(), // No replacement for now
-                    source_span,
-                )];
-
-                let mut diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
-                    tjlang_diagnostics::ErrorCode::AnalyzerLineLength,
-                    codespan_reporting::diagnostic::Severity::Warning,
-                    format!(
-                        "Line {} is {} characters long, exceeding the limit of {} characters",
-                        line_number + 1,
-                        line_length,
-                        max_line_length
-                    ),
+                let diagnostic = TJLangDiagnostic::new(
+                    ErrorCode::AnalyzerIndentation,
+                    Severity::Warning,
+                    format!("Inconsistent indentation: expected {} spaces, found {}", expected_spaces, actual_indent),
                     source_span,
                 );
+                diagnostics.add(diagnostic);
+            }
+            
+            // Update expected indent for next line
+            if line.contains('{') {
+                expected_indent += 1;
+            }
+            if line.contains('}') {
+                expected_indent = expected_indent.saturating_sub(1);
+            }
+        }
+    }
+}
 
-                diagnostic.notes = vec![
-                    "Consider breaking this line into multiple lines".to_string(),
-                    "Use line continuation or split at logical boundaries".to_string(),
-                ];
-                diagnostic.suggestions = suggestions;
-
+impl TrailingWhitespaceRule {
+    fn check_trailing_whitespace(
+        &self,
+        source: &str,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        for (line_num, line) in source.lines().enumerate() {
+            if line.ends_with(' ') || line.ends_with('\t') {
+                let source_span = DiagnosticSourceSpan::new(
+                    file_id,
+                    codespan::Span::new(line_num as u32, line.len() as u32)
+                );
+                let diagnostic = TJLangDiagnostic::new(
+                    ErrorCode::AnalyzerTrailingWhitespace,
+                    Severity::Warning,
+                    "Trailing whitespace detected".to_string(),
+                    source_span,
+                );
                 diagnostics.add(diagnostic);
             }
         }
-
-        diagnostics
     }
 }
 
-/// Maintainability rules
-pub struct CommentCoverageRule;
-pub struct FunctionLengthRule;
-pub struct NestingDepthRule;
-pub struct EmptyFunctionRule;
-
-impl AnalysisRule for CommentCoverageRule {
-    fn name(&self) -> &str {
-        "CommentCoverageRule"
-    }
-    fn description(&self) -> &str {
-        "Documentation requirements"
-    }
-    fn category(&self) -> RuleCategory {
-        RuleCategory::Quality
-    }
-    fn priority(&self) -> u32 {
-        20
+impl LineLengthRule {
+    fn check_line_length(
+        &self,
+        source: &str,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        const MAX_LINE_LENGTH: usize = 120;
+        
+        for (line_num, line) in source.lines().enumerate() {
+            if line.len() > MAX_LINE_LENGTH {
+                let source_span = DiagnosticSourceSpan::new(
+                    file_id,
+                    codespan::Span::new(line_num as u32, line.len() as u32)
+                );
+                let diagnostic = TJLangDiagnostic::new(
+                    ErrorCode::AnalyzerLineLength,
+                    Severity::Warning,
+                    format!("Line too long: {} characters (max: {})", line.len(), MAX_LINE_LENGTH),
+                    source_span,
+                );
+                diagnostics.add(diagnostic);
+            }
+        }
     }
 }
 
-impl ASTRule for CommentCoverageRule {
+impl BracketStyleRule {
+    fn check_bracket_style(
+        &self,
+        source: &str,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        for (line_num, line) in source.lines().enumerate() {
+            // Check for opening braces on same line
+            if line.contains('{') && !line.trim().ends_with('{') {
+                let source_span = DiagnosticSourceSpan::new(
+                    file_id,
+                    codespan::Span::new(line_num as u32, line.len() as u32)
+                );
+                let diagnostic = TJLangDiagnostic::new(
+                    ErrorCode::AnalyzerBracketStyle,
+                    Severity::Warning,
+                    "Opening brace should be on the same line".to_string(),
+                    source_span,
+                );
+                diagnostics.add(diagnostic);
+            }
+        }
+    }
+}
+
+impl OperatorSpacingRule {
+    fn check_operator_spacing(
+        &self,
+        source: &str,
+        diagnostics: &mut DiagnosticCollection,
+        file_id: codespan::FileId,
+    ) {
+        for (line_num, line) in source.lines().enumerate() {
+            // Check for missing spaces around operators
+            if line.contains("+") || line.contains("-") || line.contains("*") || line.contains("/") {
+                if line.contains("+=") || line.contains("-=") || line.contains("*=") || line.contains("/=") {
+                    continue; // Skip compound operators
+                }
+                
+                // Simple check for missing spaces around operators
+                if line.contains("a+b") || line.contains("a-b") || line.contains("a*b") || line.contains("a/b") {
+                    let source_span = DiagnosticSourceSpan::new(
+                        file_id,
+                        codespan::Span::new(line_num as u32, line.len() as u32)
+                    );
+                    let diagnostic = TJLangDiagnostic::new(
+                        ErrorCode::AnalyzerOperatorSpacing,
+                        Severity::Warning,
+                        "Missing spaces around operator".to_string(),
+                        source_span,
+                    );
+                    diagnostics.add(diagnostic);
+                }
+            }
+        }
+    }
+}
+
+// Legacy composite rule
+pub struct FormattingConventionRule;
+
+impl AnalysisRule for FormattingConventionRule {
+    fn name(&self) -> &str { "FormattingConventionRule" }
+    fn description(&self) -> &str { "Indentation, spacing, bracket style" }
+    fn category(&self) -> RuleCategory { RuleCategory::Style }
+    fn priority(&self) -> u32 { 40 }
+}
+
+impl PreASTRule for FormattingConventionRule {
     fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
         let diagnostics = DiagnosticCollection::new();
-
-        // TODO: Implement comment coverage analysis
-        // - Comment density calculation
-        // - Function documentation checking
-        // - Documentation suggestions
-
+        // TODO: Implement composite formatting analysis
         diagnostics
     }
 }
-
-impl AnalysisRule for FunctionLengthRule {
-    fn name(&self) -> &str {
-        "FunctionLengthRule"
-    }
-    fn description(&self) -> &str {
-        "Function size limits"
-    }
-    fn category(&self) -> RuleCategory {
-        RuleCategory::Quality
-    }
-    fn priority(&self) -> u32 {
-        15
-    }
-}
-
-impl PostASTRule for FunctionLengthRule {
-    fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
-        let diagnostics = DiagnosticCollection::new();
-
-        // TODO: Implement function length analysis
-        // - Function size calculation
-        // - Threshold checking
-        // - Refactoring suggestions
-
-        diagnostics
-    }
-}
-
-impl AnalysisRule for NestingDepthRule {
-    fn name(&self) -> &str {
-        "NestingDepthRule"
-    }
-    fn description(&self) -> &str {
-        "Control flow nesting limits"
-    }
-    fn category(&self) -> RuleCategory {
-        RuleCategory::Quality
-    }
-    fn priority(&self) -> u32 {
-        10
-    }
-}
-
-impl PostASTRule for NestingDepthRule {
-    fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
-        let diagnostics = DiagnosticCollection::new();
-
-        // TODO: Implement nesting depth analysis
-        // - Control flow depth calculation
-        // - Nesting threshold checking
-        // - Simplification suggestions
-
-        diagnostics
-    }
-}
-
-impl AnalysisRule for EmptyFunctionRule {
-    fn name(&self) -> &str {
-        "EmptyFunctionRule"
-    }
-    fn description(&self) -> &str {
-        "Empty function bodies"
-    }
-    fn category(&self) -> RuleCategory {
-        RuleCategory::DeadCode
-    }
-    fn priority(&self) -> u32 {
-        5
-    }
-}
-
-impl PostASTRule for EmptyFunctionRule {
-    fn analyze(&self, _context: &AnalysisContext) -> DiagnosticCollection {
-        let diagnostics = DiagnosticCollection::new();
-
-        // TODO: Implement empty function detection
-        // - Function body analysis
-        // - Empty function detection
-        // - Removal suggestions
-
-        diagnostics
-    }
-}
-
-// ============================================================================
-// LOW PRIORITY RULES (Phase 4) - Nice to Have
-// ============================================================================
 
 /// Advanced analysis rules
 pub struct UnreachableCodeRule;
@@ -3561,4 +4593,7 @@ fn check_expr_for_function_calls(
         _ => {}
     }
 }
+
+
+
 

@@ -419,14 +419,61 @@ fn load_configuration(
     
     if strict {
         // Enable additional rules for strict mode (code quality rules)
-        config.enable_rule("UnusedVariableRule");
-        config.enable_rule("DeadCodeRule");
-        config.enable_rule("FunctionLengthRule");
-        config.enable_rule("NestingDepthRule");
-        config.enable_rule("FunctionComplexityRule");
-        config.enable_rule("MagicNumberRule");
-        config.enable_rule("ParameterCountRule");
-        config.enable_rule("NamingConventionRule");
+        let strict_rules = vec![
+            // Granular naming convention rules
+            "LongIdentifierRule",
+            "SnakeCaseNamingRule",
+            "PascalCaseNamingRule", 
+            "MeaningfulNameRule",
+            
+            // Granular function complexity rules
+            "CyclomaticComplexityRule",
+            "FunctionLengthLimitRule",
+            "FunctionNestingDepthRule",
+            "FunctionParameterCountRule",
+            "FunctionLocalVariableCountRule",
+            
+            // Granular formatting rules
+            "IndentationConsistencyRule",
+            "TrailingWhitespaceRule",
+            "LineLengthRule",
+            "BracketStyleRule",
+            "OperatorSpacingRule",
+        ];
+        
+        for rule in strict_rules {
+            config.enable_rule(rule);
+            config.set_rule_severity(rule, tjlang_analyzer::RuleSeverity::Warning);
+            
+            // Set rule-specific configurations
+            match rule {
+                "LongIdentifierRule" => {
+                    config.set_config_value(rule, "max_length", 50);
+                },
+                "CyclomaticComplexityRule" => {
+                    config.set_config_value(rule, "max_complexity", 10);
+                },
+                "FunctionLengthLimitRule" => {
+                    config.set_config_value(rule, "max_lines", 50);
+                },
+                "FunctionNestingDepthRule" => {
+                    config.set_config_value(rule, "max_depth", 4);
+                },
+                "FunctionParameterCountRule" => {
+                    config.set_config_value(rule, "max_parameters", 5);
+                },
+                "FunctionLocalVariableCountRule" => {
+                    config.set_config_value(rule, "max_variables", 10);
+                },
+                "IndentationConsistencyRule" => {
+                    config.set_config_value(rule, "spaces_per_indent", 4);
+                },
+                "LineLengthRule" => {
+                    config.set_config_value(rule, "max_length", 120);
+                },
+                _ => {}
+            }
+        }
     }
     
     Ok(config)
@@ -535,7 +582,7 @@ fn get_all_analysis_rules() -> Vec<&'static dyn tjlang_analyzer::AnalysisRule> {
     use tjlang_analyzer::rules::*;
     
     vec![
-        &TypeSafetyRule,
+        // Core rules
         &NullPointerRule,
         &BufferOverflowRule,
         &UnsafeOperationRule,
@@ -548,6 +595,37 @@ fn get_all_analysis_rules() -> Vec<&'static dyn tjlang_analyzer::AnalysisRule> {
         &LiteralDivisionByZeroRule,
         &UndefinedVariableRule,
         &UndefinedFunctionRule,
+        
+        // Granular module validation rules
+        &ModuleEmptyNameRule,
+        &ModuleInvalidCharactersRule,
+        &ModuleReservedNameRule,
+        
+        // Granular type checking rules
+        &VariableTypeCheckRule,
+        &FunctionTypeCheckRule,
+        &ExpressionTypeCheckRule,
+        &MemberAccessTypeCheckRule,
+        
+        // Granular naming convention rules
+        &LongIdentifierRule,
+        &SnakeCaseNamingRule,
+        &PascalCaseNamingRule,
+        &MeaningfulNameRule,
+        
+        // Granular function complexity rules
+        &CyclomaticComplexityRule,
+        &FunctionLengthLimitRule,
+        &FunctionNestingDepthRule,
+        &FunctionParameterCountRule,
+        &FunctionLocalVariableCountRule,
+        
+        // Granular formatting rules
+        &IndentationConsistencyRule,
+        &TrailingWhitespaceRule,
+        &LineLengthRule,
+        &BracketStyleRule,
+        &OperatorSpacingRule,
         &NamingConventionRule,
         &FunctionComplexityRule,
         &MagicNumberRule,
@@ -559,13 +637,6 @@ fn get_all_analysis_rules() -> Vec<&'static dyn tjlang_analyzer::AnalysisRule> {
         &TooManyImportsRule,
         &GlobalVariableRule,
         &FormattingConventionRule,
-        &IndentationRule,
-        &TrailingWhitespaceRule,
-        &LineLengthRule,
-        &CommentCoverageRule,
-        &FunctionLengthRule,
-        &NestingDepthRule,
-        &EmptyFunctionRule,
         &UnreachableCodeRule,
         &RecursionDepthRule,
         &ResourceLeakRule,
