@@ -8,6 +8,15 @@ use tjlang_ast::*;
 use tjlang_diagnostics::debug_println;
 use codespan::{FileId, Span};
 
+/// Execution result that can represent normal values or control flow
+#[derive(Debug, Clone)]
+pub enum ExecutionResult {
+    Value(Value),
+    Return(Value),
+    Break,
+    Continue,
+}
+
 /// Runtime error with location information
 #[derive(Debug, Clone)]
 pub struct RuntimeError {
@@ -823,7 +832,13 @@ impl Interpreter {
                     debug_println!("              [DEBUG] Function body: {:?}", func_decl.body);
                     // Save current environment and switch to new one
                     let old_env = std::mem::replace(&mut self.environment, new_env);
-                    let result = self.interpret_block(&func_decl.body);
+                    let result = match self.interpret_block_with_control_flow(&func_decl.body) {
+                        Ok(ExecutionResult::Value(val)) => Ok(val),
+                        Ok(ExecutionResult::Return(val)) => Ok(val),
+                        Ok(ExecutionResult::Break) => Err(self.runtime_error("Break statement outside of loop".to_string())),
+                        Ok(ExecutionResult::Continue) => Err(self.runtime_error("Continue statement outside of loop".to_string())),
+                        Err(e) => Err(e),
+                    };
                     self.environment = old_env;
                     debug_println!(
                         "              [DEBUG] Function {} completed with result: {:?}",
@@ -1020,13 +1035,13 @@ impl Interpreter {
         }
     }
 
-    /// Interpret a block
-    fn interpret_block(&mut self, block: &Block) -> Result<Value, RuntimeError> {
+    /// Interpret a block with control flow handling
+    fn interpret_block_with_control_flow(&mut self, block: &Block) -> Result<ExecutionResult, RuntimeError> {
         debug_println!(
-            "                 interpret_block: {} statements",
+            "                 interpret_block_with_control_flow: {} statements",
             block.statements.len()
         );
-        let mut result = Value::None;
+        let mut result = ExecutionResult::Value(Value::None);
         for (i, stmt) in block.statements.iter().enumerate() {
             debug_println!(
                 "                   Statement {}: {:?}",
@@ -1038,7 +1053,12 @@ impl Interpreter {
                 i,
                 stmt
             );
-            result = self.interpret_statement(stmt)?;
+            result = match self.interpret_statement_with_control_flow(stmt)? {
+                ExecutionResult::Return(val) => return Ok(ExecutionResult::Return(val)),
+                ExecutionResult::Break => return Ok(ExecutionResult::Break),
+                ExecutionResult::Continue => return Ok(ExecutionResult::Continue),
+                ExecutionResult::Value(val) => ExecutionResult::Value(val),
+            };
             debug_println!(
                 "                  [DEBUG] Statement {} result: {:?}",
                 i,
@@ -1049,30 +1069,50 @@ impl Interpreter {
         Ok(result)
     }
 
-    /// Interpret a statement
-    fn interpret_statement(&mut self, stmt: &Statement) -> Result<Value, RuntimeError> {
+    /// Interpret a block (legacy method for backward compatibility)
+    fn interpret_block(&mut self, block: &Block) -> Result<Value, RuntimeError> {
+        match self.interpret_block_with_control_flow(block)? {
+            ExecutionResult::Value(val) => Ok(val),
+            ExecutionResult::Return(val) => Ok(val),
+            ExecutionResult::Break => Err(self.runtime_error("Break statement outside of loop".to_string())),
+            ExecutionResult::Continue => Err(self.runtime_error("Continue statement outside of loop".to_string())),
+        }
+    }
+
+    /// Interpret a statement with control flow handling
+    fn interpret_statement_with_control_flow(&mut self, stmt: &Statement) -> Result<ExecutionResult, RuntimeError> {
         debug_println!(
-            "                    [DEBUG] interpret_statement: {:?}",
+            "                    [DEBUG] interpret_statement_with_control_flow: {:?}",
             std::mem::discriminant(stmt)
         );
         match stmt {
             Statement::Expression(expr) => {
                 debug_println!("                       Expression statement");
-                self.interpret_expression(expr)
+                let value = self.interpret_expression(expr)?;
+                Ok(ExecutionResult::Value(value))
             }
             Statement::Variable(var) => {
                 debug_println!("                       Variable statement: {}", var.name);
                 let value = self.interpret_expression(&var.value)?;
                 self.environment.define(var.name.clone(), value.clone());
-                Ok(value)
+                Ok(ExecutionResult::Value(value))
             }
             Statement::Return(ret_stmt) => {
                 debug_println!("                       Return statement");
-                if let Some(expr) = &ret_stmt.value {
-                    self.interpret_expression(expr)
+                let value = if let Some(expr) = &ret_stmt.value {
+                    self.interpret_expression(expr)?
                 } else {
-                    Ok(Value::None)
-                }
+                    Value::None
+                };
+                Ok(ExecutionResult::Return(value))
+            }
+            Statement::Break(_) => {
+                debug_println!("                       Break statement");
+                Ok(ExecutionResult::Break)
+            }
+            Statement::Continue(_) => {
+                debug_println!("                       Continue statement");
+                Ok(ExecutionResult::Continue)
             }
             Statement::If(if_stmt) => {
                 let condition_val = self.interpret_expression(&if_stmt.condition)?;
@@ -1089,7 +1129,7 @@ impl Interpreter {
 
                 if self.is_truthy(&condition_val) {
                     debug_println!("[DEBUG] IF: executing then_block");
-                    self.interpret_block(&if_stmt.then_block)
+                    self.interpret_block_with_control_flow(&if_stmt.then_block)
                 } else {
                     debug_println!("[DEBUG] IF: condition false, checking elif branches");
                     // Check elif branches
@@ -1105,7 +1145,7 @@ impl Interpreter {
                         if self.is_truthy(&elif_condition_val) {
                             executed = true;
                             debug_println!("[DEBUG] IF: executing elif block");
-                            return self.interpret_block(&elif_branch.block);
+                            return self.interpret_block_with_control_flow(&elif_branch.block);
                         }
                     }
 
@@ -1113,14 +1153,14 @@ impl Interpreter {
                     if !executed {
                         if let Some(else_block) = &if_stmt.else_block {
                             debug_println!("[DEBUG] IF: executing else block");
-                            self.interpret_block(else_block)
+                            self.interpret_block_with_control_flow(else_block)
                         } else {
                             debug_println!("[DEBUG] IF: no else block, returning None");
-                            Ok(Value::None)
+                            Ok(ExecutionResult::Value(Value::None))
                         }
                     } else {
                         debug_println!("[DEBUG] IF: elif executed, returning None");
-                        Ok(Value::None)
+                        Ok(ExecutionResult::Value(Value::None))
                     }
                 }
             }
@@ -1130,19 +1170,29 @@ impl Interpreter {
                     if !self.is_truthy(&condition_val) {
                         break;
                     }
-                    self.interpret_block(&while_stmt.body)?;
+                    match self.interpret_block_with_control_flow(&while_stmt.body)? {
+                        ExecutionResult::Break => break,
+                        ExecutionResult::Continue => continue,
+                        ExecutionResult::Return(val) => return Ok(ExecutionResult::Return(val)),
+                        ExecutionResult::Value(_) => {}
+                    }
                 }
-                Ok(Value::None)
+                Ok(ExecutionResult::Value(Value::None))
             }
             Statement::DoWhile(do_while_stmt) => {
                 loop {
-                    self.interpret_block(&do_while_stmt.body)?;
+                    match self.interpret_block_with_control_flow(&do_while_stmt.body)? {
+                        ExecutionResult::Break => break,
+                        ExecutionResult::Continue => continue,
+                        ExecutionResult::Return(val) => return Ok(ExecutionResult::Return(val)),
+                        ExecutionResult::Value(_) => {}
+                    }
                     let condition_val = self.interpret_expression(&do_while_stmt.condition)?;
                     if !self.is_truthy(&condition_val) {
                         break;
                     }
                 }
-                Ok(Value::None)
+                Ok(ExecutionResult::Value(Value::None))
             }
             Statement::For(for_stmt) => {
                 match for_stmt {
@@ -1194,13 +1244,18 @@ impl Interpreter {
                             );
                             for item in vec {
                                 self.environment.define(var_name.clone(), item);
-                                self.interpret_block(body)?;
+                                match self.interpret_block_with_control_flow(body)? {
+                                    ExecutionResult::Break => break,
+                                    ExecutionResult::Continue => continue,
+                                    ExecutionResult::Return(val) => return Ok(ExecutionResult::Return(val)),
+                                    ExecutionResult::Value(_) => {}
+                                }
                             }
                         } else {
-                    return Err(self.runtime_error(format!(
+                            return Err(self.runtime_error(format!(
                                 "Cannot iterate over value of type: {:?}",
                                 iter_val
-                    )));
+                            )));
                         }
                     }
                     ForStatement::CStyle {
@@ -1214,7 +1269,7 @@ impl Interpreter {
 
                         // Execute initializer if present
                         if let Some(init_stmt) = initializer {
-                            self.interpret_statement(init_stmt)?;
+                            self.interpret_statement_with_control_flow(init_stmt)?;
                         }
 
                         // Loop while condition is true (or forever if no condition)
@@ -1228,7 +1283,12 @@ impl Interpreter {
                             }
 
                             // Execute body
-                            self.interpret_block(body)?;
+                            match self.interpret_block_with_control_flow(body)? {
+                                ExecutionResult::Break => break,
+                                ExecutionResult::Continue => continue,
+                                ExecutionResult::Return(val) => return Ok(ExecutionResult::Return(val)),
+                                ExecutionResult::Value(_) => {}
+                            }
 
                             // Execute increment if present
                             if let Some(inc_expr) = increment {
@@ -1237,10 +1297,20 @@ impl Interpreter {
                         }
                     }
                 }
-                Ok(Value::None)
+                Ok(ExecutionResult::Value(Value::None))
             }
-            Statement::Block(block) => self.interpret_block(block),
-            _ => Ok(Value::None),
+            Statement::Block(block) => self.interpret_block_with_control_flow(block),
+            _ => Ok(ExecutionResult::Value(Value::None)),
+        }
+    }
+
+    /// Interpret a statement (legacy method for backward compatibility)
+    fn interpret_statement(&mut self, stmt: &Statement) -> Result<Value, RuntimeError> {
+        match self.interpret_statement_with_control_flow(stmt)? {
+            ExecutionResult::Value(val) => Ok(val),
+            ExecutionResult::Return(val) => Ok(val),
+            ExecutionResult::Break => Err(self.runtime_error("Break statement outside of loop".to_string())),
+            ExecutionResult::Continue => Err(self.runtime_error("Continue statement outside of loop".to_string())),
         }
     }
 
