@@ -4300,7 +4300,305 @@ fn check_expr_for_undefined_vars(
 }
 
 // ============================================================================
-// UNDEFINED FUNCTION RULE (A2804)
+// PARAMETER TYPE VALIDATION RULE (A2804)
+// ============================================================================
+
+/// Rule to detect parameter type mismatches at compile time
+pub struct ParameterTypeValidationRule;
+
+impl AnalysisRule for ParameterTypeValidationRule {
+    fn name(&self) -> &str { "ParameterTypeValidationRule" }
+    fn description(&self) -> &str { "Detects parameter type mismatches in function calls" }
+    fn category(&self) -> RuleCategory { RuleCategory::TypeSafety }
+    fn priority(&self) -> u32 { 10 } // High priority - prevents runtime crash
+}
+
+impl ASTRule for ParameterTypeValidationRule {
+    fn analyze(&self, context: &AnalysisContext) -> DiagnosticCollection {
+        debug_println!("[DEBUG] [PARAM_TYPE] ParameterTypeValidationRule.analyze() called");
+        let mut diagnostics = DiagnosticCollection::new();
+        
+        if let Some(ast) = &context.ast {
+            debug_println!("[DEBUG] [PARAM_TYPE] AST is present with {} units", ast.units.len());
+            
+            // Track user-defined functions and their parameter types
+            let mut user_functions: std::collections::HashMap<String, Vec<tjlang_ast::Type>> = std::collections::HashMap::new();
+            
+            // First pass: collect all user-defined functions with their parameter types
+            collect_user_function_types(&ast.units, &mut user_functions);
+            
+            // Second pass: check all function calls for type mismatches
+            check_function_call_types(&ast.units, &user_functions, &mut diagnostics, context.file_id);
+        } else {
+            debug_println!("[DEBUG] [PARAM_TYPE] No AST available");
+        }
+        
+        debug_println!("[DEBUG] [PARAM_TYPE] Returning {} diagnostics", diagnostics.count());
+        diagnostics
+    }
+}
+
+/// Collect all user-defined functions and their parameter types
+fn collect_user_function_types(
+    units: &[ProgramUnit],
+    user_functions: &mut std::collections::HashMap<String, Vec<tjlang_ast::Type>>,
+) {
+    for unit in units {
+        match unit {
+            ProgramUnit::Declaration(Declaration::Function(func)) => {
+                let param_types: Vec<tjlang_ast::Type> = func.params.iter()
+                    .map(|p| p.param_type.clone())
+                    .collect();
+                let param_count = param_types.len();
+                user_functions.insert(func.name.clone(), param_types);
+                debug_println!("[DEBUG] [PARAM_TYPE] Collected function: {} with {} parameters", 
+                    func.name, param_count);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Check function calls for parameter type mismatches
+fn check_function_call_types(
+    units: &[ProgramUnit],
+    user_functions: &std::collections::HashMap<String, Vec<tjlang_ast::Type>>,
+    diagnostics: &mut DiagnosticCollection,
+    file_id: codespan::FileId,
+) {
+    for unit in units {
+        match unit {
+            ProgramUnit::Declaration(Declaration::Function(func)) => {
+                check_function_body_types(&func.body, user_functions, diagnostics, file_id);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Check function body for parameter type mismatches
+fn check_function_body_types(
+    body: &tjlang_ast::Block,
+    user_functions: &std::collections::HashMap<String, Vec<tjlang_ast::Type>>,
+    diagnostics: &mut DiagnosticCollection,
+    file_id: codespan::FileId,
+) {
+    for statement in &body.statements {
+        check_statement_types(statement, user_functions, diagnostics, file_id);
+    }
+}
+
+/// Check statement for parameter type mismatches
+fn check_statement_types(
+    statement: &tjlang_ast::Statement,
+    user_functions: &std::collections::HashMap<String, Vec<tjlang_ast::Type>>,
+    diagnostics: &mut DiagnosticCollection,
+    file_id: codespan::FileId,
+) {
+    match statement {
+        tjlang_ast::Statement::Expression(expr) => {
+            check_expression_types(expr, user_functions, diagnostics, file_id);
+        }
+        tjlang_ast::Statement::Return(return_stmt) => {
+            if let Some(expr) = &return_stmt.value {
+                check_expression_types(expr, user_functions, diagnostics, file_id);
+            }
+        }
+        tjlang_ast::Statement::If(if_stmt) => {
+            check_expression_types(&if_stmt.condition, user_functions, diagnostics, file_id);
+            check_block_types(&if_stmt.then_block, user_functions, diagnostics, file_id);
+            if let Some(else_block) = &if_stmt.else_block {
+                check_block_types(else_block, user_functions, diagnostics, file_id);
+            }
+        }
+        tjlang_ast::Statement::While(while_stmt) => {
+            check_expression_types(&while_stmt.condition, user_functions, diagnostics, file_id);
+            check_block_types(&while_stmt.body, user_functions, diagnostics, file_id);
+        }
+        tjlang_ast::Statement::For(for_stmt) => {
+            match for_stmt {
+                tjlang_ast::ForStatement::ForEach { iterable, body, .. } => {
+                    check_expression_types(iterable, user_functions, diagnostics, file_id);
+                    check_block_types(body, user_functions, diagnostics, file_id);
+                }
+                tjlang_ast::ForStatement::CStyle { condition, body, .. } => {
+                    if let Some(cond) = condition {
+                        check_expression_types(cond, user_functions, diagnostics, file_id);
+                    }
+                    check_block_types(body, user_functions, diagnostics, file_id);
+                }
+            }
+        }
+        tjlang_ast::Statement::Block(block) => {
+            check_block_types(block, user_functions, diagnostics, file_id);
+        }
+        _ => {}
+    }
+}
+
+/// Check block for parameter type mismatches
+fn check_block_types(
+    block: &tjlang_ast::Block,
+    user_functions: &std::collections::HashMap<String, Vec<tjlang_ast::Type>>,
+    diagnostics: &mut DiagnosticCollection,
+    file_id: codespan::FileId,
+) {
+    for statement in &block.statements {
+        check_statement_types(statement, user_functions, diagnostics, file_id);
+    }
+}
+
+/// Check expression for parameter type mismatches
+fn check_expression_types(
+    expr: &tjlang_ast::Expression,
+    user_functions: &std::collections::HashMap<String, Vec<tjlang_ast::Type>>,
+    diagnostics: &mut DiagnosticCollection,
+    file_id: codespan::FileId,
+) {
+    match expr {
+        tjlang_ast::Expression::Call { callee, args, span } => {
+            // Check if this is a direct function call (Variable)
+            match callee.as_ref() {
+                tjlang_ast::Expression::Variable { name: func_name, .. } => {
+                    debug_println!("[DEBUG] [PARAM_TYPE] Checking function call: {}", func_name);
+                    
+                    // Check if it's a user-defined function
+                    if let Some(expected_param_types) = user_functions.get(func_name) {
+                        debug_println!("[DEBUG] [PARAM_TYPE] Found user function: {} (expected {} params, got {})", 
+                            func_name, expected_param_types.len(), args.len());
+                        
+                        // Validate argument count first
+                        if args.len() != expected_param_types.len() {
+                            debug_println!("[DEBUG] [PARAM_TYPE] Parameter count mismatch for function: {}", func_name);
+                            return; // Let ParameterCountRule handle this
+                        }
+                        
+                        // Check each argument type
+                        for (i, (arg, expected_type)) in args.iter().zip(expected_param_types.iter()).enumerate() {
+                            let arg_type = infer_expression_type(arg);
+                            if !is_type_compatible(&arg_type, expected_type) {
+                                debug_println!("[DEBUG] [PARAM_TYPE] Type mismatch for function '{}' parameter {}: expected {:?}, got {:?}", 
+                                    func_name, i + 1, expected_type, arg_type);
+                                
+                                let message = format!(
+                                    "Function '{}' parameter '{}' (position {}) expects type {:?}, got {:?}",
+                                    func_name, 
+                                    get_parameter_name(func_name, i, user_functions),
+                                    i + 1,
+                                    format_type(expected_type),
+                                    format_type(&arg_type)
+                                );
+                                
+                                let diag_span = tjlang_diagnostics::SourceSpan::new(file_id, span.span);
+                                
+                                let diagnostic = tjlang_diagnostics::TJLangDiagnostic::new(
+                                    ErrorCode::AnalyzerWrongArgumentType,
+                                    codespan_reporting::diagnostic::Severity::Error,
+                                    message,
+                                    diag_span,
+                                ).with_note(format!(
+                                    "Function '{}' expects parameter {} to be of type {:?}",
+                                    func_name, i + 1, format_type(expected_type)
+                                ));
+                                
+                                diagnostics.add(diagnostic);
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    // For method calls, check the arguments but don't validate the method itself
+                    for arg in args {
+                        check_expression_types(arg, user_functions, diagnostics, file_id);
+                    }
+                }
+            }
+        }
+        tjlang_ast::Expression::Member { target, .. } => {
+            check_expression_types(target, user_functions, diagnostics, file_id);
+        }
+        tjlang_ast::Expression::Index { target, index, .. } => {
+            check_expression_types(target, user_functions, diagnostics, file_id);
+            check_expression_types(index, user_functions, diagnostics, file_id);
+        }
+        tjlang_ast::Expression::VecLiteral { elements, .. } => {
+            for elem in elements {
+                check_expression_types(elem, user_functions, diagnostics, file_id);
+            }
+        }
+        tjlang_ast::Expression::If { condition, then_expr, else_expr, .. } => {
+            check_expression_types(condition, user_functions, diagnostics, file_id);
+            check_expression_types(then_expr, user_functions, diagnostics, file_id);
+            check_expression_types(else_expr, user_functions, diagnostics, file_id);
+        }
+        _ => {}
+    }
+}
+
+/// Infer the type of an expression
+fn infer_expression_type(expr: &tjlang_ast::Expression) -> tjlang_ast::Type {
+    match expr {
+        tjlang_ast::Expression::Literal(lit) => {
+            match lit {
+                tjlang_ast::Literal::Int(_) => tjlang_ast::Type::Primitive(tjlang_ast::PrimitiveType::Int),
+                tjlang_ast::Literal::Float(_) => tjlang_ast::Type::Primitive(tjlang_ast::PrimitiveType::Float),
+                tjlang_ast::Literal::String(_) => tjlang_ast::Type::Primitive(tjlang_ast::PrimitiveType::Str),
+                tjlang_ast::Literal::FString(_) => tjlang_ast::Type::Primitive(tjlang_ast::PrimitiveType::Str),
+                tjlang_ast::Literal::FStringInterpolation(_) => tjlang_ast::Type::Primitive(tjlang_ast::PrimitiveType::Str),
+                tjlang_ast::Literal::Bool(_) => tjlang_ast::Type::Primitive(tjlang_ast::PrimitiveType::Bool),
+                tjlang_ast::Literal::None => tjlang_ast::Type::Primitive(tjlang_ast::PrimitiveType::Any),
+            }
+        }
+        tjlang_ast::Expression::Variable { .. } => {
+            // For variables, we can't infer the type statically without more context
+            // This is a limitation of the current static analysis
+            tjlang_ast::Type::Primitive(tjlang_ast::PrimitiveType::Any) // Unknown type
+        }
+        tjlang_ast::Expression::Call { .. } => {
+            // For function calls, we can't infer the return type statically
+            tjlang_ast::Type::Primitive(tjlang_ast::PrimitiveType::Any) // Unknown type
+        }
+        _ => tjlang_ast::Type::Primitive(tjlang_ast::PrimitiveType::Any), // Unknown type
+    }
+}
+
+/// Check if two types are compatible
+fn is_type_compatible(arg_type: &tjlang_ast::Type, expected_type: &tjlang_ast::Type) -> bool {
+    // If we can't infer the argument type, assume it's compatible (conservative approach)
+    if matches!(arg_type, tjlang_ast::Type::Primitive(tjlang_ast::PrimitiveType::Any)) {
+        return true;
+    }
+    
+    // For now, only check exact matches
+    // TODO: Add more sophisticated type compatibility rules
+    arg_type == expected_type
+}
+
+/// Get parameter name for error messages
+fn get_parameter_name(func_name: &str, param_index: usize, user_functions: &std::collections::HashMap<String, Vec<tjlang_ast::Type>>) -> String {
+    // For now, just return a generic parameter name
+    // TODO: Store parameter names in the function signature
+    format!("param_{}", param_index + 1)
+}
+
+/// Format type for error messages
+fn format_type(ty: &tjlang_ast::Type) -> String {
+    match ty {
+        tjlang_ast::Type::Primitive(prim) => {
+            match prim {
+                tjlang_ast::PrimitiveType::Int => "int".to_string(),
+                tjlang_ast::PrimitiveType::Float => "float".to_string(),
+                tjlang_ast::PrimitiveType::Str => "str".to_string(),
+                tjlang_ast::PrimitiveType::Bool => "bool".to_string(),
+                tjlang_ast::PrimitiveType::Any => "any".to_string(),
+            }
+        }
+        _ => format!("{:?}", ty),
+    }
+}
+
+// ============================================================================
+// UNDEFINED FUNCTION RULE (A2805)
 // ============================================================================
 
 /// Rule to detect calls to undefined functions at compile time

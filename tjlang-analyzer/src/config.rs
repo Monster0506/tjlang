@@ -131,6 +131,7 @@ impl Default for RuleConfig {
             "LiteralDivisionByZeroRule", 
             "UndefinedVariableRule",
             "UndefinedFunctionRule",
+            "ParameterTypeValidationRule",
             
             // Granular module validation rules (prevent runtime errors)
             "ModuleEmptyNameRule",

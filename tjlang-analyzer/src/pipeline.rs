@@ -105,10 +105,10 @@ impl AnalysisPipeline {
             self.add_ast_rule(Box::new(ModuleInvalidCharactersRule));
         }
         if self.config.is_rule_enabled("ModuleReservedNameRule") {
-            println!("DEBUG: Adding ModuleReservedNameRule to pipeline");
+            debug_println!("DEBUG: Adding ModuleReservedNameRule to pipeline");
             self.add_ast_rule(Box::new(ModuleReservedNameRule));
         } else {
-            println!("DEBUG: ModuleReservedNameRule is disabled, not adding to pipeline");
+            debug_println!("DEBUG: ModuleReservedNameRule is disabled, not adding to pipeline");
         }
 
         // Granular type checking rules
@@ -185,6 +185,9 @@ impl AnalysisPipeline {
         }
         if self.config.is_rule_enabled("UndefinedFunctionRule") {
             self.add_ast_rule(Box::new(UndefinedFunctionRule));
+        }
+        if self.config.is_rule_enabled("ParameterTypeValidationRule") {
+            self.add_ast_rule(Box::new(ParameterTypeValidationRule));
         }
 
         // Legacy rules (only add if enabled)

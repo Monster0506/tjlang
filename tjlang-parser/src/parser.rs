@@ -2884,6 +2884,7 @@ impl PestParser {
         Ok(Parameter {
             name,
             param_type,
+            default_value: None, // Default parameters not yet supported in parser
             span: self.create_span(span),
         })
     }

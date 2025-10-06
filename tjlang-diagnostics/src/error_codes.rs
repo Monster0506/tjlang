@@ -112,6 +112,7 @@ pub enum ErrorCode {
     AnalyzerDivisionByZeroStatic,
     AnalyzerNullPointerStatic,
     AnalyzerWrongArgumentCount,
+    AnalyzerWrongArgumentType,
     AnalyzerMethodNotFoundStatic,
     AnalyzerInvalidCastStatic,
 
@@ -261,8 +262,9 @@ impl ErrorCode {
             ErrorCode::AnalyzerDivisionByZeroStatic => "A2801",
             ErrorCode::AnalyzerNullPointerStatic => "A2802",
             ErrorCode::AnalyzerWrongArgumentCount => "A2803",
-            ErrorCode::AnalyzerMethodNotFoundStatic => "A2804",
-            ErrorCode::AnalyzerInvalidCastStatic => "A2805",
+            ErrorCode::AnalyzerWrongArgumentType => "A2804",
+            ErrorCode::AnalyzerMethodNotFoundStatic => "A2805",
+            ErrorCode::AnalyzerInvalidCastStatic => "A2806",
 
             // Codegen errors
             ErrorCode::CodegenInvalidType => "C3000",
@@ -391,6 +393,7 @@ impl ErrorCode {
             | ErrorCode::AnalyzerDivisionByZeroStatic
             | ErrorCode::AnalyzerNullPointerStatic
             | ErrorCode::AnalyzerWrongArgumentCount
+            | ErrorCode::AnalyzerWrongArgumentType
             | ErrorCode::AnalyzerMethodNotFoundStatic
             | ErrorCode::AnalyzerInvalidCastStatic => "Analyzer",
 
