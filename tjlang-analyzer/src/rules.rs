@@ -353,7 +353,6 @@ impl ASTRule for MemberAccessTypeCheckRule {
     }
 }
 
-// (TypeSafetyRule removed; use granular rules instead)
 
 /// Null pointer safety analysis rule
 pub struct NullPointerRule;
