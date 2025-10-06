@@ -62,49 +62,10 @@ impl TypeChecker {
     
     /// Type check a module
     fn check_module(&mut self, module: &ModuleDecl) -> Result<(), DiagnosticCollection> {
-        // ModuleDecl only has name and span, no declarations field
-        // For now, we just validate the module name and add it to the type environment
+        // Module validation (empty/invalid/reserved) is handled by dedicated rules
+        // Respect configuration by not duplicating those checks here
 
         debug_println!("[DEBUG] [TYPE_CHECKER] Checking module: '{}'", module.name);
-
-        // Check if module name is valid (basic validation)
-        if module.name.is_empty() {
-            debug_println!("[DEBUG] [TYPE_CHECKER] Module name is empty, adding error");
-            self.add_diagnostic(
-                ErrorCode::AnalyzerInvalidModule,
-                Severity::Error,
-                "Module name cannot be empty".to_string(),
-                self.convert_span(module.span.clone())
-            );
-            return Ok(());
-        }
-
-        // Check for valid module name characters (basic validation)
-        if !module.name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == ':') {
-            debug_println!("[DEBUG] [TYPE_CHECKER] Module name has invalid characters, adding error");
-            self.add_diagnostic(
-                ErrorCode::AnalyzerInvalidModule,
-                Severity::Error,
-                format!("Invalid module name '{}': module names can only contain alphanumeric characters, underscores, and colons", module.name),
-                self.convert_span(module.span.clone())
-            );
-            return Ok(());
-        }
-
-        // Check for reserved module names using stdlib registry
-        let stdlib_modules = tjlang_stdlib::get_stdlib_module_names();
-        if stdlib_modules.contains(&module.name) {
-            debug_println!("[DEBUG] [TYPE_CHECKER] Module name '{}' is reserved, adding error", module.name);
-            self.add_diagnostic(
-                ErrorCode::AnalyzerReservedModuleName,
-                Severity::Error,
-                format!("Module name '{}' conflicts with built-in module '{}'", module.name, module.name),
-                self.convert_span(module.span.clone())
-            );
-        }
-
-        // Store module in type environment for future reference
-        // This could be used for module-level type checking in the future
         debug_println!("[DEBUG] [TYPE_CHECKER] Module declared: {}", module.name);
 
         Ok(())

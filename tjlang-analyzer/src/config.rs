@@ -124,31 +124,40 @@ impl Default for RuleConfig {
         let mut enabled_rules = HashMap::new();
         let mut rule_settings = HashMap::new();
 
-        // Enable critical rules by default
+        // Enable only lenient rules by default (runtime error prevention)
         let critical_rules = vec![
-            // Only enable rules that prevent runtime crashes
-            "LiteralIndexBoundsRule", // Prevents runtime crashes
-            "LiteralDivisionByZeroRule", // Prevents runtime crashes
-            "UndefinedVariableRule", // Prevents runtime crashes
-            "UndefinedFunctionRule", // Prevents runtime crashes
-            "TypeSafetyRule", // Type checking and module validation
+            // Critical runtime error prevention rules
+            "LiteralIndexBoundsRule",
+            "LiteralDivisionByZeroRule", 
+            "UndefinedVariableRule",
+            "UndefinedFunctionRule",
             
-            // Temporarily disabled warning rules:
-            // "UnusedVariableRule", 
-            // "DeadCodeRule",
-            // "NamingConventionRule",
-            // "FormattingConventionRule",
-            // "LineLengthRule",
-            // "MagicNumberRule",
+            // Granular module validation rules (prevent runtime errors)
+            "ModuleEmptyNameRule",
+            "ModuleInvalidCharactersRule", 
+            "ModuleReservedNameRule",
+            
+            // Granular type checking rules (prevent runtime errors)
+            "VariableTypeCheckRule",
+            "FunctionTypeCheckRule",
+            "ExpressionTypeCheckRule",
+            "MemberAccessTypeCheckRule",
         ];
 
         for rule in critical_rules {
             enabled_rules.insert(rule.to_string(), true);
+            
+            // Set appropriate severity levels (all lenient rules are critical)
+            let severity = RuleSeverity::Error;
+            
+            // Set rule-specific configurations (none needed for lenient rules)
+            let config = HashMap::new();
+            
             rule_settings.insert(
                 rule.to_string(),
                 RuleSettings {
-                    severity: RuleSeverity::Warning,
-                    config: HashMap::new(),
+                    severity,
+                    config,
                 },
             );
         }

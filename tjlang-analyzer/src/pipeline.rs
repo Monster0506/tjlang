@@ -69,73 +69,140 @@ impl AnalysisPipeline {
         pipeline
     }
 
-    /// Initialize all available rules
+    /// Initialize rules based on configuration
     fn initialize_rules(&mut self) {
-        // Critical rules (Phase 1)
-        self.add_post_ast_rule(Box::new(TypeSafetyRule));
-        self.add_post_ast_rule(Box::new(NullPointerRule));
-        self.add_post_ast_rule(Box::new(BufferOverflowRule));
-        self.add_post_ast_rule(Box::new(UnsafeOperationRule));
-        self.add_post_ast_rule(Box::new(UnusedVariableRule));
-        self.add_post_ast_rule(Box::new(DeadCodeRule));
-        self.add_post_ast_rule(Box::new(UnusedParameterRule));
-        self.add_post_ast_rule(Box::new(DuplicateNameRule));
-        // UndefinedVariableRule is registered as an AST rule (line 89)
-        self.add_post_ast_rule(Box::new(CircularDependencyRule));
+        // Only add rules that are enabled in the configuration (no umbrellas)
+        if self.config.is_rule_enabled("NullPointerRule") {
+            self.add_post_ast_rule(Box::new(NullPointerRule));
+        }
+        if self.config.is_rule_enabled("BufferOverflowRule") {
+            self.add_post_ast_rule(Box::new(BufferOverflowRule));
+        }
+        if self.config.is_rule_enabled("UnsafeOperationRule") {
+            self.add_post_ast_rule(Box::new(UnsafeOperationRule));
+        }
+        if self.config.is_rule_enabled("UnusedVariableRule") {
+            self.add_post_ast_rule(Box::new(UnusedVariableRule));
+        }
+        if self.config.is_rule_enabled("DeadCodeRule") {
+            self.add_post_ast_rule(Box::new(DeadCodeRule));
+        }
+        if self.config.is_rule_enabled("UnusedParameterRule") {
+            self.add_post_ast_rule(Box::new(UnusedParameterRule));
+        }
+        if self.config.is_rule_enabled("DuplicateNameRule") {
+            self.add_post_ast_rule(Box::new(DuplicateNameRule));
+        }
+        if self.config.is_rule_enabled("CircularDependencyRule") {
+            self.add_post_ast_rule(Box::new(CircularDependencyRule));
+        }
+
+        // Granular module validation rules
+        if self.config.is_rule_enabled("ModuleEmptyNameRule") {
+            self.add_ast_rule(Box::new(ModuleEmptyNameRule));
+        }
+        if self.config.is_rule_enabled("ModuleInvalidCharactersRule") {
+            self.add_ast_rule(Box::new(ModuleInvalidCharactersRule));
+        }
+        if self.config.is_rule_enabled("ModuleReservedNameRule") {
+            println!("DEBUG: Adding ModuleReservedNameRule to pipeline");
+            self.add_ast_rule(Box::new(ModuleReservedNameRule));
+        } else {
+            println!("DEBUG: ModuleReservedNameRule is disabled, not adding to pipeline");
+        }
+
+        // Granular type checking rules
+        if self.config.is_rule_enabled("VariableTypeCheckRule") {
+            self.add_ast_rule(Box::new(VariableTypeCheckRule));
+        }
+        if self.config.is_rule_enabled("FunctionTypeCheckRule") {
+            self.add_ast_rule(Box::new(FunctionTypeCheckRule));
+        }
+        if self.config.is_rule_enabled("ExpressionTypeCheckRule") {
+            self.add_ast_rule(Box::new(ExpressionTypeCheckRule));
+        }
+        if self.config.is_rule_enabled("MemberAccessTypeCheckRule") {
+            self.add_ast_rule(Box::new(MemberAccessTypeCheckRule));
+        }
+
+        // Granular naming convention rules
+        if self.config.is_rule_enabled("LongIdentifierRule") {
+            self.add_post_ast_rule(Box::new(LongIdentifierRule));
+        }
+        if self.config.is_rule_enabled("SnakeCaseNamingRule") {
+            self.add_post_ast_rule(Box::new(SnakeCaseNamingRule));
+        }
+        if self.config.is_rule_enabled("PascalCaseNamingRule") {
+            self.add_post_ast_rule(Box::new(PascalCaseNamingRule));
+        }
+        if self.config.is_rule_enabled("MeaningfulNameRule") {
+            self.add_post_ast_rule(Box::new(MeaningfulNameRule));
+        }
+
+        // Granular function complexity rules
+        if self.config.is_rule_enabled("CyclomaticComplexityRule") {
+            self.add_post_ast_rule(Box::new(CyclomaticComplexityRule));
+        }
+        if self.config.is_rule_enabled("FunctionLengthLimitRule") {
+            self.add_post_ast_rule(Box::new(FunctionLengthLimitRule));
+        }
+        if self.config.is_rule_enabled("FunctionNestingDepthRule") {
+            self.add_post_ast_rule(Box::new(FunctionNestingDepthRule));
+        }
+        if self.config.is_rule_enabled("FunctionParameterCountRule") {
+            self.add_post_ast_rule(Box::new(FunctionParameterCountRule));
+        }
+        if self.config.is_rule_enabled("FunctionLocalVariableCountRule") {
+            self.add_post_ast_rule(Box::new(FunctionLocalVariableCountRule));
+        }
+
+        // Granular formatting rules
+        if self.config.is_rule_enabled("IndentationConsistencyRule") {
+            self.add_pre_ast_rule(Box::new(IndentationConsistencyRule));
+        }
+        if self.config.is_rule_enabled("TrailingWhitespaceRule") {
+            self.add_pre_ast_rule(Box::new(TrailingWhitespaceRule));
+        }
+        if self.config.is_rule_enabled("LineLengthRule") {
+            self.add_pre_ast_rule(Box::new(LineLengthRule));
+        }
+        if self.config.is_rule_enabled("BracketStyleRule") {
+            self.add_pre_ast_rule(Box::new(BracketStyleRule));
+        }
+        if self.config.is_rule_enabled("OperatorSpacingRule") {
+            self.add_pre_ast_rule(Box::new(OperatorSpacingRule));
+        }
 
         // Static semantic analysis rules (prevents runtime crashes)
-        self.add_ast_rule(Box::new(LiteralIndexBoundsRule));
-        self.add_ast_rule(Box::new(LiteralDivisionByZeroRule));
-        self.add_ast_rule(Box::new(UndefinedVariableRule));
-        self.add_ast_rule(Box::new(UndefinedFunctionRule));
+        if self.config.is_rule_enabled("LiteralIndexBoundsRule") {
+            self.add_ast_rule(Box::new(LiteralIndexBoundsRule));
+        }
+        if self.config.is_rule_enabled("LiteralDivisionByZeroRule") {
+            self.add_ast_rule(Box::new(LiteralDivisionByZeroRule));
+        }
+        if self.config.is_rule_enabled("UndefinedVariableRule") {
+            self.add_ast_rule(Box::new(UndefinedVariableRule));
+        }
+        if self.config.is_rule_enabled("UndefinedFunctionRule") {
+            self.add_ast_rule(Box::new(UndefinedFunctionRule));
+        }
 
-        // High priority rules (Phase 2)
-        self.add_post_ast_rule(Box::new(NamingConventionRule));
-        self.add_post_ast_rule(Box::new(FunctionComplexityRule));
-        self.add_post_ast_rule(Box::new(MagicNumberRule));
-        self.add_post_ast_rule(Box::new(ParameterCountRule));
-        self.add_post_ast_rule(Box::new(InefficientLoopRule));
-        self.add_post_ast_rule(Box::new(MemoryAllocationRule));
-        self.add_post_ast_rule(Box::new(StringConcatenationRule));
-        self.add_pre_ast_rule(Box::new(LargeFileRule));
-        self.add_rule(Box::new(TooManyImportsRule));
-        self.add_post_ast_rule(Box::new(GlobalVariableRule));
-
-        // Medium priority rules (Phase 3)
-        self.add_pre_ast_rule(Box::new(FormattingConventionRule));
-        self.add_pre_ast_rule(Box::new(IndentationRule));
-        self.add_pre_ast_rule(Box::new(TrailingWhitespaceRule));
-        self.add_pre_ast_rule(Box::new(LineLengthRule));
-        self.add_rule(Box::new(CommentCoverageRule));
-        self.add_post_ast_rule(Box::new(FunctionLengthRule));
-        self.add_post_ast_rule(Box::new(NestingDepthRule));
-        self.add_post_ast_rule(Box::new(EmptyFunctionRule));
-
-        // Low priority rules (Phase 4)
-        self.add_post_ast_rule(Box::new(UnreachableCodeRule));
-        self.add_post_ast_rule(Box::new(RecursionDepthRule));
-        self.add_post_ast_rule(Box::new(ResourceLeakRule));
-        self.add_post_ast_rule(Box::new(AsyncAwaitRule));
-        self.add_post_ast_rule(Box::new(ErrorHandlingRule));
-        self.add_post_ast_rule(Box::new(PatternMatchingRule));
-        self.add_post_ast_rule(Box::new(GenericConstraintRule));
-        self.add_rule(Box::new(CommentStyleRule));
-        self.add_rule(Box::new(SemicolonRule));
-        self.add_rule(Box::new(BracketMatchingRule));
-        self.add_rule(Box::new(ImportOrderRule));
-
-        // Advanced rules (Phase 5)
-        self.add_post_ast_rule(Box::new(CacheEfficiencyRule));
-        self.add_post_ast_rule(Box::new(BranchPredictionRule));
-        self.add_post_ast_rule(Box::new(VectorizationRule));
-        self.add_post_ast_rule(Box::new(ConcurrencyRule));
-        self.add_post_ast_rule(Box::new(MemoryLeakRule));
-        self.add_post_ast_rule(Box::new(RaceConditionRule));
-        self.add_post_ast_rule(Box::new(InputValidationRule));
-        self.add_post_ast_rule(Box::new(HardcodedCredentialsRule));
-        self.add_post_ast_rule(Box::new(SQLInjectionRule));
-        self.add_post_ast_rule(Box::new(CouplingRule));
-        self.add_post_ast_rule(Box::new(CohesionRule));
+        // Legacy rules (only add if enabled)
+        if self.config.is_rule_enabled("NamingConventionRule") {
+            self.add_post_ast_rule(Box::new(NamingConventionRule));
+        }
+        if self.config.is_rule_enabled("FunctionComplexityRule") {
+            self.add_post_ast_rule(Box::new(FunctionComplexityRule));
+        }
+        if self.config.is_rule_enabled("MagicNumberRule") {
+            self.add_post_ast_rule(Box::new(MagicNumberRule));
+        }
+        if self.config.is_rule_enabled("ParameterCountRule") {
+            self.add_post_ast_rule(Box::new(ParameterCountRule));
+        }
+        if self.config.is_rule_enabled("FormattingConventionRule") {
+            self.add_pre_ast_rule(Box::new(FormattingConventionRule));
+        }
     }
 
     /// Add a rule to the pipeline and automatically categorize it

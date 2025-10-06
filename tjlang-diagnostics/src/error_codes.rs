@@ -51,10 +51,13 @@ pub enum ErrorCode {
     AnalyzerParameterCount,
     AnalyzerFunctionLength,
     AnalyzerNestingDepth,
+    AnalyzerLocalVariableCount,
     AnalyzerEmptyFunction,
     AnalyzerCommentCoverage,
     AnalyzerCommentStyle,
     AnalyzerImportOrder,
+    AnalyzerBracketStyle,
+    AnalyzerOperatorSpacing,
 
     // Dead Code & Usage Rules (A2200-A2299)
     AnalyzerUnusedVariable,
@@ -197,10 +200,13 @@ impl ErrorCode {
             ErrorCode::AnalyzerParameterCount => "A2103",
             ErrorCode::AnalyzerFunctionLength => "A2104",
             ErrorCode::AnalyzerNestingDepth => "A2105",
-            ErrorCode::AnalyzerEmptyFunction => "A2106",
-            ErrorCode::AnalyzerCommentCoverage => "A2107",
-            ErrorCode::AnalyzerCommentStyle => "A2108",
-            ErrorCode::AnalyzerImportOrder => "A2109",
+            ErrorCode::AnalyzerLocalVariableCount => "A2106",
+            ErrorCode::AnalyzerEmptyFunction => "A2107",
+            ErrorCode::AnalyzerCommentCoverage => "A2108",
+            ErrorCode::AnalyzerCommentStyle => "A2109",
+            ErrorCode::AnalyzerImportOrder => "A2110",
+            ErrorCode::AnalyzerBracketStyle => "A2111",
+            ErrorCode::AnalyzerOperatorSpacing => "A2112",
 
             // Dead Code & Usage Rules (A2200-A2299)
             ErrorCode::AnalyzerUnusedVariable => "A2200",
@@ -338,6 +344,7 @@ impl ErrorCode {
             | ErrorCode::AnalyzerParameterCount
             | ErrorCode::AnalyzerFunctionLength
             | ErrorCode::AnalyzerNestingDepth
+            | ErrorCode::AnalyzerLocalVariableCount
             | ErrorCode::AnalyzerEmptyFunction
             | ErrorCode::AnalyzerCommentCoverage
             | ErrorCode::AnalyzerCommentStyle
@@ -365,6 +372,8 @@ impl ErrorCode {
             | ErrorCode::AnalyzerLineLength
             | ErrorCode::AnalyzerSemicolon
             | ErrorCode::AnalyzerBracketMatching
+            | ErrorCode::AnalyzerBracketStyle
+            | ErrorCode::AnalyzerOperatorSpacing
             | ErrorCode::AnalyzerNullPointer
             | ErrorCode::AnalyzerBufferOverflow
             | ErrorCode::AnalyzerUnsafeOperation
