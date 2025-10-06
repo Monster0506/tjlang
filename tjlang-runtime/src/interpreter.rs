@@ -239,6 +239,22 @@ impl Interpreter {
             }
         }
 
+        // Third pass: call main function if it exists
+        debug_println!(" Third pass: checking for main function...");
+        if let Some(main_func) = self.functions.get("main") {
+            debug_println!(" Found main function, calling it...");
+            let main_value = Value::Function {
+                name: "main".to_string(),
+                params: main_func.params.iter().map(|p| p.name.clone()).collect(),
+                body: Expression::Literal(Literal::None), // This will be replaced with actual body handling
+                closure: HashMap::new(),
+            };
+            result = self.interpret_call(&main_value, &[])?;
+            debug_println!(" Main function result: {:?}", result);
+        } else {
+            debug_println!(" No main function found");
+        }
+
         debug_println!(" Program interpretation completed successfully");
         Ok(result)
     }
