@@ -8,6 +8,16 @@ use tjlang_ast::*;
 use tjlang_diagnostics::debug_println;
 use codespan::{FileId, Span};
 
+/// Create a dummy SourceSpan for runtime values
+fn dummy_span() -> SourceSpan {
+    let mut files = codespan::Files::new();
+    let file_id = files.add("runtime", "");
+    SourceSpan {
+        file_id,
+        span: Span::new(0, 0),
+    }
+}
+
 /// Execution result that can represent normal values or control flow
 #[derive(Debug, Clone)]
 pub enum ExecutionResult {
@@ -151,7 +161,7 @@ impl Interpreter {
                 let func_value = Value::Function {
                     name: function_name.clone(),
                     params: vec![], // Native functions handle their own parameter validation
-                    body: Expression::Literal(Literal::None), // Native functions don't have TJLang bodies
+                    body: Block { statements: vec![], span: dummy_span() }, // Native functions don't have TJLang bodies
                     closure: HashMap::new(),
                 };
                 modules
@@ -246,7 +256,7 @@ impl Interpreter {
             let main_value = Value::Function {
                 name: "main".to_string(),
                 params: main_func.params.iter().map(|p| p.name.clone()).collect(),
-                body: Expression::Literal(Literal::None), // This will be replaced with actual body handling
+                body: main_func.body.clone(), // Store actual main function body
                 closure: HashMap::new(),
             };
             result = self.interpret_call(&main_value, &[])?;
@@ -274,7 +284,7 @@ impl Interpreter {
                 let func_value = Value::Function {
                     name: func.name.clone(),
                     params: func.params.iter().map(|p| p.name.clone()).collect(),
-                    body: Expression::Literal(Literal::None), // This will be replaced with actual body handling
+                    body: func.body.clone(), // Store actual function body
                     closure: HashMap::new(),
                 };
                 self.environment.define(func.name.clone(), func_value);
@@ -780,7 +790,7 @@ impl Interpreter {
             std::mem::discriminant(callee)
         );
         match callee {
-            Value::Function { name, body, .. } => {
+            Value::Function { name, params, body, .. } => {
                 debug_println!("             Calling function: {}", name);
 
                 // Check if it's a primitive method call
@@ -817,59 +827,51 @@ impl Interpreter {
                     return Ok(result);
                 }
 
-                debug_println!("              [DEBUG] Looking up user function: {}", name);
+                // Use the function body stored in the Value::Function
                 debug_println!(
-                    "               Available functions: {:?}",
-                    self.functions.keys().collect::<Vec<_>>()
+                    "              [DEBUG] Using stored function body for: {}",
+                    name
                 );
-                // Look up the actual function declaration
-                if let Some(func_decl) = self.functions.get(name) {
-                    debug_println!(
-                        "              [DEBUG] Found function declaration for: {}",
-                        name
-                    );
-                    debug_println!("               Function params: {:?}", func_decl.params);
-                    debug_println!("               Function body: {:?}", func_decl.body);
-                    // Clone the function declaration to avoid borrow conflicts
-                    let func_decl = func_decl.clone();
+                debug_println!("               Function params: {:?}", params);
+                debug_println!("               Function body: {:?}", body);
 
-                    debug_println!(
-                        "               Creating new environment with {} params",
-                        func_decl.params.len()
-                    );
-                    // Create new environment with parameters that has access to global scope
-                    let mut new_env = Environment::with_parent(self.environment.clone());
-                    for (param, arg) in func_decl.params.iter().zip(args.iter()) {
-                        debug_println!("                 Binding param {} = {:?}", param.name, arg);
-                        new_env.define(param.name.clone(), arg.clone());
-                    }
-
-                    debug_println!("               Executing function body...");
-                    debug_println!("              [DEBUG] Function body: {:?}", func_decl.body);
-                    // Save current environment and switch to new one
-                    let old_env = std::mem::replace(&mut self.environment, new_env);
-                    let result = match self.interpret_block_with_control_flow(&func_decl.body) {
-                        Ok(ExecutionResult::Value(val)) => Ok(val),
-                        Ok(ExecutionResult::Return(val)) => Ok(val),
-                        Ok(ExecutionResult::Break) => Err(self.runtime_error("Break statement outside of loop".to_string())),
-                        Ok(ExecutionResult::Continue) => Err(self.runtime_error("Continue statement outside of loop".to_string())),
-                        Err(e) => Err(e),
-                    };
-                    self.environment = old_env;
-                    debug_println!(
-                        "              [DEBUG] Function {} completed with result: {:?}",
-                        name,
-                        result
-                    );
-                    result
-                } else {
-                    debug_println!("               Function '{}' not found", name);
-                    debug_println!(
-                        "               Available functions: {:?}",
-                        self.functions.keys().collect::<Vec<_>>()
-                    );
-                    Err(self.runtime_error(format!("Function '{}' not found", name)))
+                // Validate parameter count
+                if args.len() != params.len() {
+                    return Err(self.runtime_error(format!(
+                        "Function '{}' expects {} arguments, got {}",
+                        name, params.len(), args.len()
+                    )));
                 }
+
+                debug_println!(
+                    "               Creating new environment with {} params",
+                    params.len()
+                );
+                // Create new environment with parameters that has access to global scope
+                let mut new_env = Environment::with_parent(self.environment.clone());
+                for (param_name, arg) in params.iter().zip(args.iter()) {
+                    debug_println!("                 Binding param {} = {:?}", param_name, arg);
+                    new_env.define(param_name.clone(), arg.clone());
+                }
+
+                debug_println!("               Executing function body...");
+                debug_println!("              [DEBUG] Function body: {:?}", body);
+                // Save current environment and switch to new one
+                let old_env = std::mem::replace(&mut self.environment, new_env);
+                let result = match self.interpret_block_with_control_flow(body) {
+                    Ok(ExecutionResult::Value(val)) => Ok(val),
+                    Ok(ExecutionResult::Return(val)) => Ok(val),
+                    Ok(ExecutionResult::Break) => Err(self.runtime_error("Break statement outside of loop".to_string())),
+                    Ok(ExecutionResult::Continue) => Err(self.runtime_error("Continue statement outside of loop".to_string())),
+                    Err(e) => Err(e),
+                };
+                self.environment = old_env;
+                debug_println!(
+                    "              [DEBUG] Function {} completed with result: {:?}",
+                    name,
+                    result
+                );
+                result
             }
             Value::Closure { params, body, .. } => {
                 debug_println!("             Calling closure with {} params", params.len());

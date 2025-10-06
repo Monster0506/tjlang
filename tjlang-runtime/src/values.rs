@@ -6,7 +6,7 @@ use codespan::{Files, Span};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
-use tjlang_ast::{Expression, PrimitiveType, SourceSpan, Type};
+use tjlang_ast::{Block, Expression, PrimitiveType, SourceSpan, Type};
 
 /// Create a dummy SourceSpan for runtime values
 fn dummy_span() -> SourceSpan {
@@ -51,7 +51,7 @@ pub enum Value {
     Function {
         name: String,
         params: Vec<String>,
-        body: Expression,
+        body: Block,
         closure: HashMap<String, Value>,
     },
     Closure {
